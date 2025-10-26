@@ -1056,8 +1056,8 @@ public class MainActivity extends AppCompatActivity {
         container.addView(title);
         MaterialButton pick = new MaterialButton(this);
         pick.setText("Choose cover");
-        int primary = resolveThemeColor(com.google.android.material.R.attr.colorPrimary);
-        int onPrimary = resolveThemeColor(com.google.android.material.R.attr.colorOnPrimary);
+        int primary = resolveThemeColor(android.R.attr.colorPrimary);
+        int onPrimary = resolveThemeColor(android.R.attr.textColorPrimary);
         pick.setBackgroundTintList(ColorStateList.valueOf(primary));
         pick.setTextColor(onPrimary);
         container.addView(pick);
@@ -1080,8 +1080,8 @@ public class MainActivity extends AppCompatActivity {
         if (existing != null) {
             MaterialButton remove = new MaterialButton(this);
             remove.setText("Remove chosen cover");
-            int surfaceVariant = resolveThemeColor(com.google.android.material.R.attr.colorSurfaceVariant);
-            int onSurface = resolveThemeColor(com.google.android.material.R.attr.colorOnSurface);
+            int surfaceVariant = resolveThemeColor(android.R.attr.colorBackground);
+            int onSurface = resolveThemeColor(android.R.attr.textColorPrimary);
             remove.setBackgroundTintList(ColorStateList.valueOf(surfaceVariant));
             remove.setTextColor(onSurface);
             container.addView(remove);
@@ -1530,10 +1530,10 @@ public class MainActivity extends AppCompatActivity {
         if (drawerFastForwardButton == null) {
             return;
         }
-        int surfaceVariant = resolveThemeColor(com.google.android.material.R.attr.colorSurfaceVariant);
-        int onSurface = resolveThemeColor(com.google.android.material.R.attr.colorOnSurface);
-        int primary = resolveThemeColor(com.google.android.material.R.attr.colorPrimary);
-        int onPrimary = resolveThemeColor(com.google.android.material.R.attr.colorOnPrimary);
+        int surfaceVariant = resolveThemeColor(android.R.attr.colorBackground);
+        int onSurface = resolveThemeColor(android.R.attr.textColorPrimary);
+        int primary = resolveThemeColor(android.R.attr.colorPrimary);
+        int onPrimary = resolveThemeColor(android.R.attr.textColorPrimary);
 
         if (isFastForwardEnabled) {
             drawerFastForwardButton.setBackgroundTintList(ColorStateList.valueOf(primary));

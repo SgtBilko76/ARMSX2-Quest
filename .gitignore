@@ -18,6 +18,7 @@ app/libs/discord_partner_sdk.aar
 app/src/main/assets/discord_creds.env
 .project
 .settings/
+.idea/
 app/src/main/cpp/3rdparty/rcheevos/.build
 app/src/main/cpp/3rdparty/discord_social_sdk/cdiscord.h
 app/src/main/cpp/3rdparty/discord_social_sdk/discordpp.h
