@@ -45,14 +45,14 @@ def discordCallbackScheme = discordSchemeFromEnv ? discordSchemeFromEnv : (disco
 
 android {
     namespace 'kr.co.iefriends.pcsx2'
-    compileSdk 34
-    ndkVersion '27.0.12077973'
+    compileSdk 36
+    ndkVersion '29.0.14206865'
 
 
     defaultConfig {
     applicationId "come.nanodata.armsx2"
         minSdk 26
-        targetSdk 35
+        targetSdk 36
         versionCode 11
         versionName "1.0 REL"
 
@@ -117,8 +117,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
     }
     externalNativeBuild {
         cmake {
@@ -130,7 +130,9 @@ android {
         jniLibs {
             useLegacyPackaging = true
         }
-        exclude 'META-INF/DEPENDENCIES'
+        resources {
+            excludes += ['META-INF/DEPENDENCIES']
+        }
     }
 
     buildFeatures {
@@ -166,10 +168,10 @@ if (enableRN) {
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.1'
-    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'com.google.android.material:material:1.13.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
     implementation 'com.caverock:androidsvg:1.4'
-    implementation 'androidx.browser:browser:1.8.0'
+    implementation 'androidx.browser:browser:1.9.0'
     if (enableRN) {
         // React Native core and Hermes engine (brownfield integration)
         implementation 'com.facebook.react:react-android:0.74.3'
