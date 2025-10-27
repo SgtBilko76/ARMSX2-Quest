@@ -453,11 +453,13 @@ public class MainActivity extends AppCompatActivity {
             View img = header.findViewById(R.id.header_image);
             View imgBlur = header.findViewById(R.id.header_image_blur);
             android.graphics.Bitmap bmp = loadHeaderBitmapFromAssets();
+            android.graphics.Bitmap blurBmp = loadHeaderBlurBitmapFromAssets();
             if (img instanceof android.widget.ImageView && bmp != null) {
                 ((android.widget.ImageView) img).setImageBitmap(bmp);
             }
-            if (imgBlur instanceof android.widget.ImageView && bmp != null) {
-                ((android.widget.ImageView) imgBlur).setImageBitmap(bmp);
+            android.graphics.Bitmap useForBlur = blurBmp != null ? blurBmp : bmp;
+            if (imgBlur instanceof android.widget.ImageView && useForBlur != null) {
+                ((android.widget.ImageView) imgBlur).setImageBitmap(useForBlur);
                 if (android.os.Build.VERSION.SDK_INT >= 31) {
                     try {
                         imgBlur.setRenderEffect(android.graphics.RenderEffect.createBlurEffect(18f, 18f, android.graphics.Shader.TileMode.CLAMP));
@@ -4552,6 +4554,21 @@ public class MainActivity extends AppCompatActivity {
             try (java.io.InputStream is2 = getAssets().open("app_icons/icon.png")) {
                 return android.graphics.BitmapFactory.decodeStream(is2);
             } catch (Exception ignored2) { return null; }
+        }
+    }
+
+
+    private android.graphics.Bitmap loadHeaderBlurBitmapFromAssets() {
+        try (java.io.InputStream is = getAssets().open("app_icons/icon-old.png")) {
+            return android.graphics.BitmapFactory.decodeStream(is);
+        } catch (Exception ignored) {
+            try (java.io.InputStream is2 = getAssets().open("app_icons/icon.png")) {
+                return android.graphics.BitmapFactory.decodeStream(is2);
+            } catch (Exception ignored2) {
+                try (java.io.InputStream is3 = getAssets().open("icon.png")) {
+                    return android.graphics.BitmapFactory.decodeStream(is3);
+                } catch (Exception ignored3) { return null; }
+            }
         }
     }
 
