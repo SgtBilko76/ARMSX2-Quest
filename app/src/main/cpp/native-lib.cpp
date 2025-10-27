@@ -1168,6 +1168,13 @@ Java_kr_co_iefriends_pcsx2_NativeApp_refreshBIOS(JNIEnv* env, jclass clazz)
     // No-op placeholder for now; implement BIOS refresh if needed later.
 }
 
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_hasValidVm(JNIEnv*, jclass)
+{
+    return VMManager::HasValidVM() ? JNI_TRUE : JNI_FALSE;
+}
+
 
 extern "C"
 JNIEXPORT jboolean JNICALL

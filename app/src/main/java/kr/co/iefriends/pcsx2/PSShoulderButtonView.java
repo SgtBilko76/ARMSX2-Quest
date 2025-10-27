@@ -10,6 +10,7 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import androidx.annotation.DrawableRes;
+import androidx.annotation.Nullable;
 import androidx.appcompat.content.res.AppCompatResources;
 
 public class PSShoulderButtonView extends View {
@@ -159,6 +160,16 @@ public class PSShoulderButtonView extends View {
                 iconDrawable = iconDrawable.mutate();
                 updateIconBounds();
             }
+        }
+        invalidate();
+    }
+
+    public void setIconDrawable(@Nullable Drawable drawable) {
+        if (drawable == null) {
+            iconDrawable = null;
+        } else {
+            iconDrawable = drawable.mutate();
+            updateIconBounds();
         }
         invalidate();
     }

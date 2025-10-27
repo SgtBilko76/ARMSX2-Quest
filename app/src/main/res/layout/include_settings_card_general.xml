@@ -135,7 +135,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:value="100"
-                android:valueFrom="20"
+                android:valueFrom="0"
                 android:valueTo="200"
                 android:stepSize="1"
                 app:haloRadius="16dp"

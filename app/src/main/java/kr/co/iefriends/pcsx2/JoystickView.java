@@ -29,6 +29,10 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 
+import android.graphics.drawable.Drawable;
+
+import androidx.annotation.Nullable;
+
 public class JoystickView extends View {
     
     private Paint basePaint;
@@ -43,6 +47,9 @@ public class JoystickView extends View {
     
     private float analogX = 0.0f;
     private float analogY = 0.0f;
+    private Drawable baseDrawable;
+    private Drawable knobDrawable;
+    private float knobScaleFactor = 1.0f;
     
     public interface OnJoystickMoveListener {
         void onJoystickMove(float x, float y);
@@ -81,6 +88,35 @@ public class JoystickView extends View {
         
         knobPosition = new PointF();
     }
+
+    public void setDrawables(@Nullable Drawable base, @Nullable Drawable knob) {
+        this.baseDrawable = base != null ? base.mutate() : null;
+        this.knobDrawable = knob != null ? knob.mutate() : null;
+        updateDrawableBounds();
+        invalidate();
+    }
+
+    public void setKnobScaleFactor(float factor) {
+        float clamped = Math.max(0.1f, Math.min(3.0f, factor));
+        if (Math.abs(knobScaleFactor - clamped) < 0.001f) {
+            return;
+        }
+        knobScaleFactor = clamped;
+        updateDrawableBounds();
+        invalidate();
+    }
+
+    private void updateDrawableBounds() {
+        if (baseDrawable != null) {
+            baseDrawable.setBounds(0, 0, getWidth(), getHeight());
+        }
+        if (knobDrawable != null) {
+            int knobSize = Math.round(knobRadius * knobScaleFactor * 2f);
+            int left = Math.round(knobPosition.x - knobSize / 2f);
+            int top = Math.round(knobPosition.y - knobSize / 2f);
+            knobDrawable.setBounds(left, top, left + knobSize, top + knobSize);
+        }
+    }
     
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
@@ -92,17 +128,30 @@ public class JoystickView extends View {
         knobRadius = baseRadius * 0.3f;
         
         knobPosition.set(centerX, centerY);
+        updateDrawableBounds();
     }
     
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        
-        canvas.drawCircle(centerX, centerY, baseRadius, basePaint);
-        canvas.drawCircle(centerX, centerY, baseRadius, strokePaint);
-        
-        canvas.drawCircle(knobPosition.x, knobPosition.y, knobRadius, knobPaint);
-        canvas.drawCircle(knobPosition.x, knobPosition.y, knobRadius, strokePaint);
+        if (baseDrawable != null) {
+            baseDrawable.draw(canvas);
+        } else {
+            canvas.drawCircle(centerX, centerY, baseRadius, basePaint);
+            canvas.drawCircle(centerX, centerY, baseRadius, strokePaint);
+        }
+
+        if (knobDrawable != null) {
+            int knobSize = Math.round(knobRadius * knobScaleFactor * 2f);
+            int left = Math.round(knobPosition.x - knobSize / 2f);
+            int top = Math.round(knobPosition.y - knobSize / 2f);
+            knobDrawable.setBounds(left, top, left + knobSize, top + knobSize);
+            knobDrawable.draw(canvas);
+        } else {
+            float drawRadius = knobRadius * knobScaleFactor;
+            canvas.drawCircle(knobPosition.x, knobPosition.y, drawRadius, knobPaint);
+            canvas.drawCircle(knobPosition.x, knobPosition.y, drawRadius, strokePaint);
+        }
     }
     
     @Override
@@ -137,6 +186,7 @@ public class JoystickView extends View {
                     if (listener != null) {
                         listener.onJoystickMove(analogX, analogY);
                     }
+                    updateDrawableBounds();
                     invalidate();
                     return true;
                 }
@@ -150,12 +200,17 @@ public class JoystickView extends View {
         float dx = x - centerX;
         float dy = y - centerY;
         float distance = (float) Math.sqrt(dx * dx + dy * dy);
-        
-        float maxDistance = baseRadius - knobRadius;
+        float knobVisualRadius = knobRadius * knobScaleFactor;
+        float maxDistance = Math.max(0f, baseRadius - knobVisualRadius);
         if (distance <= maxDistance) {
             knobPosition.set(x, y);
-            analogX = dx / maxDistance;
-            analogY = dy / maxDistance;
+            if (maxDistance > 0f) {
+                analogX = dx / maxDistance;
+                analogY = dy / maxDistance;
+            } else {
+                analogX = 0f;
+                analogY = 0f;
+            }
         } else {
             float angle = (float) Math.atan2(dy, dx);
             knobPosition.x = centerX + (float) Math.cos(angle) * maxDistance;
@@ -167,7 +222,7 @@ public class JoystickView extends View {
         if (listener != null) {
             listener.onJoystickMove(analogX, analogY);
         }
-        
+        updateDrawableBounds();
         invalidate();
     }
     

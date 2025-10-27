@@ -41,9 +41,11 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.util.TypedValue;
+import android.os.SystemClock;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.DrawableRes;
 import androidx.annotation.IdRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.StringRes;
@@ -53,6 +55,8 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.graphics.Insets;
 
 import kr.co.iefriends.pcsx2.util.DebugLog;
 import kr.co.iefriends.pcsx2.util.DeviceProfiles;
@@ -68,6 +72,7 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
+import com.google.android.material.slider.Slider;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
@@ -152,9 +157,21 @@ public class MainActivity extends AppCompatActivity {
     private AlertDialog dataDirProgressDialog;
     private static final String PREFS = "armsx2";
     private static final String PREF_GAMES_URI = "games_folder_uri";
+    private static final String PREF_ONBOARDING_COMPLETE = "onboarding_complete";
+    private static final String PREF_ONSCREEN_UI_STYLE = "on_screen_ui_style";
+    private static final String PREF_UI_SCALE_MULTIPLIER = "onscreen_ui_scale_multiplier";
+    private static final String STYLE_DEFAULT = "default";
+    private static final String STYLE_NETHER = "nether";
+    private static final float ONSCREEN_UI_SCALE_MIN = 0.2f;
+    private static final float ONSCREEN_UI_SCALE_MAX = 4.0f;
     // Preflight
     private Uri pendingGameUri = null;
     private int pendingLaunchRetries = 0;
+    private boolean onboardingLaunched = false;
+    private boolean postOnboardingChecksRun = false;
+    private String currentOnScreenUiStyle = STYLE_DEFAULT;
+    private float onScreenUiScaleMultiplier = 1.0f;
+    private float faceButtonsBaseScale = 1.0f;
 
     // Auto-hide state
     private enum InputSource { TOUCH, CONTROLLER }
@@ -244,6 +261,7 @@ public class MainActivity extends AppCompatActivity {
         DiscordBridge.updateEngineActivity(this);
         sInstanceRef = new WeakReference<>(this);
         setContentView(R.layout.activity_main);
+        setupSafeAreaHandling();
         disableTouchControls = DeviceProfiles.isTvOrDesktop(this);
 	// Keep screen awake during gameplay
 	getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -278,14 +296,15 @@ public class MainActivity extends AppCompatActivity {
     // Load on-screen controls hide timeout
     loadHideTimeoutFromPrefs();
 
+    loadOnScreenUiScalePreference();
+    currentOnScreenUiStyle = resolveOnScreenUiStylePreference();
         if (!disableTouchControls) {
             makeButtonTouch();
         }
 
     setSurfaceView(new SDLSurface(this));
 
-        // Ensure BIOS exists or prompt user to choose one
-        ensureBiosPresent();
+        maybeStartOnboardingFlow();
 
     // Cache on-screen pad containers
     llPadSelectStart = findViewById(R.id.ll_pad_select_start);
@@ -487,8 +506,6 @@ public class MainActivity extends AppCompatActivity {
             bootBios();
         }
     } catch (Throwable ignored) {}
-
-    maybeShowDataDirectoryPrompt();
     }
     private void toggleSearchBar() {
         if (etSearch == null) return;
@@ -1132,6 +1149,10 @@ public class MainActivity extends AppCompatActivity {
             }
             return false;
         });
+        View inGameRootView = findViewById(R.id.in_game_root);
+        if (inGameRootView != null) {
+            ViewCompat.requestApplyInsets(inGameRootView);
+        }
     }
 
     public void onSurfaceReady() {
@@ -1445,6 +1466,26 @@ public class MainActivity extends AppCompatActivity {
         setupDrawerSpinners();
         setupControllerModeSpinner();
         setupDrawerSwitches();
+        Slider uiScaleSlider = findViewById(R.id.drawer_slider_ui_scale);
+        TextView uiScaleValue = findViewById(R.id.drawer_ui_scale_value);
+        if (uiScaleSlider != null) {
+            uiScaleSlider.setValue(onScreenUiScaleMultiplier);
+            updateOnScreenUiScaleLabel(uiScaleValue);
+            uiScaleSlider.addOnChangeListener((slider, value, fromUser) -> {
+                float clamped = Math.max(ONSCREEN_UI_SCALE_MIN, Math.min(ONSCREEN_UI_SCALE_MAX, value));
+                if (Math.abs(clamped - value) > 0.001f) {
+                    slider.setValue(clamped);
+                }
+                if (Math.abs(onScreenUiScaleMultiplier - clamped) > 0.001f) {
+                    onScreenUiScaleMultiplier = clamped;
+                    saveOnScreenUiScalePreference(clamped);
+                    updateOnScreenUiScaleLabel(uiScaleValue);
+                    applyUserUiScale();
+                }
+            });
+        } else {
+            updateOnScreenUiScaleLabel(uiScaleValue);
+        }
         updatePauseButtonIcon();
     }
 
@@ -1920,6 +1961,7 @@ public class MainActivity extends AppCompatActivity {
                     faceParams.bottomMargin = dpToPx(1); 
                     llPadRight.setLayoutParams(faceParams);
                 }
+                faceButtonsBaseScale = 1.0f;
                 break;
                 
             case 1: // 1 Stick + Face Buttons 
@@ -1946,6 +1988,7 @@ public class MainActivity extends AppCompatActivity {
                     faceParams1.bottomMargin = dpToPx(6) + dpToPx(11); 
                     llPadRight.setLayoutParams(faceParams1);
                 }
+                faceButtonsBaseScale = 1.4f;
                 break;
                 
             case 2: // D-Pad Only 
@@ -1972,8 +2015,13 @@ public class MainActivity extends AppCompatActivity {
                     faceParams2.bottomMargin = dpToPx(6) + dpToPx(11); 
                     llPadRight.setLayoutParams(faceParams2);
                 }
+                faceButtonsBaseScale = 1.4f;
                 break;
         }
+        applyJoystickStyle(joystickLeft);
+        applyJoystickStyle(joystickRight);
+        applyDpadStyle(dpadView);
+        applyUserUiScale();
     }
 
     private void setupDrawerSwitches() {
@@ -2110,22 +2158,23 @@ public class MainActivity extends AppCompatActivity {
         .setTitle("Game State")
                 .setItems(items, (dialog, which) -> {
                     if (which == 0) {
+                        pauseVmForStateOperation();
                         boolean ok = NativeApp.saveStateToSlot(1);
                         try {
                             Toast.makeText(this, ok ? "State saved" : "Failed to save state", Toast.LENGTH_SHORT).show();
                         } catch (Throwable ignored) {}
-                        NativeApp.resume();
-                        isVmPaused = false;
-                        updatePauseButtonIcon();
+                        resumeVmAfterStateOperation();
                     } else if (which == 1) {
+                        pauseVmForStateOperation();
                         boolean ok = NativeApp.loadStateFromSlot(1);
                         try {
                             Toast.makeText(this, ok ? "State loaded" : "Failed to load state", Toast.LENGTH_SHORT).show();
                         } catch (Throwable ignored) {}
-                        if (ok) {
-                            isVmPaused = false;
-                            updatePauseButtonIcon();
+                        if (!ok) {
+                            resumeVmAfterStateOperation();
+                            return;
                         }
+                        resumeVmAfterStateOperation();
                     }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
@@ -2137,13 +2186,20 @@ public class MainActivity extends AppCompatActivity {
         try {
             versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception ignored) {}
-        String message = "ARMSX2 (" + versionName + ")\n" +
-                "by MoonPower\n\n" +
-                "Thanks to:\n" +
-                "- pontos2024 (emulator base)\n" +
-                "- PCSX2 v2.3.430 (core emulator)\n" +
-                "- SDL (SDL3)\n" +
-                "- Fffathur (icon design)";
+    String message = "ARMSX2 (" + versionName + ")\n" +
+        "by ARMSX2 team\n\n" +
+        "Core contributors:\n" +
+        "- MoonPower — App developer\n" +
+        "- jpolo — Management\n" +
+        "- Medieval Shell — Web developer\n" +
+        "- set l — Web developer\n" +
+        "- Alex — QA tester\n" +
+        "- Yua — QA tester\n\n" +
+        "Thanks to:\n" +
+        "- pontos2024 (emulator base)\n" +
+        "- PCSX2 v2.3.430 (core emulator)\n" +
+        "- SDL (SDL3)\n" +
+        "- Fffathur (icon design)";
     new MaterialAlertDialogBuilder(this)
         .setTitle("About")
         .setMessage(message)
@@ -2151,23 +2207,219 @@ public class MainActivity extends AppCompatActivity {
         .show();
     }
 
+    private String resolveOnScreenUiStylePreference() {
+        String value = getSharedPreferences(PREFS, MODE_PRIVATE).getString(PREF_ONSCREEN_UI_STYLE, STYLE_DEFAULT);
+        if (STYLE_NETHER.equalsIgnoreCase(value)) {
+            return STYLE_NETHER;
+        }
+        return STYLE_DEFAULT;
+    }
+
+    private void refreshOnScreenUiStyleIfNeeded() {
+        String pref = resolveOnScreenUiStylePreference();
+        if (!pref.equals(currentOnScreenUiStyle)) {
+            currentOnScreenUiStyle = pref;
+            makeButtonTouch();
+        }
+    }
+
+    private Drawable loadNetherDrawable(String assetName) {
+        try (InputStream is = getAssets().open("app_icons/controller_icons_nether/" + assetName)) {
+            Drawable drawable = Drawable.createFromStream(is, assetName);
+            if (drawable != null) {
+                drawable = drawable.mutate();
+            }
+            return drawable;
+        } catch (IOException e) {
+            try { DebugLog.e("OnScreenUI", "Failed to load Nether icon " + assetName + ": " + e.getMessage()); } catch (Throwable ignored) {}
+            return null;
+        }
+    }
+
+    private void applyButtonIcon(PSButtonView view, @DrawableRes int defaultResId, String netherAssetName) {
+        if (view == null) {
+            return;
+        }
+        if (STYLE_NETHER.equals(currentOnScreenUiStyle)) {
+            Drawable drawable = loadNetherDrawable(netherAssetName);
+            if (drawable != null) {
+                view.setIconDrawable(drawable);
+                return;
+            }
+        }
+        view.setIconResource(defaultResId);
+    }
+
+    private void applyShoulderIcon(PSShoulderButtonView view, @DrawableRes int defaultResId, String netherAssetName) {
+        if (view == null) {
+            return;
+        }
+        if (STYLE_NETHER.equals(currentOnScreenUiStyle)) {
+            Drawable drawable = loadNetherDrawable(netherAssetName);
+            if (drawable != null) {
+                view.setIconDrawable(drawable);
+                return;
+            }
+        }
+        view.setIconResource(defaultResId);
+    }
+
+    private void applyJoystickStyle(JoystickView joystick) {
+        if (joystick == null) {
+            return;
+        }
+        if (STYLE_NETHER.equals(currentOnScreenUiStyle)) {
+            Drawable base = loadNetherDrawable("ic_controller_analog_base.png");
+            Drawable knob = loadNetherDrawable("ic_controller_analog_stick.png");
+            if (base != null && knob != null) {
+                joystick.setDrawables(base, knob);
+                joystick.setKnobScaleFactor(1.2f);
+                return;
+            }
+        }
+        joystick.setDrawables(null, null);
+        joystick.setKnobScaleFactor(1.0f);
+    }
+
+    private void applyDpadStyle(DPadView dpadView) {
+        if (dpadView == null) {
+            return;
+        }
+        if (STYLE_NETHER.equals(currentOnScreenUiStyle)) {
+            Drawable up = loadNetherDrawable("ic_controller_up_button.png");
+            Drawable down = loadNetherDrawable("ic_controller_down_button.png");
+            Drawable left = loadNetherDrawable("ic_controller_left_button.png");
+            Drawable right = loadNetherDrawable("ic_controller_right_button.png");
+            dpadView.setDrawables(null, null);
+            dpadView.setDirectionalDrawables(up, down, left, right);
+        } else {
+            dpadView.setDrawables(null, null);
+            dpadView.setDirectionalDrawables(null, null, null, null);
+        }
+    }
+
+    private void loadOnScreenUiScalePreference() {
+        float value = 1.0f;
+        try {
+            value = getSharedPreferences(PREFS, MODE_PRIVATE).getFloat(PREF_UI_SCALE_MULTIPLIER, 1.0f);
+        } catch (Exception ignored) {}
+        if (value < ONSCREEN_UI_SCALE_MIN) value = ONSCREEN_UI_SCALE_MIN;
+        if (value > ONSCREEN_UI_SCALE_MAX) value = ONSCREEN_UI_SCALE_MAX;
+        onScreenUiScaleMultiplier = value;
+    }
+
+    private void saveOnScreenUiScalePreference(float value) {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putFloat(PREF_UI_SCALE_MULTIPLIER, value).apply();
+    }
+
+    private void applyUserUiScale() {
+        float multiplier = Math.max(ONSCREEN_UI_SCALE_MIN, Math.min(ONSCREEN_UI_SCALE_MAX, onScreenUiScaleMultiplier));
+        onScreenUiScaleMultiplier = multiplier;
+        applyScaleWithPivot(llPadSelectStart, multiplier, multiplier, 0.5f, 1f);
+        View padRight = llPadRight != null ? llPadRight : findViewById(R.id.ll_pad_right);
+        float faceScale = faceButtonsBaseScale * multiplier;
+        applyScaleWithPivot(padRight, faceScale, faceScale, 1f, 1f);
+        View leftShoulders = findViewById(R.id.ll_pad_shoulders_left);
+        applyScaleWithPivot(leftShoulders, multiplier, multiplier, 0f, 0f);
+        View rightShoulders = findViewById(R.id.ll_pad_shoulders_right);
+        applyScaleWithPivot(rightShoulders, multiplier, multiplier, 1f, 0f);
+        JoystickView joystickLeft = findViewById(R.id.joystick_left);
+        applyScaleWithPivot(joystickLeft, multiplier, multiplier, 0f, 1f);
+        JoystickView joystickRight = findViewById(R.id.joystick_right);
+        applyScaleWithPivot(joystickRight, multiplier, multiplier, 1f, 1f);
+        DPadView dpadView = findViewById(R.id.dpad_view);
+        applyScaleWithPivot(dpadView, multiplier, multiplier, 0f, 1f);
+    }
+
+    private void applyScaleWithPivot(View view, float scaleX, float scaleY, float pivotXF, float pivotYF) {
+        if (view == null) {
+            return;
+        }
+        Runnable apply = () -> {
+            float pivotX = view.getWidth() * pivotXF;
+            float pivotY = view.getHeight() * pivotYF;
+            view.setPivotX(pivotX);
+            view.setPivotY(pivotY);
+            view.setScaleX(scaleX);
+            view.setScaleY(scaleY);
+        };
+        if (view.getWidth() == 0 || view.getHeight() == 0) {
+            view.post(apply);
+        } else {
+            apply.run();
+        }
+    }
+
+    private void pauseVmForStateOperation() {
+        try {
+            NativeApp.pause();
+            SystemClock.sleep(50);
+            NativeApp.resetKeyStatus();
+        } catch (Throwable ignored) {}
+    }
+
+    private void resumeVmAfterStateOperation() {
+        try {
+            SystemClock.sleep(30);
+            NativeApp.resume();
+            isVmPaused = false;
+            updatePauseButtonIcon();
+        } catch (Throwable ignored) {}
+    }
+
+    private void updateOnScreenUiScaleLabel(TextView label) {
+        if (label != null) {
+            label.setText(getString(R.string.drawer_ui_scale_value, onScreenUiScaleMultiplier));
+        }
+    }
+
+    private void refreshOnScreenUiScaleIfNeeded() {
+        float stored = 1.0f;
+        try {
+            stored = getSharedPreferences(PREFS, MODE_PRIVATE).getFloat(PREF_UI_SCALE_MULTIPLIER, 1.0f);
+        } catch (Exception ignored) {}
+        if (stored < ONSCREEN_UI_SCALE_MIN) stored = ONSCREEN_UI_SCALE_MIN;
+        if (stored > ONSCREEN_UI_SCALE_MAX) stored = ONSCREEN_UI_SCALE_MAX;
+        if (Math.abs(stored - onScreenUiScaleMultiplier) > 0.001f) {
+            onScreenUiScaleMultiplier = stored;
+            applyUserUiScale();
+            Slider slider = findViewById(R.id.drawer_slider_ui_scale);
+            if (slider != null && Math.abs(slider.getValue() - stored) > 0.001f) {
+                slider.setValue(stored);
+            }
+            TextView label = findViewById(R.id.drawer_ui_scale_value);
+            updateOnScreenUiScaleLabel(label);
+        }
+    }
+
     private void makeButtonTouch() {
+        boolean isNether = STYLE_NETHER.equals(currentOnScreenUiStyle);
         PSButtonView btn_pad_select = findViewById(R.id.btn_pad_select);
         if (btn_pad_select != null) {
-            btn_pad_select.setIconResource(R.drawable.playstation3_button_select);
+            applyButtonIcon(btn_pad_select, R.drawable.playstation3_button_select, "ic_controller_select_button.png");
             btn_pad_select.setRectangular(true);
+            float selectScale = isNether ? 0.75f : 1.0f;
+            btn_pad_select.setScaleX(selectScale);
+            btn_pad_select.setScaleY(selectScale);
             btn_pad_select.setOnPSButtonListener(pressed -> NativeApp.setPadButton(KeyEvent.KEYCODE_BUTTON_SELECT, 0, pressed));
         }
 
         PSButtonView btn_pad_start = findViewById(R.id.btn_pad_start);
         if (btn_pad_start != null) {
-            btn_pad_start.setIconResource(R.drawable.playstation3_button_start);
+            applyButtonIcon(btn_pad_start, R.drawable.playstation3_button_start, "ic_controller_start_button.png");
+            float selectScale = isNether ? 0.75f : 1.0f;
+            btn_pad_start.setScaleX(selectScale);
+            btn_pad_start.setScaleY(selectScale);
             btn_pad_start.setOnPSButtonListener(pressed -> NativeApp.setPadButton(KeyEvent.KEYCODE_BUTTON_START, 0, pressed));
         }
 
+        float faceScale = isNether ? 0.9f : 1.0f;
+
         PSButtonView btn_pad_a = findViewById(R.id.btn_pad_a);
         if (btn_pad_a != null) {
-            btn_pad_a.setIconResource(R.drawable.playstation_button_color_cross_outline);
+            applyButtonIcon(btn_pad_a, R.drawable.playstation_button_color_cross_outline, "ic_controller_cross_button.png");
+            btn_pad_a.setScaleX(faceScale);
+            btn_pad_a.setScaleY(faceScale);
             btn_pad_a.setOnPSButtonListener(pressed -> {
                 int action = pressed ? MotionEvent.ACTION_DOWN : MotionEvent.ACTION_UP;
                 sendKeyAction(btn_pad_a, action, KeyEvent.KEYCODE_BUTTON_A);
@@ -2176,7 +2428,9 @@ public class MainActivity extends AppCompatActivity {
 
         PSButtonView btn_pad_b = findViewById(R.id.btn_pad_b);
         if (btn_pad_b != null) {
-            btn_pad_b.setIconResource(R.drawable.playstation_button_color_circle_outline);
+            applyButtonIcon(btn_pad_b, R.drawable.playstation_button_color_circle_outline, "ic_controller_circle_button.png");
+            btn_pad_b.setScaleX(faceScale);
+            btn_pad_b.setScaleY(faceScale);
             btn_pad_b.setOnPSButtonListener(pressed -> {
                 int action = pressed ? MotionEvent.ACTION_DOWN : MotionEvent.ACTION_UP;
                 sendKeyAction(btn_pad_b, action, KeyEvent.KEYCODE_BUTTON_B);
@@ -2185,7 +2439,9 @@ public class MainActivity extends AppCompatActivity {
 
         PSButtonView btn_pad_x = findViewById(R.id.btn_pad_x);
         if (btn_pad_x != null) {
-            btn_pad_x.setIconResource(R.drawable.playstation_button_color_square_outline);
+            applyButtonIcon(btn_pad_x, R.drawable.playstation_button_color_square_outline, "ic_controller_square_button.png");
+            btn_pad_x.setScaleX(faceScale);
+            btn_pad_x.setScaleY(faceScale);
             btn_pad_x.setOnPSButtonListener(pressed -> {
                 int action = pressed ? MotionEvent.ACTION_DOWN : MotionEvent.ACTION_UP;
                 sendKeyAction(btn_pad_x, action, KeyEvent.KEYCODE_BUTTON_X);
@@ -2194,7 +2450,9 @@ public class MainActivity extends AppCompatActivity {
 
         PSButtonView btn_pad_y = findViewById(R.id.btn_pad_y);
         if (btn_pad_y != null) {
-            btn_pad_y.setIconResource(R.drawable.playstation_button_color_triangle_outline);
+            applyButtonIcon(btn_pad_y, R.drawable.playstation_button_color_triangle_outline, "ic_controller_triangle_button.png");
+            btn_pad_y.setScaleX(faceScale);
+            btn_pad_y.setScaleY(faceScale);
             btn_pad_y.setOnPSButtonListener(pressed -> {
                 int action = pressed ? MotionEvent.ACTION_DOWN : MotionEvent.ACTION_UP;
                 sendKeyAction(btn_pad_y, action, KeyEvent.KEYCODE_BUTTON_Y);
@@ -2203,42 +2461,53 @@ public class MainActivity extends AppCompatActivity {
 
         PSShoulderButtonView btn_pad_l1 = findViewById(R.id.btn_pad_l1);
         if (btn_pad_l1 != null) {
-            btn_pad_l1.setIconResource(R.drawable.playstation_trigger_l1_alternative_outline);
+            applyShoulderIcon(btn_pad_l1, R.drawable.playstation_trigger_l1_alternative_outline, "ic_controller_l1_button.png");
+            btn_pad_l1.setScaleX(1.0f);
+            btn_pad_l1.setScaleY(isNether ? 0.6f : 1.0f);
             btn_pad_l1.setOnPSShoulderButtonListener(pressed -> NativeApp.setPadButton(KeyEvent.KEYCODE_BUTTON_L1, 0, pressed));
         }
 
         PSShoulderButtonView btn_pad_r1 = findViewById(R.id.btn_pad_r1);
         if (btn_pad_r1 != null) {
-            btn_pad_r1.setIconResource(R.drawable.playstation_trigger_r1_alternative_outline);
+            applyShoulderIcon(btn_pad_r1, R.drawable.playstation_trigger_r1_alternative_outline, "ic_controller_r1_button.png");
+            btn_pad_r1.setScaleX(1.0f);
+            btn_pad_r1.setScaleY(isNether ? 0.6f : 1.0f);
             btn_pad_r1.setOnPSShoulderButtonListener(pressed -> NativeApp.setPadButton(KeyEvent.KEYCODE_BUTTON_R1, 0, pressed));
         }
 
         PSShoulderButtonView btn_pad_l2 = findViewById(R.id.btn_pad_l2);
         if (btn_pad_l2 != null) {
-            btn_pad_l2.setIconResource(R.drawable.playstation_trigger_l2_alternative_outline);
+            applyShoulderIcon(btn_pad_l2, R.drawable.playstation_trigger_l2_alternative_outline, "ic_controller_l2_button.png");
+            btn_pad_l2.setScaleX(1.0f);
+            btn_pad_l2.setScaleY(isNether ? 0.6f : 1.0f);
             btn_pad_l2.setOnPSShoulderButtonListener(pressed -> NativeApp.setPadButton(KeyEvent.KEYCODE_BUTTON_L2, 0, pressed));
         }
 
         PSShoulderButtonView btn_pad_r2 = findViewById(R.id.btn_pad_r2);
         if (btn_pad_r2 != null) {
-            btn_pad_r2.setIconResource(R.drawable.playstation_trigger_r2_alternative_outline);
+            applyShoulderIcon(btn_pad_r2, R.drawable.playstation_trigger_r2_alternative_outline, "ic_controller_r2_button.png");
+            btn_pad_r2.setScaleX(1.0f);
+            btn_pad_r2.setScaleY(isNether ? 0.6f : 1.0f);
             btn_pad_r2.setOnPSShoulderButtonListener(pressed -> NativeApp.setPadButton(KeyEvent.KEYCODE_BUTTON_R2, 0, pressed));
         }
 
         PSButtonView btn_pad_l3 = findViewById(R.id.btn_pad_l3);
         if (btn_pad_l3 != null) {
-            btn_pad_l3.setIconResource(R.drawable.playstation_button_l3_outline);
+            applyButtonIcon(btn_pad_l3, R.drawable.playstation_button_l3_outline, "ic_controller_l3_button.png");
             btn_pad_l3.setOnPSButtonListener(pressed -> NativeApp.setPadButton(KeyEvent.KEYCODE_BUTTON_THUMBL, 0, pressed));
         }
 
         PSButtonView btn_pad_r3 = findViewById(R.id.btn_pad_r3);
         if (btn_pad_r3 != null) {
-            btn_pad_r3.setIconResource(R.drawable.playstation_button_r3_outline);
+            applyButtonIcon(btn_pad_r3, R.drawable.playstation_button_r3_outline, "ic_controller_r3_button.png");
             btn_pad_r3.setOnPSButtonListener(pressed -> NativeApp.setPadButton(KeyEvent.KEYCODE_BUTTON_THUMBR, 0, pressed));
         }
 
+        applyUserUiScale();
+
         JoystickView joystickLeft = findViewById(R.id.joystick_left);
         if (joystickLeft != null) {
+            applyJoystickStyle(joystickLeft);
             joystickLeft.setOnJoystickMoveListener((x, y) -> {
                 float clampedX = Math.max(-1f, Math.min(1f, x));
                 float clampedY = Math.max(-1f, Math.min(1f, y));
@@ -2254,6 +2523,7 @@ public class MainActivity extends AppCompatActivity {
 
         JoystickView joystickRight = findViewById(R.id.joystick_right);
         if (joystickRight != null) {
+            applyJoystickStyle(joystickRight);
             joystickRight.setOnJoystickMoveListener((x, y) -> {
                 float clampedX = Math.max(-1f, Math.min(1f, x));
                 float clampedY = Math.max(-1f, Math.min(1f, y));
@@ -2269,6 +2539,7 @@ public class MainActivity extends AppCompatActivity {
 
         DPadView dpadView = findViewById(R.id.dpad_view);
         if (dpadView != null) {
+            applyDpadStyle(dpadView);
             dpadView.setOnDPadListener((direction, pressed) -> {
                 int keycode = -1;
                 switch (direction) {
@@ -2292,6 +2563,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         }
+        applyUserUiScale();
     }
 
     private boolean importMemcardToSlot1(Uri uri) {
@@ -2591,16 +2863,23 @@ public class MainActivity extends AppCompatActivity {
         btnAbout.setOnClickListener(v -> {
         String versionName = "";
         try { versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception ignored) {}
-        String msg = "ARMSX2 (" + versionName + ")\n" +
-            "by MoonPower\n\n" +
+        String message = "ARMSX2 (" + versionName + ")\n" +
+            "by ARMSX2 team\n\n" +
+            "Core contributors:\n" +
+            "- MoonPower — App developer\n" +
+            "- jpolo — Management\n" +
+            "- Medieval Shell — Web developer\n" +
+            "- set l — Web developer\n" +
+            "- Alex — QA tester\n" +
+            "- Yua — QA tester\n\n" +
             "Thanks to:\n" +
             "- pontos2024 (emulator base)\n" +
             "- PCSX2 v2.3.430 (core emulator)\n" +
             "- SDL (SDL3)\n" +
-            "- Fffathur (Logo)";
+            "- Fffathur (icon design)";
         new MaterialAlertDialogBuilder(this)
             .setTitle("About")
-            .setMessage(msg)
+            .setMessage(message)
             .setPositiveButton("OK", (d, w) -> d.dismiss())
             .show();
         });
@@ -2669,6 +2948,16 @@ public class MainActivity extends AppCompatActivity {
                     showBiosManagerDialog();
                 }
             });
+    private final ActivityResultLauncher<Intent> startActivityResultOnboarding =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                onboardingLaunched = false;
+                if (result.getResultCode() == Activity.RESULT_OK) {
+                    setOnboardingComplete();
+                    runPostOnboardingPrompts();
+                } else if (!isOnboardingComplete()) {
+                    maybeStartOnboardingFlow();
+                }
+            });
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration p_newConfig) {
@@ -2705,6 +2994,8 @@ public class MainActivity extends AppCompatActivity {
         // Re-apply immersive fullscreen when resuming
         applyFullscreen();
         loadHideTimeoutFromPrefs();
+        refreshOnScreenUiStyleIfNeeded();
+        refreshOnScreenUiScaleIfNeeded();
     }
 
 	@Override
@@ -2724,19 +3015,40 @@ public class MainActivity extends AppCompatActivity {
 
     /// ///////////////////////////////////////////////////////////////////////////////////////////
 
-	public void Initialize() {
-		File dataDir = DataDirectoryManager.getDataRoot(getApplicationContext());
-		if (dataDir != null) {
-			NativeApp.setDataRootOverride(dataDir.getAbsolutePath());
-		}
-		NativeApp.initializeOnce(getApplicationContext());
-		LogcatRecorder.initialize(getApplicationContext());
-		boolean recordLogs = false;
-		try {
-			String current = NativeApp.getSetting("Logging", "RecordAndroidLog", "bool");
-			recordLogs = "true".equalsIgnoreCase(current);
-		} catch (Exception ignored) {}
-		LogcatRecorder.setEnabled(recordLogs);
+    private void setupSafeAreaHandling() {
+        View inGameRootView = findViewById(R.id.in_game_root);
+        if (inGameRootView != null) {
+            ViewCompat.setOnApplyWindowInsetsListener(inGameRootView, (v, insets) -> {
+                Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                return insets;
+            });
+            ViewCompat.requestApplyInsets(inGameRootView);
+        }
+        View homeView = findViewById(R.id.home_container);
+        if (homeView != null) {
+            ViewCompat.setOnApplyWindowInsetsListener(homeView, (v, insets) -> {
+                Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                return insets;
+            });
+            ViewCompat.requestApplyInsets(homeView);
+        }
+    }
+
+    public void Initialize() {
+        File dataDir = DataDirectoryManager.getDataRoot(getApplicationContext());
+        if (dataDir != null) {
+            NativeApp.setDataRootOverride(dataDir.getAbsolutePath());
+        }
+        NativeApp.initializeOnce(getApplicationContext());
+        LogcatRecorder.initialize(getApplicationContext());
+        boolean recordLogs = false;
+        try {
+            String current = NativeApp.getSetting("Logging", "RecordAndroidLog", "bool");
+            recordLogs = "true".equalsIgnoreCase(current);
+        } catch (Exception ignored) {}
+        LogcatRecorder.setEnabled(recordLogs);
 
 		// Set up JNI
 		SDLControllerManager.nativeSetupJNI();
@@ -2745,6 +3057,44 @@ public class MainActivity extends AppCompatActivity {
         SDLControllerManager.initialize();
 
         mHIDDeviceManager = HIDDeviceManager.acquire(this);
+    }
+
+    private boolean isOnboardingComplete() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_ONBOARDING_COMPLETE, false);
+    }
+
+    private void setOnboardingComplete() {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(PREF_ONBOARDING_COMPLETE, true).apply();
+    }
+
+    private void maybeStartOnboardingFlow() {
+        if (postOnboardingChecksRun) {
+            return;
+        }
+        if (isOnboardingComplete()) {
+            runPostOnboardingPrompts();
+            return;
+        }
+        if (onboardingLaunched) {
+            return;
+        }
+        try {
+            Intent onboardingIntent = new Intent(this, OnboardingActivity.class);
+            startActivityResultOnboarding.launch(onboardingIntent);
+            onboardingLaunched = true;
+        } catch (Throwable t) {
+            setOnboardingComplete();
+            runPostOnboardingPrompts();
+        }
+    }
+
+    private void runPostOnboardingPrompts() {
+        if (postOnboardingChecksRun) {
+            return;
+        }
+        postOnboardingChecksRun = true;
+        ensureBiosPresent();
+        maybeShowDataDirectoryPrompt();
     }
 
     private void maybeShowDataDirectoryPrompt() {
@@ -2887,42 +3237,66 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void startEmuThread() {
-        if (!hasBios()) { ensureBiosPresent(); return; }
-        if(!isThread()) {
-            isVmPaused = false;
-            updatePauseButtonIcon();
-            mEmulationThread = new Thread(() -> {
-                runOnUiThread(() -> {
-                    try { if (NativeApp.isFullscreenUIEnabled()) setOnScreenControlsVisible(true); } catch (Throwable ignored) {}
-                    try {
-                        String p = m_szGamefile;
-                        if (p != null && !p.isEmpty()) {
-                            Toast.makeText(this, "Launching: " + p, Toast.LENGTH_SHORT).show();
-                        }
-                    } catch (Throwable ignored) {}
-                });
-                NativeApp.runVMThread(m_szGamefile);
-            });
-            mEmulationThread.start();
+    public synchronized void startEmuThread() {
+        if (!hasBios()) {
+            ensureBiosPresent();
+            return;
         }
+        stopEmuThread(false);
+        for (int attempts = 0; attempts < 40 && NativeApp.hasValidVm(); attempts++) {
+            SystemClock.sleep(50);
+        }
+        if (NativeApp.hasValidVm()) {
+            NativeApp.shutdown();
+            SystemClock.sleep(100);
+            if (NativeApp.hasValidVm()) {
+                DebugLog.w("VM", "VM still reporting active after shutdown; proceeding with clean boot");
+            }
+        }
+        try { NativeApp.resetKeyStatus(); } catch (Throwable ignored) {}
+        if (isThread()) {
+            return;
+        }
+        isVmPaused = false;
+        updatePauseButtonIcon();
+        mEmulationThread = new Thread(() -> {
+            runOnUiThread(() -> {
+                try { if (NativeApp.isFullscreenUIEnabled()) setOnScreenControlsVisible(true); } catch (Throwable ignored) {}
+                try {
+                    String p = m_szGamefile;
+                    if (p != null && !p.isEmpty()) {
+                        Toast.makeText(this, "Launching: " + p, Toast.LENGTH_SHORT).show();
+                    }
+                } catch (Throwable ignored) {}
+            });
+            NativeApp.runVMThread(m_szGamefile);
+        });
+        mEmulationThread.start();
     }
 
     private void stopEmuThread() {
-        NativeApp.shutdown();
+        stopEmuThread(true);
+    }
+
+    private synchronized void stopEmuThread(boolean forceShutdown) {
         if (mEmulationThread != null) {
+            NativeApp.shutdown();
             try {
                 mEmulationThread.join();
             } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
             }
             mEmulationThread = null;
+        } else if (forceShutdown) {
+            NativeApp.shutdown();
         }
+        try { NativeApp.resetKeyStatus(); } catch (Throwable ignored) {}
+        setFastForwardEnabled(false);
+        isVmPaused = false;
+        updatePauseButtonIcon();
     }
 
     private void restartEmuThread() {
-        if (!hasBios()) { ensureBiosPresent(); return; }
-        stopEmuThread();
-        ////
         startEmuThread();
     }
 
@@ -3982,7 +4356,6 @@ public class MainActivity extends AppCompatActivity {
             getWindow().getDecorView().removeCallbacks(pendingLaunchRunnable);
         } catch (Throwable ignored) {}
         stopEmuThread();
-        try { NativeApp.resetKeyStatus(); } catch (Throwable ignored) {}
         m_szGamefile = "";
         showHome(true);
         lastInput = InputSource.TOUCH;

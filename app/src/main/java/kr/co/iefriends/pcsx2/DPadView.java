@@ -30,6 +30,9 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 
+import android.graphics.drawable.Drawable;
+import androidx.annotation.Nullable;
+
 /**
  * Custom D-pad view for PCSX2 directional control
  */
@@ -44,6 +47,9 @@ public class DPadView extends View {
     
     // D-pad regions
     private RectF upRegion, downRegion, leftRegion, rightRegion, centerRegion;
+    private Drawable upDrawable, downDrawable, leftDrawable, rightDrawable;
+    private Drawable baseDrawable;
+    private Drawable pressedDrawable;
     
     // Press states
     private boolean upPressed = false;
@@ -102,6 +108,54 @@ public class DPadView extends View {
         rightRegion = new RectF();
         centerRegion = new RectF();
     }
+
+    public void setDrawables(@Nullable Drawable base, @Nullable Drawable pressed) {
+        baseDrawable = base != null ? base.mutate() : null;
+        pressedDrawable = pressed != null ? pressed.mutate() : null;
+        updateDrawableBounds();
+        invalidate();
+    }
+
+    public void setDirectionalDrawables(@Nullable Drawable up, @Nullable Drawable down,
+                                        @Nullable Drawable left, @Nullable Drawable right) {
+        upDrawable = up != null ? up.mutate() : null;
+        downDrawable = down != null ? down.mutate() : null;
+        leftDrawable = left != null ? left.mutate() : null;
+        rightDrawable = right != null ? right.mutate() : null;
+        updateDirectionalBounds();
+        invalidate();
+    }
+
+    private void updateDrawableBounds() {
+        if (baseDrawable != null) {
+            baseDrawable.setBounds(Math.round(bounds.left), Math.round(bounds.top),
+                    Math.round(bounds.right), Math.round(bounds.bottom));
+        }
+        if (pressedDrawable != null) {
+            pressedDrawable.setBounds(Math.round(bounds.left), Math.round(bounds.top),
+                    Math.round(bounds.right), Math.round(bounds.bottom));
+        }
+        updateDirectionalBounds();
+    }
+
+    private void updateDirectionalBounds() {
+        if (upDrawable != null) {
+            upDrawable.setBounds(Math.round(upRegion.left), Math.round(upRegion.top),
+                    Math.round(upRegion.right), Math.round(upRegion.bottom));
+        }
+        if (downDrawable != null) {
+            downDrawable.setBounds(Math.round(downRegion.left), Math.round(downRegion.top),
+                    Math.round(downRegion.right), Math.round(downRegion.bottom));
+        }
+        if (leftDrawable != null) {
+            leftDrawable.setBounds(Math.round(leftRegion.left), Math.round(leftRegion.top),
+                    Math.round(leftRegion.right), Math.round(leftRegion.bottom));
+        }
+        if (rightDrawable != null) {
+            rightDrawable.setBounds(Math.round(rightRegion.left), Math.round(rightRegion.top),
+                    Math.round(rightRegion.right), Math.round(rightRegion.bottom));
+        }
+    }
     
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
@@ -140,6 +194,7 @@ public class DPadView extends View {
         // Center region
         centerRegion.set(centerX - armWidth/2, centerY - armWidth/2,
                         centerX + armWidth/2, centerY + armWidth/2);
+        updateDrawableBounds();
     }
     
     private void createDPadPath() {
@@ -168,40 +223,60 @@ public class DPadView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        
-        // Draw base D-pad shape
-        canvas.drawPath(dpadPath, basePaint);
-        
-        // Draw pressed regions
-        if (upPressed) {
-            canvas.drawRect(upRegion, pressedPaint);
+        boolean hasDirectionalIcons = upDrawable != null || downDrawable != null || leftDrawable != null || rightDrawable != null;
+
+        if (baseDrawable != null) {
+            baseDrawable.draw(canvas);
+            if (pressedDrawable != null && (upPressed || downPressed || leftPressed || rightPressed)) {
+                pressedDrawable.draw(canvas);
+            }
+        } else if (!hasDirectionalIcons) {
+            canvas.drawPath(dpadPath, basePaint);
+            if (upPressed) {
+                canvas.drawRect(upRegion, pressedPaint);
+            }
+            if (downPressed) {
+                canvas.drawRect(downRegion, pressedPaint);
+            }
+            if (leftPressed) {
+                canvas.drawRect(leftRegion, pressedPaint);
+            }
+            if (rightPressed) {
+                canvas.drawRect(rightRegion, pressedPaint);
+            }
+            canvas.drawPath(dpadPath, strokePaint);
         }
-        if (downPressed) {
-            canvas.drawRect(downRegion, pressedPaint);
+
+        if (hasDirectionalIcons) {
+            if (upDrawable != null) {
+                upDrawable.setAlpha(upPressed ? 255 : 180);
+                upDrawable.draw(canvas);
+            }
+            if (downDrawable != null) {
+                downDrawable.setAlpha(downPressed ? 255 : 180);
+                downDrawable.draw(canvas);
+            }
+            if (leftDrawable != null) {
+                leftDrawable.setAlpha(leftPressed ? 255 : 180);
+                leftDrawable.draw(canvas);
+            }
+            if (rightDrawable != null) {
+                rightDrawable.setAlpha(rightPressed ? 255 : 180);
+                rightDrawable.draw(canvas);
+            }
+        } else {
+            Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            textPaint.setColor(0xFF000000);
+            textPaint.setTextSize(bounds.width() * 0.12f);
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            
+            float textY = bounds.centerY() + textPaint.getTextSize() / 3;
+            
+            canvas.drawText("▲", bounds.centerX(), upRegion.centerY() + textPaint.getTextSize() / 3, textPaint);
+            canvas.drawText("▼", bounds.centerX(), downRegion.centerY() + textPaint.getTextSize() / 3, textPaint);
+            canvas.drawText("◀", leftRegion.centerX(), textY, textPaint);
+            canvas.drawText("▶", rightRegion.centerX(), textY, textPaint);
         }
-        if (leftPressed) {
-            canvas.drawRect(leftRegion, pressedPaint);
-        }
-        if (rightPressed) {
-            canvas.drawRect(rightRegion, pressedPaint);
-        }
-        
-        // Draw outline
-        canvas.drawPath(dpadPath, strokePaint);
-        
-        // Draw direction arrows/symbols
-        Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        textPaint.setColor(0xFF000000);
-        textPaint.setTextSize(bounds.width() * 0.12f);
-        textPaint.setTextAlign(Paint.Align.CENTER);
-        
-        float textY = bounds.centerY() + textPaint.getTextSize() / 3;
-        
-        // Draw arrows
-        canvas.drawText("▲", bounds.centerX(), upRegion.centerY() + textPaint.getTextSize() / 3, textPaint);
-        canvas.drawText("▼", bounds.centerX(), downRegion.centerY() + textPaint.getTextSize() / 3, textPaint);
-        canvas.drawText("◀", leftRegion.centerX(), textY, textPaint);
-        canvas.drawText("▶", rightRegion.centerX(), textY, textPaint);
     }
     
     @Override

@@ -142,6 +142,7 @@ public class NativeApp {
 	}
 
 	public static native void refreshBIOS();
+	public static native boolean hasValidVm();
 
     public static native boolean isFullscreenUIEnabled();
 

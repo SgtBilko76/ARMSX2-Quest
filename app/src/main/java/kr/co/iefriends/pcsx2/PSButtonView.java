@@ -11,6 +11,7 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import androidx.annotation.DrawableRes;
+import androidx.annotation.Nullable;
 import androidx.appcompat.content.res.AppCompatResources;
 
 public class PSButtonView extends View {
@@ -251,6 +252,16 @@ public class PSButtonView extends View {
                 iconDrawable = iconDrawable.mutate();
                 updateIconBounds();
             }
+        }
+        invalidate();
+    }
+
+    public void setIconDrawable(@Nullable Drawable drawable) {
+        if (drawable == null) {
+            iconDrawable = null;
+        } else {
+            iconDrawable = drawable.mutate();
+            updateIconBounds();
         }
         invalidate();
     }

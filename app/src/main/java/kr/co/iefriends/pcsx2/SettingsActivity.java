@@ -61,8 +61,9 @@ public class SettingsActivity extends AppCompatActivity {
 	private static final int SECTION_GRAPHICS = 1;
 	private static final int SECTION_PERFORMANCE = 2;
 	private static final int SECTION_CONTROLLER = 3;
-	private static final int SECTION_STORAGE = 4;
-	private static final int SECTION_ACHIEVEMENTS = 5;
+	private static final int SECTION_CUSTOMIZATION = 4;
+	private static final int SECTION_STORAGE = 5;
+	private static final int SECTION_ACHIEVEMENTS = 6;
 	private static final String STATE_SELECTED_SECTION = "settings_selected_section";
 	private TextView tvDataDirPath;
 	private AlertDialog dataDirProgressDialog;
@@ -78,6 +79,7 @@ public class SettingsActivity extends AppCompatActivity {
 	private View groupDiscordIdentity;
 	private ShapeableImageView imgDiscordAvatar;
 	private TextView tvDiscordLoggedInAs;
+	private TextView tvOnScreenUiStyleValue;
 	private MaterialButton btnDiscordLogout;
     private MaterialSwitch switchRaEnabled;
     private MaterialSwitch switchRaHardcore;
@@ -132,6 +134,7 @@ public class SettingsActivity extends AppCompatActivity {
 		initializeGraphicsSettings();
 		initializeControllerSettings();
 		initializePerformanceSettings();
+		initializeCustomizationSettings();
 		initializeMemoryCardSettings();
 		initializeStorageSettings();
 		initializeActionButtons();
@@ -151,10 +154,11 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
+	protected void onResume() {
+		super.onResume();
 		DiscordBridge.updateEngineActivity(this);
         updateDataDirSummary();
+        updateOnScreenUiStyleSummary();
         updateDiscordUi(DiscordBridge.isLoggedIn());
         RetroAchievementsBridge.refreshState();
     }
@@ -743,7 +747,7 @@ public class SettingsActivity extends AppCompatActivity {
 				String br = NativeApp.getSetting("EmuCore/GS", "BrightnessScale", "float");
 				float val = (br == null || br.isEmpty()) ? 1.0f : Float.parseFloat(br);
 				int prog = Math.round(val * 100f);
-				prog = Math.max(20, Math.min(200, prog));
+				prog = Math.max(0, Math.min(200, prog));
 				sbBrightness.setValue(prog);
 				tvBrightness.setText(String.format("Brightness: %.2f", val));
 			} catch (Exception ignored) {
@@ -751,7 +755,7 @@ public class SettingsActivity extends AppCompatActivity {
 				tvBrightness.setText("Brightness: 1.00");
 			}
 			sbBrightness.addOnChangeListener((slider, value, fromUser) -> {
-				int clamped = Math.max(20, Math.min(200, Math.round(value)));
+				int clamped = Math.max(0, Math.min(200, Math.round(value)));
 				if (clamped != Math.round(value)) slider.setValue(clamped);
 				float scale = clamped / 100f;
 				tvBrightness.setText(String.format("Brightness: %.2f", scale));
@@ -1408,6 +1412,54 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
+	private void initializeCustomizationSettings() {
+		MaterialButton btnUiStyle = findViewById(R.id.btn_on_screen_ui_style);
+		tvOnScreenUiStyleValue = findViewById(R.id.tv_on_screen_ui_style_value);
+		updateOnScreenUiStyleSummary();
+		if (btnUiStyle != null) {
+			btnUiStyle.setOnClickListener(v -> showOnScreenUiStyleDialog());
+		}
+	}
+
+	private void updateOnScreenUiStyleSummary() {
+		if (tvOnScreenUiStyleValue == null) {
+			return;
+		}
+		String current = getSharedPreferences("armsx2", MODE_PRIVATE)
+				.getString("on_screen_ui_style", "default");
+		int labelRes = "nether".equalsIgnoreCase(current)
+				? R.string.on_screen_ui_style_nether
+				: R.string.on_screen_ui_style_default;
+		tvOnScreenUiStyleValue.setText(labelRes);
+	}
+
+	private void showOnScreenUiStyleDialog() {
+		final String prefName = "armsx2";
+		final String prefKey = "on_screen_ui_style";
+		String current = getSharedPreferences(prefName, MODE_PRIVATE)
+				.getString(prefKey, "default");
+		int checked = "nether".equalsIgnoreCase(current) ? 1 : 0;
+		CharSequence[] options = new CharSequence[]{
+				getString(R.string.on_screen_ui_style_default),
+				getString(R.string.on_screen_ui_style_nether)
+		};
+		new MaterialAlertDialogBuilder(this)
+				.setTitle(R.string.dialog_on_screen_ui_style_title)
+				.setSingleChoiceItems(options, checked, (dialog, which) -> {
+					String selected = which == 1 ? "nether" : "default";
+					if (!selected.equalsIgnoreCase(current)) {
+						getSharedPreferences(prefName, MODE_PRIVATE)
+								.edit()
+								.putString(prefKey, selected)
+								.apply();
+						updateOnScreenUiStyleSummary();
+					}
+					dialog.dismiss();
+				})
+				.setNegativeButton(android.R.string.cancel, null)
+				.show();
+	}
+
 	private void initializeMemoryCardSettings() {
 		Button btnImportMc = findViewById(R.id.btn_import_memcard);
 		btnImportMc.setOnClickListener(v -> {
@@ -1534,9 +1586,10 @@ public class SettingsActivity extends AppCompatActivity {
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_graphics));
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_performance));
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_controller));
+                sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_customization));
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_storage));
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_achievements));
-			}
+		}
 			sectionTabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
 				@Override
 				public void onTabSelected(TabLayout.Tab tab) {
@@ -1600,11 +1653,12 @@ public class SettingsActivity extends AppCompatActivity {
 		toolbar.setSubtitle(resId != 0 ? getString(resId) : null);
 	}
 
-	private int getSectionTitleRes(int section) {
+    private int getSectionTitleRes(int section) {
         switch (section) {
             case SECTION_GRAPHICS: return R.string.settings_section_graphics;
             case SECTION_PERFORMANCE: return R.string.settings_section_performance;
             case SECTION_CONTROLLER: return R.string.settings_section_controller;
+            case SECTION_CUSTOMIZATION: return R.string.settings_section_customization;
             case SECTION_STORAGE: return R.string.settings_section_storage;
             case SECTION_ACHIEVEMENTS: return R.string.settings_section_achievements;
             case SECTION_GENERAL:
@@ -1616,6 +1670,7 @@ public class SettingsActivity extends AppCompatActivity {
         if (buttonId == R.id.btn_section_graphics) return SECTION_GRAPHICS;
         if (buttonId == R.id.btn_section_performance) return SECTION_PERFORMANCE;
         if (buttonId == R.id.btn_section_controller) return SECTION_CONTROLLER;
+        if (buttonId == R.id.btn_section_customization) return SECTION_CUSTOMIZATION;
         if (buttonId == R.id.btn_section_storage) return SECTION_STORAGE;
         if (buttonId == R.id.btn_section_achievements) return SECTION_ACHIEVEMENTS;
         return SECTION_GENERAL;
@@ -1626,6 +1681,7 @@ public class SettingsActivity extends AppCompatActivity {
             case SECTION_GRAPHICS: return R.id.btn_section_graphics;
             case SECTION_PERFORMANCE: return R.id.btn_section_performance;
             case SECTION_CONTROLLER: return R.id.btn_section_controller;
+            case SECTION_CUSTOMIZATION: return R.id.btn_section_customization;
             case SECTION_STORAGE: return R.id.btn_section_storage;
             case SECTION_ACHIEVEMENTS: return R.id.btn_section_achievements;
             case SECTION_GENERAL:
@@ -1777,15 +1833,23 @@ public class SettingsActivity extends AppCompatActivity {
 			try { 
 				versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; 
 			} catch (Exception ignored) {}
-			String msg = "ARMSX2 (" + versionName + ")\n" +
-					"by MoonPower\n\n" +
-					"Thanks to:\n" +
-					"- pontos2024 (emulator base)\n" +
-					"- PCSX2 v2.3.430 (core emulator)\n" +
-					"- SDL (SDL3)";
+			String message = "ARMSX2 (" + versionName + ")\n" +
+        		"by ARMSX2 team\n\n" +
+        		"Core contributors:\n" +
+        		"- MoonPower — App developer\n" +
+        		"- jpolo — Management\n" +
+        		"- Medieval Shell — Web developer\n" +
+        		"- set l — Web developer\n" +
+        		"- Alex — QA tester\n" +
+        		"- Yua — QA tester\n\n" +
+        		"Thanks to:\n" +
+        		"- pontos2024 (emulator base)\n" +
+        		"- PCSX2 v2.3.430 (core emulator)\n" +
+        		"- SDL (SDL3)\n" +
+        		"- Fffathur (icon design)";
 			new MaterialAlertDialogBuilder(this)
 					.setTitle("About")
-					.setMessage(msg)
+					.setMessage(message)
 					.setPositiveButton("OK", (d, w) -> d.dismiss())
 					.show();
 		});
