@@ -56,7 +56,7 @@ Here's a roadmap of the things you can expect from ARMSX2 in the future:
 # Why are there .js and .jsx files?
 Originally as a curious idea the react native screens were just an experiment i decided to keep they are extremely barebones and will either be finalized in a seperate branch (armsx2-rn) or removed altogether They do not affect performance as they are hidden by default and not executed. Any PR to them is welcome!
 
-### To start developing with ARMSX2 RN do the following root:
+### To start developing with ARMSX2 RN do the following:
 
 1. First install the deps:
 ```sh

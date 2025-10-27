@@ -67,12 +67,16 @@ final class DiscordBridge {
     static {
         Method method = null;
         boolean available = false;
-        try {
-            Class<?> clazz = Class.forName(SDK_INIT_CLASS_NAME);
-            method = clazz.getMethod("setEngineActivity", Activity.class);
-            available = true;
-        } catch (Throwable t) {
-            Log.i(TAG, "Discord SDK not found. Discord integration disabled.", t);
+        if (BuildConfig.DISCORD_INTEGRATION_ENABLED) {
+            try {
+                Class<?> clazz = Class.forName(SDK_INIT_CLASS_NAME);
+                method = clazz.getMethod("setEngineActivity", Activity.class);
+                available = true;
+            } catch (Throwable t) {
+                Log.i(TAG, "Discord SDK not found. Discord integration disabled.", t);
+            }
+        } else {
+            Log.i(TAG, "Discord integration disabled at build time; skipping SDK lookup.");
         }
         sSetEngineActivityMethod = method;
         sSdkAvailable = available;

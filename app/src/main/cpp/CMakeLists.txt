@@ -40,6 +40,8 @@ include(SearchForStuff)
 
 if(ANDROID)
 	find_package(discord_partner_sdk REQUIRED CONFIG)
+	# Link all native binaries with 16KB page support for newer devices.
+	add_link_options(-Wl,-z,max-page-size=16384)
 endif()
 
 # Must be done after SearchForStuff

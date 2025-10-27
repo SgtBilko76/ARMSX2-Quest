@@ -76,6 +76,8 @@
 
         <activity
             android:name="com.discord.socialsdk.AuthenticationActivity"
+            android:exported="${discordAuthActivityExported}"
+            android:enabled="${discordAuthActivityEnabled}"
             tools:node="merge">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

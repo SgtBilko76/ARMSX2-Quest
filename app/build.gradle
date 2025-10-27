@@ -42,6 +42,7 @@ def sanitizeScheme = { String raw ->
 }
 def discordSchemeFromEnv = sanitizeScheme(discordProps.getProperty("APPLICATION_SCHEME", ""))
 def discordCallbackScheme = discordSchemeFromEnv ? discordSchemeFromEnv : (discordApplicationId ? "discord-${discordApplicationId}" : "armsx2")
+def isDiscordSdkAvailable = file("${project.projectDir}/libs/discord_partner_sdk.aar").exists()
 
 android {
     namespace 'kr.co.iefriends.pcsx2'
@@ -71,9 +72,12 @@ android {
             abiFilters 'arm64-v8a'
         }
         manifestPlaceholders = [
-                discordCallbackScheme: discordCallbackScheme
+                discordCallbackScheme       : discordCallbackScheme,
+                discordAuthActivityExported : isDiscordSdkAvailable ? "true" : "false",
+                discordAuthActivityEnabled  : isDiscordSdkAvailable ? "true" : "false"
         ]
-    buildConfigField "boolean", "ENABLE_RN", enableRN ? "true" : "false"
+        buildConfigField "boolean", "ENABLE_RN", enableRN ? "true" : "false"
+        buildConfigField "boolean", "DISCORD_INTEGRATION_ENABLED", isDiscordSdkAvailable ? "true" : "false"
     }
 
     def keystorePropertiesFile = rootProject.file("app/armsx2_keystore.properties")
@@ -117,8 +121,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_21
-        targetCompatibility JavaVersion.VERSION_21
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
     externalNativeBuild {
         cmake {
@@ -177,8 +181,7 @@ dependencies {
         implementation 'com.facebook.react:react-android:0.74.3'
         implementation 'com.facebook.react:hermes-android:0.74.3'
     }
-    def discordSdkAar = file("${project.projectDir}/libs/discord_partner_sdk.aar")
-    if (discordSdkAar.exists()) {
+    if (isDiscordSdkAvailable) {
         implementation(name: 'discord_partner_sdk', ext: 'aar')
     } else {
         logger.lifecycle("[app] Discord SDK not found; Discord integration will be disabled.")
