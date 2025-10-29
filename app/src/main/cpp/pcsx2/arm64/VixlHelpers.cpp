@@ -249,29 +249,29 @@ void armMoveAddressToReg(const a64::Register& reg, const void* addr)
     // psxAsm->Mov(reg, static_cast<u64>(reinterpret_cast<uintptr_t>(addr)));
     pxAssert(reg.IsX());
 
-//    const void* current_code_ptr_page = reinterpret_cast<const void*>(
-//            reinterpret_cast<uintptr_t>(armGetCurrentCodePointer()) & ~static_cast<uintptr_t>(0xFFF));
-//    const void* ptr_page =
-//            reinterpret_cast<const void*>(reinterpret_cast<uintptr_t>(addr) & ~static_cast<uintptr_t>(0xFFF));
-//    const s64 page_displacement = GetPCDisplacement(current_code_ptr_page, ptr_page) >> 10;
-//    const u32 page_offset = static_cast<u32>(reinterpret_cast<uintptr_t>(addr) & 0xFFFu);
-//    if (vixl::IsInt21(page_displacement) && a64::Assembler::IsImmAddSub(page_offset))
-//    {
-//        {
-//            a64::SingleEmissionCheckScope guard(armAsm);
-//            armAsm->adrp(reg, page_displacement);
-//        }
-//        armAsm->Add(reg, reg, page_offset);
-//    }
-//    else if (vixl::IsInt21(page_displacement) && a64::Assembler::IsImmLogical(page_offset, 64))
-//    {
-//        {
-//            a64::SingleEmissionCheckScope guard(armAsm);
-//            armAsm->adrp(reg, page_displacement);
-//        }
-//        armAsm->Orr(reg, reg, page_offset);
-//    }
-//    else
+    const void* current_code_ptr_page = reinterpret_cast<const void*>(
+            reinterpret_cast<uintptr_t>(armGetCurrentCodePointer()) & ~static_cast<uintptr_t>(0xFFF));
+    const void* ptr_page =
+            reinterpret_cast<const void*>(reinterpret_cast<uintptr_t>(addr) & ~static_cast<uintptr_t>(0xFFF));
+    const s64 page_displacement = GetPCDisplacement(current_code_ptr_page, ptr_page) >> 10;
+    const u32 page_offset = static_cast<u32>(reinterpret_cast<uintptr_t>(addr) & 0xFFFu);
+    if (vixl::IsInt21(page_displacement) && a64::Assembler::IsImmAddSub(page_offset))
+    {
+        {
+            a64::SingleEmissionCheckScope guard(armAsm);
+            armAsm->adrp(reg, page_displacement);
+        }
+        armAsm->Add(reg, reg, page_offset);
+    }
+    else if (vixl::IsInt21(page_displacement) && a64::Assembler::IsImmLogical(page_offset, 64))
+    {
+        {
+            a64::SingleEmissionCheckScope guard(armAsm);
+            armAsm->adrp(reg, page_displacement);
+        }
+        armAsm->Orr(reg, reg, page_offset);
+    }
+    else
     {
         armAsm->Mov(reg, reinterpret_cast<uintptr_t>(addr));
     }
@@ -481,7 +481,7 @@ u8* ArmConstantPool::GetLiteral(const u128& value)
     if (it != m_literals.end())
         return m_base_ptr + it->second;
 
-    if (GetRemainingCapacity() < 8)
+    if (GetRemainingCapacity() < sizeof(value))
         return nullptr;
 
     const u32 offset = Common::AlignUpPow2(m_used, 16);

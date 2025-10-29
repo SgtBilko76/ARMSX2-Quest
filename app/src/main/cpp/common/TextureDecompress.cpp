@@ -1,4 +1,5 @@
 #include "TextureDecompress.h"
+#include <algorithm>
 
 /*
 DXT1/DXT3/DXT5 texture decompression
@@ -567,15 +568,38 @@ inline void insert_weight_zero(uint64_t& index_bits, uint32_t bits_per_index, ui
 // BC7 mode 0-7 decompression.
 // Instead of one monster routine to unpack all the BC7 modes, we're lumping the 3 subset, 2 subset, 1 subset, and dual plane modes together into simple shared routines.
 
-static inline uint32_t bc7_dequant(uint32_t val, uint32_t pbit, uint32_t val_bits) { assert(val < (1U << val_bits)); assert(pbit < 2); assert(val_bits >= 4 && val_bits <= 8); const uint32_t total_bits = val_bits + 1; val = (val << 1) | pbit; val <<= (8 - total_bits); val |= (val >> total_bits); assert(val <= 255); return val; }
-static inline uint32_t bc7_dequant(uint32_t val, uint32_t val_bits) { assert(val < (1U << val_bits)); assert(val_bits >= 4 && val_bits <= 8); val <<= (8 - val_bits); val |= (val >> val_bits); assert(val <= 255); return val; }
+static inline uint32_t bc7_dequant(uint32_t val, uint32_t pbit, uint32_t val_bits)
+{
+	val_bits = std::clamp<uint32_t>(val_bits, 4, 8);
+	const uint32_t max_val = (1U << val_bits) - 1U;
+	if (val > max_val)
+		val = max_val;
+	pbit &= 1U;
+	const uint32_t total_bits = val_bits + 1;
+	val = (val << 1) | pbit;
+	val <<= (8 - total_bits);
+	val |= (val >> total_bits);
+	return std::min<uint32_t>(val, 255);
+}
 
-static inline uint32_t bc7_interp2(uint32_t l, uint32_t h, uint32_t w) { assert(w < 4); return (l * (64 - g_bc7_weights2[w]) + h * g_bc7_weights2[w] + 32) >> 6; }
-static inline uint32_t bc7_interp3(uint32_t l, uint32_t h, uint32_t w) { assert(w < 8); return (l * (64 - g_bc7_weights3[w]) + h * g_bc7_weights3[w] + 32) >> 6; }
-static inline uint32_t bc7_interp4(uint32_t l, uint32_t h, uint32_t w) { assert(w < 16); return (l * (64 - g_bc7_weights4[w]) + h * g_bc7_weights4[w] + 32) >> 6; }
+static inline uint32_t bc7_dequant(uint32_t val, uint32_t val_bits)
+{
+	val_bits = std::clamp<uint32_t>(val_bits, 4, 8);
+	const uint32_t max_val = (1U << val_bits) - 1U;
+	if (val > max_val)
+		val = max_val;
+	val <<= (8 - val_bits);
+	val |= (val >> val_bits);
+	return std::min<uint32_t>(val, 255);
+}
+
+static inline uint32_t bc7_interp2(uint32_t l, uint32_t h, uint32_t w) { w = std::min<uint32_t>(w, 3); return (l * (64 - g_bc7_weights2[w]) + h * g_bc7_weights2[w] + 32) >> 6; }
+static inline uint32_t bc7_interp3(uint32_t l, uint32_t h, uint32_t w) { w = std::min<uint32_t>(w, 7); return (l * (64 - g_bc7_weights3[w]) + h * g_bc7_weights3[w] + 32) >> 6; }
+static inline uint32_t bc7_interp4(uint32_t l, uint32_t h, uint32_t w) { w = std::min<uint32_t>(w, 15); return (l * (64 - g_bc7_weights4[w]) + h * g_bc7_weights4[w] + 32) >> 6; }
 static inline uint32_t bc7_interp(uint32_t l, uint32_t h, uint32_t w, uint32_t bits)
 {
-	assert(l <= 255 && h <= 255);
+	l = std::min<uint32_t>(l, 255);
+	h = std::min<uint32_t>(h, 255);
 	switch (bits)
 	{
 	case 2: return bc7_interp2(l, h, w);
@@ -1040,25 +1064,26 @@ bool unpack_bc7_mode6(const void *pBlock_bits, color_rgba *pPixels)
 	}
 #endif
 
-	pPixels[0] = vals[block.m_hi.m_s00];
-	pPixels[1] = vals[block.m_hi.m_s10];
-	pPixels[2] = vals[block.m_hi.m_s20];
-	pPixels[3] = vals[block.m_hi.m_s30];
+	const uint8_t selectors[16] = {
+		static_cast<uint8_t>(block.m_hi.m_s00), static_cast<uint8_t>(block.m_hi.m_s10),
+		static_cast<uint8_t>(block.m_hi.m_s20), static_cast<uint8_t>(block.m_hi.m_s30),
+		static_cast<uint8_t>(block.m_hi.m_s01), static_cast<uint8_t>(block.m_hi.m_s11),
+		static_cast<uint8_t>(block.m_hi.m_s21), static_cast<uint8_t>(block.m_hi.m_s31),
+		static_cast<uint8_t>(block.m_hi.m_s02), static_cast<uint8_t>(block.m_hi.m_s12),
+		static_cast<uint8_t>(block.m_hi.m_s22), static_cast<uint8_t>(block.m_hi.m_s32),
+		static_cast<uint8_t>(block.m_hi.m_s03), static_cast<uint8_t>(block.m_hi.m_s13),
+		static_cast<uint8_t>(block.m_hi.m_s23), static_cast<uint8_t>(block.m_hi.m_s33)
+	};
 
-	pPixels[4] = vals[block.m_hi.m_s01];
-	pPixels[5] = vals[block.m_hi.m_s11];
-	pPixels[6] = vals[block.m_hi.m_s21];
-	pPixels[7] = vals[block.m_hi.m_s31];
+	for (uint8_t selector : selectors) {
+		if (selector >= 16) {
+			return false;
+		}
+	}
 
-	pPixels[8] = vals[block.m_hi.m_s02];
-	pPixels[9] = vals[block.m_hi.m_s12];
-	pPixels[10] = vals[block.m_hi.m_s22];
-	pPixels[11] = vals[block.m_hi.m_s32];
-
-	pPixels[12] = vals[block.m_hi.m_s03];
-	pPixels[13] = vals[block.m_hi.m_s13];
-	pPixels[14] = vals[block.m_hi.m_s23];
-	pPixels[15] = vals[block.m_hi.m_s33];
+	for (uint32_t i = 0; i < 16; i++) {
+		pPixels[i] = vals[selectors[i]];
+	}
 
 	return true;
 }
@@ -1148,4 +1173,3 @@ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ------------------------------------------------------------------------------
 */
-

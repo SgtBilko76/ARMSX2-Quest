@@ -169,4 +169,14 @@
     <string name="cover_prefetch_running">Cover download already in progress.</string>
     <string name="cover_prefetch_no_connection">Connect to the internet to download covers.</string>
     <string name="action_save">Save</string>
+    <string name="per_game_settings_enable_custom">Enable per-game settings</string>
+    <string name="per_game_settings_renderer">Renderer</string>
+    <string name="per_game_settings_aspect_ratio">Aspect ratio</string>
+    <string name="per_game_settings_widescreen">Apply widescreen patch</string>
+    <string name="per_game_settings_enable_cheats">Enable cheats</string>
+    <string name="per_game_settings_no_interlacing">Disable interlacing</string>
+    <string name="per_game_settings_load_textures">Load texture replacements</string>
+    <string name="per_game_settings_async_textures">Async texture streaming</string>
+    <string name="per_game_settings_precache_textures">Pre-cache textures</string>
+    <string name="per_game_settings_show_fps">Display FPS counter</string>
 </resources>

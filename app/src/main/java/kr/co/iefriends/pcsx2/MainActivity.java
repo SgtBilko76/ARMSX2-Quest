@@ -11,6 +11,7 @@ import android.net.Uri;
 import android.content.pm.ActivityInfo;
 import android.database.Cursor;
 import android.os.Bundle;
+import android.os.ParcelFileDescriptor;
 import android.provider.OpenableColumns;
 import android.text.TextUtils;
 import android.view.InputDevice;
@@ -48,6 +49,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.IdRes;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -55,8 +57,6 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
-import androidx.core.view.ViewCompat;
-import androidx.core.graphics.Insets;
 
 import kr.co.iefriends.pcsx2.util.DebugLog;
 import kr.co.iefriends.pcsx2.util.DeviceProfiles;
@@ -78,18 +78,23 @@ import com.google.android.material.textfield.TextInputLayout;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.Closeable;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Objects;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
 import java.security.MessageDigest;
 import java.security.DigestInputStream;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.lang.ref.WeakReference;
@@ -97,6 +102,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.zip.Inflater;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -261,7 +267,6 @@ public class MainActivity extends AppCompatActivity {
         DiscordBridge.updateEngineActivity(this);
         sInstanceRef = new WeakReference<>(this);
         setContentView(R.layout.activity_main);
-        setupSafeAreaHandling();
         disableTouchControls = DeviceProfiles.isTvOrDesktop(this);
 	// Keep screen awake during gameplay
 	getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -1130,28 +1135,30 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void applyFullscreen() {
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        boolean fullscreen = !isHomeVisible();
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), !fullscreen);
         View decorView = getWindow().getDecorView();
         WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(getWindow(), decorView);
-        controller.hide(WindowInsetsCompat.Type.statusBars() | WindowInsetsCompat.Type.navigationBars());
-        controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-
-        decorView.setOnTouchListener((v, e) -> {
-            if (disableTouchControls) return false;
-            if (e.getAction() == MotionEvent.ACTION_DOWN || e.getAction() == MotionEvent.ACTION_MOVE) {
-                lastInput = InputSource.TOUCH;
-                lastTouchTimeMs = System.currentTimeMillis();
-                if (mEmulationThread != null) {
-                    setOnScreenControlsVisible(true);
-                    maybeAutoHideControls();
+        if (fullscreen) {
+            controller.hide(WindowInsetsCompat.Type.statusBars() | WindowInsetsCompat.Type.navigationBars());
+            controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            decorView.setOnTouchListener((v, e) -> {
+                if (disableTouchControls) return false;
+                if (e.getAction() == MotionEvent.ACTION_DOWN || e.getAction() == MotionEvent.ACTION_MOVE) {
+                    lastInput = InputSource.TOUCH;
+                    lastTouchTimeMs = System.currentTimeMillis();
+                    if (mEmulationThread != null) {
+                        setOnScreenControlsVisible(true);
+                        maybeAutoHideControls();
+                    }
+                    v.performClick();
                 }
-                v.performClick();
-            }
-            return false;
-        });
-        View inGameRootView = findViewById(R.id.in_game_root);
-        if (inGameRootView != null) {
-            ViewCompat.requestApplyInsets(inGameRootView);
+                return false;
+            });
+        } else {
+            controller.show(WindowInsetsCompat.Type.statusBars() | WindowInsetsCompat.Type.navigationBars());
+            controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_DEFAULT);
+            decorView.setOnTouchListener(null);
         }
     }
 
@@ -3015,27 +3022,6 @@ public class MainActivity extends AppCompatActivity {
 
     /// ///////////////////////////////////////////////////////////////////////////////////////////
 
-    private void setupSafeAreaHandling() {
-        View inGameRootView = findViewById(R.id.in_game_root);
-        if (inGameRootView != null) {
-            ViewCompat.setOnApplyWindowInsetsListener(inGameRootView, (v, insets) -> {
-                Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
-                v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
-                return insets;
-            });
-            ViewCompat.requestApplyInsets(inGameRootView);
-        }
-        View homeView = findViewById(R.id.home_container);
-        if (homeView != null) {
-            ViewCompat.setOnApplyWindowInsetsListener(homeView, (v, insets) -> {
-                Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
-                v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
-                return insets;
-            });
-            ViewCompat.requestApplyInsets(homeView);
-        }
-    }
-
     public void Initialize() {
         File dataDir = DataDirectoryManager.getDataRoot(getApplicationContext());
         if (dataDir != null) {
@@ -4344,6 +4330,7 @@ public class MainActivity extends AppCompatActivity {
                 bgImage.setVisibility(View.GONE);
             }
         }
+        applyFullscreen();
     }
 
     private boolean isHomeVisible() {
@@ -4525,7 +4512,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     static class GameScanner {
-    static final String[] EXTS = new String[]{".iso", ".img", ".bin", ".chd", ".gz"};
+    static final String[] EXTS = new String[]{".iso", ".img", ".bin", ".cso", ".zso", ".chd", ".gz"};
     static List<GameEntry> scanFolder(Context ctx, Uri treeUri) {
             List<GameEntry> out = new ArrayList<>();
             android.content.ContentResolver cr = ctx.getContentResolver();
@@ -4581,7 +4568,7 @@ public class MainActivity extends AppCompatActivity {
                     String s = parseSerialFromString(ft);
                     if (s != null) e.serial = s;
                     String lowerName = name != null ? name.toLowerCase() : "";
-                    if (e.serial == null && (lowerName.endsWith(".iso") || lowerName.endsWith(".img"))) {
+                    if (e.serial == null && (lowerName.endsWith(".iso") || lowerName.endsWith(".img") || lowerName.endsWith(".cso") || lowerName.endsWith(".zso"))) {
                         try {
                             String isoSerial = tryExtractIsoSerial(cr, doc);
                             if (isoSerial != null) e.serial = isoSerial;
@@ -4715,7 +4702,7 @@ public class MainActivity extends AppCompatActivity {
         static String tryExtractBinSerialQuick(android.content.ContentResolver cr, Uri uri) throws java.io.IOException {
             final int MAX = 8 * 1024 * 1024; 
             byte[] buf;
-            try (java.io.InputStream in = cr.openInputStream(uri)) {
+            try (java.io.InputStream in = CsoUtils.openInputStream(cr, uri)) {
                 if (in == null) return null;
                 java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream(Math.min(MAX, 1 << 20));
                 byte[] tmp = new byte[64 * 1024];
@@ -4751,6 +4738,10 @@ public class MainActivity extends AppCompatActivity {
         private static byte[] readRange(android.content.ContentResolver cr, Uri uri, long offset, int size) throws java.io.IOException {
             if (size <= 0) return null;
             if (size > 2 * 1024 * 1024) size = 2 * 1024 * 1024;
+            byte[] csoBytes = CsoUtils.readRange(cr, uri, offset, size);
+            if (csoBytes != null) {
+                return csoBytes;
+            }
             try (java.io.InputStream in = cr.openInputStream(uri)) {
                 if (in == null) return null;
                 long toSkip = offset;
@@ -4775,6 +4766,326 @@ public class MainActivity extends AppCompatActivity {
                 if (off2 == 0) return null;
                 if (off2 < size) return java.util.Arrays.copyOf(buf, off2);
                 return buf;
+            }
+        }
+    }
+
+    private static final class CsoUtils {
+        private static final int MAGIC_CISO = 0x4F534943;
+        private static final int MAGIC_ZISO = 0x4F53495A;
+
+        private CsoUtils() {}
+
+        @Nullable
+        static byte[] readRange(android.content.ContentResolver cr, Uri uri, long offset, int size) {
+            CsoReader reader = null;
+            try {
+                reader = CsoReader.open(cr, uri);
+                if (reader == null) {
+                    return null;
+                }
+                return reader.readRange(offset, size);
+            } catch (Exception ignored) {
+                return null;
+            } finally {
+                closeQuietly(reader);
+            }
+        }
+
+        @Nullable
+        static java.io.InputStream openInputStream(android.content.ContentResolver cr, Uri uri) throws java.io.IOException {
+            CsoReader reader = CsoReader.open(cr, uri);
+            if (reader == null) {
+                return cr.openInputStream(uri);
+            }
+            return new CsoInputStream(reader);
+        }
+
+        private static void closeQuietly(@Nullable Closeable closeable) {
+            if (closeable == null) {
+                return;
+            }
+            try {
+                closeable.close();
+            } catch (Exception ignored) {}
+        }
+
+        private static final class CsoReader implements Closeable {
+            private final ParcelFileDescriptor descriptor;
+            private final FileInputStream inputStream;
+            private final FileChannel channel;
+            private final long uncompressedSize;
+            private final int blockSize;
+            private final int alignShift;
+            private final int[] indexTable;
+            private final int blockCount;
+
+            private CsoReader(ParcelFileDescriptor descriptor, FileInputStream inputStream, FileChannel channel,
+                              long uncompressedSize, int blockSize, int alignShift, int[] indexTable) {
+                this.descriptor = descriptor;
+                this.inputStream = inputStream;
+                this.channel = channel;
+                this.uncompressedSize = uncompressedSize;
+                this.blockSize = blockSize;
+                this.alignShift = alignShift;
+                this.indexTable = indexTable;
+                this.blockCount = indexTable.length - 1;
+            }
+
+            static CsoReader open(android.content.ContentResolver cr, Uri uri) throws java.io.IOException {
+                ParcelFileDescriptor pfd = cr.openFileDescriptor(uri, "r");
+                if (pfd == null) {
+                    return null;
+                }
+                FileInputStream fis = null;
+                try {
+                    fis = new FileInputStream(pfd.getFileDescriptor());
+                    FileChannel channel = fis.getChannel();
+                    ByteBuffer header = ByteBuffer.allocate(0x18).order(ByteOrder.LITTLE_ENDIAN);
+                    if (channel.read(header) < 0x18) {
+                        closeQuietly(fis);
+                        closeQuietly(pfd);
+                        return null;
+                    }
+                    header.flip();
+                    int magic = header.getInt();
+                    if (magic != MAGIC_CISO && magic != MAGIC_ZISO) {
+                        closeQuietly(fis);
+                        closeQuietly(pfd);
+                        return null;
+                    }
+                    int headerSize = header.getInt();
+                    long uncompressedSize = header.getLong();
+                    int blockSize = header.getInt();
+                    header.get();
+                    int align = header.get() & 0xFF;
+                    header.get();
+                    header.get();
+                    if (blockSize <= 0 || uncompressedSize <= 0 || headerSize < 0x18) {
+                        closeQuietly(fis);
+                        closeQuietly(pfd);
+                        return null;
+                    }
+                    int entryCount = (headerSize - 0x18) / 4;
+                    if (entryCount <= 1) {
+                        closeQuietly(fis);
+                        closeQuietly(pfd);
+                        return null;
+                    }
+                    int[] table = new int[entryCount];
+                    ByteBuffer indexBuffer = ByteBuffer.allocate(entryCount * 4).order(ByteOrder.LITTLE_ENDIAN);
+                    if (channel.read(indexBuffer) < entryCount * 4) {
+                        closeQuietly(fis);
+                        closeQuietly(pfd);
+                        return null;
+                    }
+                    indexBuffer.flip();
+                    for (int i = 0; i < entryCount; i++) {
+                        table[i] = indexBuffer.getInt();
+                    }
+                    return new CsoReader(pfd, fis, channel, uncompressedSize, blockSize, align, table);
+                } catch (Exception e) {
+                    closeQuietly(fis);
+                    closeQuietly(pfd);
+                    throw e;
+                }
+            }
+
+            byte[] readRange(long offset, int size) throws java.io.IOException {
+                if (size <= 0 || offset < 0 || offset >= uncompressedSize) {
+                    return null;
+                }
+                int cappedSize = (int)Math.min(size, uncompressedSize - offset);
+                byte[] output = new byte[cappedSize];
+                byte[] blockBuffer = new byte[blockSize];
+                int startBlock = (int)(offset / blockSize);
+                int endBlock = Math.min(blockCount, (int)Math.ceil((offset + cappedSize) / (double)blockSize));
+                int outOffset = 0;
+                int offsetInBlock = (int)(offset % blockSize);
+                long remaining = cappedSize;
+                for (int block = startBlock; block < endBlock && remaining > 0; block++) {
+                    int produced = readBlockInto(block, blockBuffer);
+                    if (produced <= 0) {
+                        break;
+                    }
+                    int start = (block == startBlock) ? offsetInBlock : 0;
+                    if (start >= produced) {
+                        continue;
+                    }
+                    int copyLength = (int)Math.min(produced - start, remaining);
+                    System.arraycopy(blockBuffer, start, output, outOffset, copyLength);
+                    outOffset += copyLength;
+                    remaining -= copyLength;
+                }
+                if (outOffset == 0) {
+                    return null;
+                }
+                if (outOffset < output.length) {
+                    return Arrays.copyOf(output, outOffset);
+                }
+                return output;
+            }
+
+            int readBlockInto(int blockIndex, byte[] dest) throws java.io.IOException {
+                if (blockIndex < 0 || blockIndex >= blockCount) {
+                    return -1;
+                }
+                long startOffset = (long)(indexTable[blockIndex] & 0x7FFFFFFFL) << alignShift;
+                long endOffset = (long)(indexTable[blockIndex + 1] & 0x7FFFFFFFL) << alignShift;
+                boolean isPlain = (indexTable[blockIndex] & 0x80000000) != 0;
+                int compressedSize = (int)Math.max(0, endOffset - startOffset);
+                int expectedSize = (int)Math.min(blockSize, uncompressedSize - ((long)blockIndex * blockSize));
+                if (expectedSize <= 0) {
+                    return 0;
+                }
+                if (compressedSize == 0) {
+                    Arrays.fill(dest, 0, expectedSize, (byte)0);
+                    return expectedSize;
+                }
+                byte[] compressed = new byte[compressedSize];
+                ByteBuffer buffer = ByteBuffer.wrap(compressed);
+                channel.position(startOffset);
+                int readTotal = 0;
+                while (buffer.hasRemaining()) {
+                    int r = channel.read(buffer);
+                    if (r <= 0) {
+                        break;
+                    }
+                    readTotal += r;
+                }
+                if (readTotal != compressedSize) {
+                    return -1;
+                }
+                if (isPlain) {
+                    int toCopy = Math.min(expectedSize, compressedSize);
+                    System.arraycopy(compressed, 0, dest, 0, toCopy);
+                    if (toCopy < expectedSize) {
+                        Arrays.fill(dest, toCopy, expectedSize, (byte)0);
+                    }
+                    return expectedSize;
+                }
+                Inflater inflater = new Inflater(true);
+                try {
+                    inflater.setInput(compressed);
+                    int total = 0;
+                    while (!inflater.finished() && total < expectedSize) {
+                        int r = inflater.inflate(dest, total, expectedSize - total);
+                        if (r <= 0) {
+                            if (inflater.needsInput() || inflater.finished()) {
+                                break;
+                            }
+                        } else {
+                            total += r;
+                        }
+                    }
+                    if (total <= 0) {
+                        Arrays.fill(dest, 0, expectedSize, (byte)0);
+                        return expectedSize;
+                    }
+                    return total;
+                } catch (Exception ignored) {
+                    return -1;
+                } finally {
+                    inflater.end();
+                }
+            }
+
+            int getBlockCount() {
+                return blockCount;
+            }
+
+            int getBlockSize() {
+                return blockSize;
+            }
+
+            long getUncompressedSize() {
+                return uncompressedSize;
+            }
+
+            @Override
+            public void close() throws java.io.IOException {
+                try {
+                    channel.close();
+                } finally {
+                    try {
+                        inputStream.close();
+                    } finally {
+                        descriptor.close();
+                    }
+                }
+            }
+        }
+
+        private static final class CsoInputStream extends java.io.InputStream {
+            private final CsoReader reader;
+            private final byte[] blockBuffer;
+            private int currentBlock = 0;
+            private int blockPos = 0;
+            private int blockLimit = 0;
+            private long bytesRemaining;
+
+            CsoInputStream(CsoReader reader) {
+                this.reader = reader;
+                this.blockBuffer = new byte[reader.getBlockSize()];
+                this.bytesRemaining = reader.getUncompressedSize();
+            }
+
+            @Override
+            public int read() throws java.io.IOException {
+                byte[] single = new byte[1];
+                int r = read(single, 0, 1);
+                if (r <= 0) {
+                    return -1;
+                }
+                return single[0] & 0xFF;
+            }
+
+            @Override
+            public int read(@NonNull byte[] b, int off, int len) throws java.io.IOException {
+                if (b == null) {
+                    throw new NullPointerException();
+                }
+                if (off < 0 || len < 0 || len > b.length - off) {
+                    throw new IndexOutOfBoundsException();
+                }
+                if (len == 0) {
+                    return 0;
+                }
+                if (bytesRemaining <= 0) {
+                    return -1;
+                }
+                int total = 0;
+                while (len > 0 && bytesRemaining > 0) {
+                    if (blockPos >= blockLimit) {
+                        if (currentBlock >= reader.getBlockCount()) {
+                            break;
+                        }
+                        blockLimit = reader.readBlockInto(currentBlock, blockBuffer);
+                        currentBlock++;
+                        blockPos = 0;
+                        if (blockLimit <= 0) {
+                            break;
+                        }
+                    }
+                    int available = blockLimit - blockPos;
+                    int copy = Math.min(len, available);
+                    copy = (int)Math.min(copy, bytesRemaining);
+                    if (copy <= 0) {
+                        break;
+                    }
+                    System.arraycopy(blockBuffer, blockPos, b, off, copy);
+                    off += copy;
+                    len -= copy;
+                    total += copy;
+                    blockPos += copy;
+                    bytesRemaining -= copy;
+                }
+                return total > 0 ? total : -1;
+            }
+
+            @Override
+            public void close() throws java.io.IOException {
+                reader.close();
             }
         }
     }
@@ -4900,7 +5211,7 @@ public class MainActivity extends AppCompatActivity {
                 long total = 0;
                 final int BUF = 1024 * 1024;
                 byte[] buf = new byte[BUF];
-                try (java.io.InputStream in = cr.openInputStream(file)) {
+                try (java.io.InputStream in = CsoUtils.openInputStream(cr, file)) {
                     if (in == null) return null;
                     while (true) {
                         int r = in.read(buf);
