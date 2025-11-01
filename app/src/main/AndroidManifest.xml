@@ -29,7 +29,8 @@
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="archos.permission.FULLSCREEN.FULL" />
+    <!-- should keep an eye on this its causing issues on some devices -->
+    <uses-permission android:name="archos.permission.FULLSCREEN.FULL" /> 
 
     <supports-screens
         android:largeScreens="true"

@@ -180,6 +180,12 @@ public class MainActivity extends AppCompatActivity {
     private float onScreenUiScaleMultiplier = 1.0f;
     private float faceButtonsBaseScale = 1.0f;
 
+    @Nullable
+    private PerGameOverrideSnapshot lastPerGameOverrideSnapshot = null;
+    @Nullable
+    private String lastPerGameOverrideKey = null;
+    private boolean perGameOverridesActive = false;
+
     // Auto-hide state
     private enum InputSource { TOUCH, CONTROLLER }
     private InputSource lastInput = InputSource.TOUCH;
@@ -1156,7 +1162,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
-    private void promptChooseManualCover(GameEntry e) {
+    private void showGameOptionsDialog(GameEntry e) {
         if (e == null) return;
         String key = gameKeyFromEntry(e);
         String existing = getManualCoverUri(key);
@@ -1166,18 +1172,30 @@ public class MainActivity extends AppCompatActivity {
         container.setPadding(pad, pad, pad, pad);
         container.setBackgroundColor(0xEE222222);
         android.widget.TextView title = new android.widget.TextView(this);
-        title.setText("Cover options");
+        title.setText(e.gameTitle != null ? e.gameTitle : e.title);
         title.setTextColor(0xFFFFFFFF);
         title.setTextSize(18);
         title.setPadding(0, 0, 0, pad / 2);
         container.addView(title);
-        MaterialButton pick = new MaterialButton(this);
-        pick.setText("Choose cover");
-        int primary = resolveThemeColor(android.R.attr.colorPrimary);
-        int onPrimary = resolveThemeColor(android.R.attr.textColorPrimary);
-        pick.setBackgroundTintList(ColorStateList.valueOf(primary));
-        pick.setTextColor(onPrimary);
-        container.addView(pick);
+
+    float density = getResources().getDisplayMetrics().density;
+    int primary = resolveThemeColor(android.R.attr.colorPrimary);
+    int onPrimary = resolveThemeColor(android.R.attr.textColorPrimary);
+    int surfaceVariant = resolveThemeColor(android.R.attr.colorBackground);
+    int onSurface = resolveThemeColor(android.R.attr.textColorPrimary);
+    int secondary = resolveThemeColor(com.google.android.material.R.attr.colorSecondary);
+    int onSecondary = resolveThemeColor(com.google.android.material.R.attr.colorOnSecondary);
+    int spacing = (int) (8f * density);
+
+    MaterialButton pick = new MaterialButton(this);
+    LinearLayout.LayoutParams pickParams = new LinearLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    pickParams.topMargin = spacing;
+    pick.setLayoutParams(pickParams);
+    pick.setText(getString(R.string.cover_action_choose));
+    pick.setBackgroundTintList(ColorStateList.valueOf(primary));
+    pick.setTextColor(onPrimary);
+    container.addView(pick);
 
         MaterialAlertDialogBuilder mBuilder = new MaterialAlertDialogBuilder(this)
                 .setView(container)
@@ -1196,9 +1214,11 @@ public class MainActivity extends AppCompatActivity {
 
         if (existing != null) {
             MaterialButton remove = new MaterialButton(this);
-            remove.setText("Remove chosen cover");
-            int surfaceVariant = resolveThemeColor(android.R.attr.colorBackground);
-            int onSurface = resolveThemeColor(android.R.attr.textColorPrimary);
+            LinearLayout.LayoutParams removeParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            removeParams.topMargin = spacing;
+            remove.setLayoutParams(removeParams);
+            remove.setText(getString(R.string.cover_action_remove));
             remove.setBackgroundTintList(ColorStateList.valueOf(surfaceVariant));
             remove.setTextColor(onSurface);
             container.addView(remove);
@@ -1209,8 +1229,413 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
+        MaterialButton perGame = new MaterialButton(this);
+        LinearLayout.LayoutParams perGameParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        perGameParams.topMargin = spacing * 2;
+        perGame.setLayoutParams(perGameParams);
+        perGame.setText(getString(R.string.per_game_settings_button));
+        perGame.setBackgroundTintList(ColorStateList.valueOf(secondary));
+        perGame.setTextColor(onSecondary);
+        container.addView(perGame);
+
+        perGame.setOnClickListener(v -> {
+            dlg.dismiss();
+            showPerGameSettingsDialog(e);
+        });
+
         dlg.show();
     }
+
+    private void showPerGameSettingsDialog(GameEntry entry) {
+        if (entry == null) return;
+        String gameKey = gameKeyFromEntry(entry);
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_game_specific_settings, null);
+
+        MaterialSwitch switchEnabled = dialogView.findViewById(R.id.per_game_switch_enabled);
+        ViewGroup settingsGroup = dialogView.findViewById(R.id.per_game_settings_group);
+        Spinner rendererSpinner = dialogView.findViewById(R.id.per_game_spinner_renderer);
+        Spinner aspectSpinner = dialogView.findViewById(R.id.per_game_spinner_aspect_ratio);
+        MaterialSwitch switchWidescreen = dialogView.findViewById(R.id.per_game_switch_widescreen);
+        MaterialSwitch switchCheats = dialogView.findViewById(R.id.per_game_switch_enable_cheats);
+        MaterialSwitch switchNoInterlacing = dialogView.findViewById(R.id.per_game_switch_no_interlacing);
+        MaterialSwitch switchLoadTextures = dialogView.findViewById(R.id.per_game_switch_load_textures);
+        MaterialSwitch switchAsyncTextures = dialogView.findViewById(R.id.per_game_switch_async_textures);
+        MaterialSwitch switchPrecache = dialogView.findViewById(R.id.per_game_switch_precache_textures);
+        MaterialSwitch switchShowFps = dialogView.findViewById(R.id.per_game_switch_show_fps);
+
+        boolean globalCheats = readBoolSetting("EmuCore", "EnableCheats", false);
+        boolean globalWidescreen = readBoolSetting("EmuCore", "EnableWideScreenPatches", false);
+        boolean globalNoInterlacing = readBoolSetting("EmuCore", "EnableNoInterlacingPatches", false);
+        boolean globalLoadTextures = readBoolSetting("EmuCore/GS", "LoadTextureReplacements", false);
+        boolean globalAsyncTextures = readBoolSetting("EmuCore/GS", "LoadTextureReplacementsAsync", false);
+        boolean globalPrecache = readBoolSetting("EmuCore/GS", "PrecacheTextureReplacements", false);
+        boolean globalShowFps = readBoolSetting("EmuCore/GS", "OsdShowFPS", false);
+        int globalRenderer = getCurrentRendererValue();
+        String globalAspect = getCurrentAspectRatioValue();
+
+        GameSpecificSettingsManager.GameSettings existing = GameSpecificSettingsManager.getSettings(this, gameKey);
+
+        boolean initialEnabled = existing != null;
+        boolean initialCheats = existing != null && existing.enableCheats != null ? existing.enableCheats : globalCheats;
+        boolean initialWidescreen = existing != null && existing.widescreen != null ? existing.widescreen : globalWidescreen;
+        boolean initialNoInterlacing = existing != null && existing.noInterlacing != null ? existing.noInterlacing : globalNoInterlacing;
+        boolean initialLoadTextures = existing != null && existing.loadTextures != null ? existing.loadTextures : globalLoadTextures;
+        boolean initialAsyncTextures = existing != null && existing.asyncTextures != null ? existing.asyncTextures : globalAsyncTextures;
+        boolean initialPrecache = existing != null && existing.precacheTextures != null ? existing.precacheTextures : globalPrecache;
+        boolean initialShowFps = existing != null && existing.showFps != null ? existing.showFps : globalShowFps;
+        int initialRenderer = existing != null && existing.renderer != null ? existing.renderer : globalRenderer;
+        String initialAspect = existing != null && !TextUtils.isEmpty(existing.aspectRatio) ? existing.aspectRatio : globalAspect;
+
+        switchEnabled.setChecked(initialEnabled);
+        switchCheats.setChecked(initialCheats);
+        switchWidescreen.setChecked(initialWidescreen);
+        switchNoInterlacing.setChecked(initialNoInterlacing);
+        switchLoadTextures.setChecked(initialLoadTextures);
+        switchAsyncTextures.setChecked(initialAsyncTextures);
+        switchPrecache.setChecked(initialPrecache);
+        switchShowFps.setChecked(initialShowFps);
+
+        rendererSpinner.setSelection(rendererSpinnerPositionForValue(initialRenderer), false);
+
+        String[] aspectOptions = getResources().getStringArray(R.array.aspect_ratios);
+        int aspectIndex = 0;
+        for (int i = 0; i < aspectOptions.length; i++) {
+            if (TextUtils.equals(aspectOptions[i], initialAspect)) {
+                aspectIndex = i;
+                break;
+            }
+        }
+        aspectSpinner.setSelection(aspectIndex, false);
+
+        setGroupEnabled(settingsGroup, initialEnabled);
+
+        switchEnabled.setOnCheckedChangeListener((button, isChecked) -> setGroupEnabled(settingsGroup, isChecked));
+
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this)
+                .setTitle(entry.gameTitle != null ? entry.gameTitle : entry.title)
+                .setView(dialogView)
+                .setNegativeButton(android.R.string.cancel, (d, w) -> d.dismiss())
+                .setPositiveButton(R.string.action_save, null);
+
+        AlertDialog dialog = builder.create();
+        dialog.setOnShowListener(dlg -> {
+            android.widget.Button saveButton = dialog.getButton(DialogInterface.BUTTON_POSITIVE);
+            if (saveButton == null) {
+                return;
+            }
+            saveButton.setOnClickListener(v -> {
+                if (!switchEnabled.isChecked()) {
+                    GameSpecificSettingsManager.removeSettings(this, gameKey);
+                    try { Toast.makeText(this, R.string.per_game_settings_cleared_toast, Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
+                    dialog.dismiss();
+                    return;
+                }
+
+                GameSpecificSettingsManager.GameSettings toSave = new GameSpecificSettingsManager.GameSettings();
+
+                boolean cheatsValue = switchCheats.isChecked();
+                if (cheatsValue != globalCheats) toSave.enableCheats = cheatsValue;
+
+                boolean widescreenValue = switchWidescreen.isChecked();
+                if (widescreenValue != globalWidescreen) toSave.widescreen = widescreenValue;
+
+                boolean noInterlacingValue = switchNoInterlacing.isChecked();
+                if (noInterlacingValue != globalNoInterlacing) toSave.noInterlacing = noInterlacingValue;
+
+                boolean loadTexturesValue = switchLoadTextures.isChecked();
+                if (loadTexturesValue != globalLoadTextures) toSave.loadTextures = loadTexturesValue;
+
+                boolean asyncTexturesValue = switchAsyncTextures.isChecked();
+                if (asyncTexturesValue != globalAsyncTextures) toSave.asyncTextures = asyncTexturesValue;
+
+                boolean precacheValue = switchPrecache.isChecked();
+                if (precacheValue != globalPrecache) toSave.precacheTextures = precacheValue;
+
+                boolean showFpsValue = switchShowFps.isChecked();
+                if (showFpsValue != globalShowFps) toSave.showFps = showFpsValue;
+
+                int rendererValue = rendererValueForSpinnerPosition(rendererSpinner.getSelectedItemPosition());
+                if (rendererValue != globalRenderer) toSave.renderer = rendererValue;
+
+                String aspectValue = aspectOptions[aspectSpinner.getSelectedItemPosition()];
+                if (!TextUtils.equals(aspectValue, globalAspect)) toSave.aspectRatio = aspectValue;
+
+                if (toSave.hasOverrides()) {
+                    GameSpecificSettingsManager.saveSettings(this, gameKey, toSave);
+                    try { Toast.makeText(this, R.string.per_game_settings_saved_toast, Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
+                } else {
+                    GameSpecificSettingsManager.removeSettings(this, gameKey);
+                    try { Toast.makeText(this, R.string.per_game_settings_cleared_toast, Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
+                }
+                dialog.dismiss();
+            });
+        });
+
+        dialog.show();
+    }
+
+    private void setGroupEnabled(@Nullable ViewGroup group, boolean enabled) {
+        if (group == null) {
+            return;
+        }
+        group.setEnabled(enabled);
+        group.setAlpha(enabled ? 1f : 0.38f);
+        for (int i = 0; i < group.getChildCount(); i++) {
+            View child = group.getChildAt(i);
+            child.setEnabled(enabled);
+            if (child instanceof ViewGroup) {
+                setGroupEnabled((ViewGroup) child, enabled);
+            }
+        }
+    }
+
+    private int rendererSpinnerPositionForValue(int value) {
+        switch (value) {
+            case 12:
+                return 1;
+            case 13:
+                return 2;
+            case 14:
+                return 3;
+            default:
+                return 0;
+        }
+    }
+
+    private int rendererValueForSpinnerPosition(int position) {
+        switch (position) {
+            case 1:
+                return 12;
+            case 2:
+                return 13;
+            case 3:
+                return 14;
+            default:
+                return -1;
+        }
+    }
+
+    private int getCurrentRendererValue() {
+        int initialValue = -1;
+        try {
+            String renderer = NativeApp.getSetting("EmuCore/GS", "Renderer", "int");
+            if (!TextUtils.isEmpty(renderer)) {
+                initialValue = Integer.parseInt(renderer);
+            }
+        } catch (Exception ignored) {}
+        return initialValue;
+    }
+
+    private String getCurrentAspectRatioValue() {
+        String[] aspectOptions = getResources().getStringArray(R.array.aspect_ratios);
+        String defaultValue = aspectOptions.length > 1 ? aspectOptions[1] : aspectOptions[0];
+        try {
+            String aspect = NativeApp.getSetting("EmuCore/GS", "AspectRatio", "string");
+            if (!TextUtils.isEmpty(aspect)) {
+                return aspect;
+            }
+        } catch (Exception ignored) {}
+        return defaultValue;
+    }
+
+    private void applyPerGameSettingsForEntry(@Nullable GameEntry entry) {
+        if (entry == null) {
+            return;
+        }
+        applyPerGameSettingsForKey(gameKeyFromEntry(entry));
+    }
+
+    private void applyPerGameSettingsForUri(@Nullable Uri uri) {
+        applyPerGameSettingsForKey(uri != null ? uri.toString() : null);
+    }
+
+    private void applyPerGameSettingsForKey(@Nullable String gameKey) {
+        restorePerGameOverrides();
+        if (TextUtils.isEmpty(gameKey)) {
+            return;
+        }
+        GameSpecificSettingsManager.GameSettings settings = GameSpecificSettingsManager.getSettings(this, gameKey);
+        if (settings == null || !settings.hasOverrides()) {
+            return;
+        }
+
+        PerGameOverrideSnapshot snapshot = captureCurrentPerGameSnapshot();
+        boolean applied = false;
+
+        if (settings.enableCheats != null) {
+            setNativeSetting("EmuCore", "EnableCheats", "bool", boolToString(settings.enableCheats));
+            applied = true;
+        }
+        if (settings.widescreen != null) {
+            setNativeSetting("EmuCore", "EnableWideScreenPatches", "bool", boolToString(settings.widescreen));
+            applied = true;
+        }
+        if (settings.noInterlacing != null) {
+            setNativeSetting("EmuCore", "EnableNoInterlacingPatches", "bool", boolToString(settings.noInterlacing));
+            applied = true;
+        }
+        if (settings.loadTextures != null) {
+            setNativeSetting("EmuCore/GS", "LoadTextureReplacements", "bool", boolToString(settings.loadTextures));
+            applied = true;
+        }
+        if (settings.asyncTextures != null) {
+            setNativeSetting("EmuCore/GS", "LoadTextureReplacementsAsync", "bool", boolToString(settings.asyncTextures));
+            applied = true;
+        }
+        if (settings.precacheTextures != null) {
+            setNativeSetting("EmuCore/GS", "PrecacheTextureReplacements", "bool", boolToString(settings.precacheTextures));
+            applied = true;
+        }
+        if (settings.showFps != null) {
+            setNativeSetting("EmuCore/GS", "OsdShowFPS", "bool", boolToString(settings.showFps));
+            applied = true;
+        }
+        if (settings.renderer != null) {
+            setNativeSetting("EmuCore/GS", "Renderer", "int", Integer.toString(settings.renderer));
+            applied = true;
+        }
+        if (!TextUtils.isEmpty(settings.aspectRatio)) {
+            setNativeSetting("EmuCore/GS", "AspectRatio", "string", settings.aspectRatio);
+            applied = true;
+        }
+
+        if (applied) {
+            perGameOverridesActive = true;
+            lastPerGameOverrideSnapshot = snapshot;
+            lastPerGameOverrideKey = gameKey;
+        }
+    }
+
+    private void restorePerGameOverrides() {
+        if (!perGameOverridesActive) {
+            lastPerGameOverrideSnapshot = null;
+            lastPerGameOverrideKey = null;
+            return;
+        }
+        PerGameOverrideSnapshot snapshot = lastPerGameOverrideSnapshot;
+        perGameOverridesActive = false;
+        lastPerGameOverrideSnapshot = null;
+        lastPerGameOverrideKey = null;
+        if (snapshot == null) {
+            return;
+        }
+
+        setNativeSetting("EmuCore", "EnableCheats", "bool", snapshot.enableCheats);
+        setNativeSetting("EmuCore", "EnableWideScreenPatches", "bool", snapshot.widescreen);
+        setNativeSetting("EmuCore", "EnableNoInterlacingPatches", "bool", snapshot.noInterlacing);
+        setNativeSetting("EmuCore/GS", "LoadTextureReplacements", "bool", snapshot.loadTextures);
+        setNativeSetting("EmuCore/GS", "LoadTextureReplacementsAsync", "bool", snapshot.asyncTextures);
+        setNativeSetting("EmuCore/GS", "PrecacheTextureReplacements", "bool", snapshot.precacheTextures);
+        setNativeSetting("EmuCore/GS", "OsdShowFPS", "bool", snapshot.showFps);
+        setNativeSetting("EmuCore/GS", "Renderer", "int", snapshot.renderer);
+        setNativeSetting("EmuCore/GS", "AspectRatio", "string", snapshot.aspectRatio);
+    }
+
+    private PerGameOverrideSnapshot captureCurrentPerGameSnapshot() {
+        String cheats = safeGetSetting("EmuCore", "EnableCheats", "bool");
+        if (cheats == null) {
+            cheats = boolToString(readBoolSetting("EmuCore", "EnableCheats", false));
+        }
+
+        String widescreen = safeGetSetting("EmuCore", "EnableWideScreenPatches", "bool");
+        if (widescreen == null) {
+            widescreen = boolToString(readBoolSetting("EmuCore", "EnableWideScreenPatches", false));
+        }
+
+        String noInterlacing = safeGetSetting("EmuCore", "EnableNoInterlacingPatches", "bool");
+        if (noInterlacing == null) {
+            noInterlacing = boolToString(readBoolSetting("EmuCore", "EnableNoInterlacingPatches", false));
+        }
+
+        String loadTextures = safeGetSetting("EmuCore/GS", "LoadTextureReplacements", "bool");
+        if (loadTextures == null) {
+            loadTextures = boolToString(readBoolSetting("EmuCore/GS", "LoadTextureReplacements", false));
+        }
+
+        String asyncTextures = safeGetSetting("EmuCore/GS", "LoadTextureReplacementsAsync", "bool");
+        if (asyncTextures == null) {
+            asyncTextures = boolToString(readBoolSetting("EmuCore/GS", "LoadTextureReplacementsAsync", false));
+        }
+
+        String precache = safeGetSetting("EmuCore/GS", "PrecacheTextureReplacements", "bool");
+        if (precache == null) {
+            precache = boolToString(readBoolSetting("EmuCore/GS", "PrecacheTextureReplacements", false));
+        }
+
+        String showFps = safeGetSetting("EmuCore/GS", "OsdShowFPS", "bool");
+        if (showFps == null) {
+            showFps = boolToString(readBoolSetting("EmuCore/GS", "OsdShowFPS", false));
+        }
+
+        String renderer = safeGetSetting("EmuCore/GS", "Renderer", "int");
+        if (renderer == null) {
+            renderer = Integer.toString(getCurrentRendererValue());
+        }
+
+        String aspect = safeGetSetting("EmuCore/GS", "AspectRatio", "string");
+        if (aspect == null) {
+            aspect = getCurrentAspectRatioValue();
+        }
+
+        return new PerGameOverrideSnapshot(cheats, widescreen, noInterlacing, loadTextures, asyncTextures, precache, showFps, renderer, aspect);
+    }
+
+    @Nullable
+    private static String safeGetSetting(String section, String key, String type) {
+        try {
+            return NativeApp.getSetting(section, key, type);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static void setNativeSetting(String section, String key, String type, @Nullable String value) {
+        if (value == null) {
+            return;
+        }
+        try {
+            NativeApp.setSetting(section, key, type, value);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static String boolToString(boolean value) {
+        return value ? "true" : "false";
+    }
+
+    private static final class PerGameOverrideSnapshot {
+        @Nullable final String enableCheats;
+        @Nullable final String widescreen;
+        @Nullable final String noInterlacing;
+        @Nullable final String loadTextures;
+        @Nullable final String asyncTextures;
+        @Nullable final String precacheTextures;
+        @Nullable final String showFps;
+        @Nullable final String renderer;
+        @Nullable final String aspectRatio;
+
+        PerGameOverrideSnapshot(@Nullable String enableCheats,
+                                @Nullable String widescreen,
+                                @Nullable String noInterlacing,
+                                @Nullable String loadTextures,
+                                @Nullable String asyncTextures,
+                                @Nullable String precacheTextures,
+                                @Nullable String showFps,
+                                @Nullable String renderer,
+                                @Nullable String aspectRatio) {
+            this.enableCheats = enableCheats;
+            this.widescreen = widescreen;
+            this.noInterlacing = noInterlacing;
+            this.loadTextures = loadTextures;
+            this.asyncTextures = asyncTextures;
+            this.precacheTextures = precacheTextures;
+            this.showFps = showFps;
+            this.renderer = renderer;
+            this.aspectRatio = aspectRatio;
+        }
+    }
+
     // endregion Manual cover selection
 
     
@@ -2999,6 +3424,7 @@ public class MainActivity extends AppCompatActivity {
                         if(_intent != null) {
                             Uri picked = _intent.getData();
                             if (picked != null) {
+                                applyPerGameSettingsForUri(picked);
                                 m_szGamefile = picked.toString();
                                 if(!TextUtils.isEmpty(m_szGamefile)) {
                                     handleSelectedGameUri(picked);
@@ -4358,14 +4784,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showHome(boolean show) {
-    if (homeContainer != null) homeContainer.setVisibility(show ? View.VISIBLE : View.GONE);
-    if (drawerLayout != null) {
-        drawerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
-        try {
-            drawerLayout.setDrawerLockMode(show ? DrawerLayout.LOCK_MODE_UNLOCKED : DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
-            drawerLayout.setScrimColor(android.graphics.Color.TRANSPARENT);
-        } catch (Throwable ignored) {}
-    }
+        if (show) {
+            restorePerGameOverrides();
+        }
+
+        if (homeContainer != null) {
+            homeContainer.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+        if (drawerLayout != null) {
+            drawerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
+            try {
+                drawerLayout.setDrawerLockMode(show ? DrawerLayout.LOCK_MODE_UNLOCKED : DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
+                drawerLayout.setScrimColor(android.graphics.Color.TRANSPARENT);
+            } catch (Throwable ignored) {}
+        }
         if (inGameDrawer != null) {
             if (show) {
                 try {
@@ -4405,10 +4837,11 @@ public class MainActivity extends AppCompatActivity {
             if (show) {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
             } else {
-                if (TextUtils.isEmpty(m_szGamefile))
+                if (TextUtils.isEmpty(m_szGamefile)) {
                     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
-                else
+                } else {
                     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                }
             }
         } catch (Throwable ignored) {}
         if (show && tvEmpty != null && gamesFolderUri == null) {
@@ -4543,6 +4976,7 @@ public class MainActivity extends AppCompatActivity {
 
     // Cheap but effective: if emulator isn't running yet, boot BIOS first, then load the game like the File button flow.
     private void launchGameWithPreflight(@NonNull Uri uri) {
+        applyPerGameSettingsForUri(uri);
         if (isThread()) {
             handleSelectedGameUri(uri);
             return;
@@ -4551,9 +4985,9 @@ public class MainActivity extends AppCompatActivity {
         try { Toast.makeText(this, "Preflight: booting BIOS…", Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
         pendingGameUri = uri;
         pendingLaunchRetries = 0;
-    bootBios();
-    getWindow().getDecorView().postDelayed(pendingLaunchRunnable, 900);
-    schedulePreflightFallback();
+        bootBios();
+        getWindow().getDecorView().postDelayed(pendingLaunchRunnable, 900);
+        schedulePreflightFallback();
     }
 
     private final Runnable pendingLaunchRunnable = new Runnable() {
@@ -5575,7 +6009,7 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             });
             holder.itemView.setOnLongClickListener(v -> {
-                try { ((MainActivity)holder.itemView.getContext()).promptChooseManualCover(e); } catch (Throwable ignored) {}
+                try { ((MainActivity)holder.itemView.getContext()).showGameOptionsDialog(e); } catch (Throwable ignored) {}
                 return true;
             });
         }

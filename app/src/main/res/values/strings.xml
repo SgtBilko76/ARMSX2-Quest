@@ -163,6 +163,8 @@
     <string name="cover_template_dialog_description">Use ${serial}, ${title}, or ${filetitle} to target each game.</string>
     <string name="cover_template_dialog_example">Example: https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default/${serial}.jpg</string>
     <string name="cover_template_saved_toast">Cover template saved.</string>
+    <string name="cover_action_choose">Choose cover</string>
+    <string name="cover_action_remove">Remove chosen cover</string>
     <string name="cover_prefetch_start">Downloading covers in the background…</string>
     <string name="cover_prefetch_done">Cached %1$d cover(s).</string>
     <string name="cover_prefetch_none">No covers could be downloaded.</string>
@@ -179,4 +181,7 @@
     <string name="per_game_settings_async_textures">Async texture streaming</string>
     <string name="per_game_settings_precache_textures">Pre-cache textures</string>
     <string name="per_game_settings_show_fps">Display FPS counter</string>
+    <string name="per_game_settings_button">Per-game settings</string>
+    <string name="per_game_settings_saved_toast">Per-game settings saved.</string>
+    <string name="per_game_settings_cleared_toast">Per-game settings cleared.</string>
 </resources>
