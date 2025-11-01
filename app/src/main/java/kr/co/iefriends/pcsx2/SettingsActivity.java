@@ -1846,7 +1846,8 @@ public class SettingsActivity extends AppCompatActivity {
         		"- pontos2024 (emulator base)\n" +
         		"- PCSX2 v2.3.430 (core emulator)\n" +
         		"- SDL (SDL3)\n" +
-        		"- Fffathur (icon design)";
+        		"- Fffathur (icon design)\n" +
+				"- vivimagic0 (icon design)";
 			new MaterialAlertDialogBuilder(this)
 					.setTitle("About")
 					.setMessage(message)
