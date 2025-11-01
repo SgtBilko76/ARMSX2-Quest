@@ -2,6 +2,7 @@ package kr.co.iefriends.pcsx2;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -506,11 +507,103 @@ public class MainActivity extends AppCompatActivity {
         applySavedBackground();
     } catch (Throwable ignored) {}
 
+    boolean handledLaunch = false;
     try {
-        if (getIntent() != null && getIntent().getBooleanExtra("BOOT_BIOS", false)) {
-            bootBios();
-        }
+        handledLaunch = handleLaunchIntent(getIntent());
     } catch (Throwable ignored) {}
+    if (!handledLaunch) {
+        try {
+            if (getIntent() != null && getIntent().getBooleanExtra("BOOT_BIOS", false)) {
+                bootBios();
+            }
+        } catch (Throwable ignored) {}
+    }
+    }
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        try {
+            handleLaunchIntent(intent);
+        } catch (Throwable ignored) {}
+    }
+
+    private boolean handleLaunchIntent(@Nullable Intent intent) {
+        if (intent == null) {
+            return false;
+        }
+        Uri dataUri = null;
+        try {
+            dataUri = intent.getData();
+        } catch (Throwable ignored) {}
+        if (dataUri == null) {
+            try {
+                Object stream = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+                if (stream instanceof Uri) {
+                    dataUri = (Uri) stream;
+                } else if (stream instanceof String) {
+                    dataUri = Uri.parse((String) stream);
+                }
+            } catch (Throwable ignored) {}
+            if (dataUri == null) {
+                String streamText = intent.getStringExtra(Intent.EXTRA_STREAM);
+                if (!TextUtils.isEmpty(streamText)) {
+                    try {
+                        dataUri = Uri.parse(streamText);
+                    } catch (Throwable ignored) {}
+                }
+            }
+        }
+        if (dataUri == null) {
+            ClipData clipData = intent.getClipData();
+            if (clipData != null && clipData.getItemCount() > 0) {
+                ClipData.Item item = clipData.getItemAt(0);
+                if (item != null) {
+                    dataUri = item.getUri();
+                    if (dataUri == null && item.getIntent() != null) {
+                        dataUri = item.getIntent().getData();
+                    }
+                }
+            }
+        }
+        if (dataUri == null) {
+            try {
+                java.util.ArrayList<Uri> streams = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+                if (streams != null && !streams.isEmpty()) {
+                    dataUri = streams.get(0);
+                }
+            } catch (Throwable ignored) {}
+        }
+        if (dataUri == null) {
+            String extraText = intent.getStringExtra(Intent.EXTRA_TEXT);
+            if (!TextUtils.isEmpty(extraText)) {
+                try {
+                    dataUri = Uri.parse(extraText);
+                } catch (Throwable ignored) {}
+            }
+        }
+        if (dataUri == null) {
+            return false;
+        }
+        String action = intent.getAction();
+        if (!TextUtils.isEmpty(action)) {
+            if (!(Intent.ACTION_VIEW.equals(action)
+                    || Intent.ACTION_SEND.equals(action)
+                    || Intent.ACTION_SEND_MULTIPLE.equals(action)
+                    || Intent.ACTION_MAIN.equals(action))) {
+                return false;
+            }
+        }
+        if (TextUtils.isEmpty(dataUri.getScheme())) {
+            String path = dataUri.getPath();
+            if (!TextUtils.isEmpty(path)) {
+                try {
+                    dataUri = Uri.fromFile(new File(path));
+                } catch (Throwable ignored) {}
+            }
+        }
+        launchGameWithPreflight(dataUri);
+        return true;
     }
     private void toggleSearchBar() {
         if (etSearch == null) return;
