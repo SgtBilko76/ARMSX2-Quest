@@ -1182,14 +1182,15 @@ target_link_libraries(PCSX2_FLAGS INTERFACE
 	${LIBC_LIBRARIES}
 )
 
-if(ANDROID)
-	target_link_libraries(PCSX2_FLAGS INTERFACE
-		discord_partner_sdk::discord_partner_sdk
-	)
-else()
-	target_link_libraries(PCSX2_FLAGS INTERFACE
-		discord-rpc
-	)
+# Discord linking: only link when the option is enabled and the corresponding target exists
+if(USE_DISCORD_SDK)
+	if(TARGET discord_partner_sdk::discord_partner_sdk)
+		target_link_libraries(PCSX2_FLAGS INTERFACE discord_partner_sdk::discord_partner_sdk)
+	elseif(TARGET discord-rpc)
+		target_link_libraries(PCSX2_FLAGS INTERFACE discord-rpc)
+	else()
+		message(WARNING "USE_DISCORD_SDK is ON but no discord SDK target (discord_partner_sdk or discord-rpc) was found. Build may fail until a SDK is provided.")
+	endif()
 endif()
 
 if(WIN32)

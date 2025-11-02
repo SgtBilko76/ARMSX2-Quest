@@ -5,6 +5,7 @@ app/.cxx/
 app/.DS_Store
 armsx2_release.jks
 armsx2_keystore.properties
+local.properties
 EEJitA64.cpp
 EEJitA64.h
 macos

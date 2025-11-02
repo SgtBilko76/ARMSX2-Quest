@@ -57,11 +57,13 @@
 #include "IconsFontAwesome5.h"
 #include "IconsPromptFont.h"
 #include "cpuinfo.h"
+#ifdef USE_DISCORD_SDK
 #if defined(__ANDROID__)
 #define DISCORDPP_IMPLEMENTATION
 #include "discordpp.h"
 #else
 #include "discord_rpc.h"
+#endif
 #endif
 #include "fmt/format.h"
 
@@ -133,14 +135,14 @@ namespace VMManager
 		std::unique_ptr<SaveStateScreenshotData> screenshot, std::string osd_key, const char* filename,
 		s32 slot_for_message);
 	static void ZipSaveStateOnThread(std::unique_ptr<ArchiveEntryList> elist,
-		std::unique_ptr<SaveStateScreenshotData> screenshot, std::string osd_key, std::string filename,
+		std::unique_ptr<SaveStateScreenshotData> screenshot, std::string osd_key, const std::string& filename,
 		s32 slot_for_message);
 
 	static void LoadSettings();
 	static void LoadCoreSettings(SettingsInterface& si);
 	static void ApplyCoreSettings();
 	static void LoadInputBindings(SettingsInterface& si, std::unique_lock<std::mutex>& lock);
-	static void UpdateInhibitScreensaver(bool allow);
+	static void UpdateInhibitScreensaver(bool inhibit);
 	static void AccumulateSessionPlaytime();
 	static void ResetResumeTimestamp();
 	static void SaveSessionTime(const std::string& prev_serial);
@@ -205,8 +207,12 @@ static u64 s_session_accumulated_playtime = 0;
 
 static bool s_screensaver_inhibited = false;
 
+// Discord presence state. On Android we optionally use the Discord SDK (discordpp).
 #if defined(__ANDROID__)
 static bool s_discord_presence_active = false;
+static time_t s_discord_presence_time_epoch;
+// Discord SDK specific state - only present when the SDK is enabled.
+#if defined(USE_DISCORD_SDK)
 static bool s_discord_presence_paused = false;
 static std::mutex s_discord_mutex;
 static std::shared_ptr<discordpp::Client> s_discord_client;
@@ -217,7 +223,6 @@ static std::string s_discord_large_image_key = "app_icon";
 static bool s_discord_logged_in = false;
 static bool s_discord_authorizing = false;
 static bool s_discord_connect_in_progress = false;
-static time_t s_discord_presence_time_epoch;
 static std::chrono::system_clock::time_point s_discord_session_start = std::chrono::system_clock::time_point::min();
 static std::string s_discord_last_state;
 static std::string s_discord_last_details;
@@ -231,6 +236,7 @@ static std::optional<discordpp::AuthorizationCodeVerifier> s_discord_pending_cod
 static std::string s_discord_scope;
 static std::string s_discord_last_error;
 static bool s_discord_presence_dirty = false;
+#endif
 #else
 static bool s_discord_presence_active = false;
 static time_t s_discord_presence_time_epoch;
@@ -244,252 +250,260 @@ JNIEnv* AndroidDiscordGetEnv()
 	return static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
 }
 
-jclass AndroidDiscordGetBridgeClass(JNIEnv* env)
-{
-	static jclass s_bridge_class = nullptr;
-	if (!env)
-		return nullptr;
-	if (!s_bridge_class)
+	jclass AndroidDiscordGetBridgeClass(JNIEnv* env)
 	{
-		jclass local = env->FindClass("kr/co/iefriends/pcsx2/DiscordBridge");
-		if (!local)
+		static jclass s_bridge_class = nullptr;
+		if (!env)
 			return nullptr;
-		s_bridge_class = reinterpret_cast<jclass>(env->NewGlobalRef(local));
-		env->DeleteLocalRef(local);
+		if (!s_bridge_class)
+		{
+			jclass local = env->FindClass("kr/co/iefriends/pcsx2/DiscordBridge");
+			if (!local)
+				return nullptr;
+			s_bridge_class = reinterpret_cast<jclass>(env->NewGlobalRef(local));
+			env->DeleteLocalRef(local);
+		}
+		return s_bridge_class;
 	}
-	return s_bridge_class;
-}
 
-void AndroidDiscordDispatchTokenUpdate(const std::string& access_token, const std::string& refresh_token,
-	discordpp::AuthorizationTokenType token_type, int32_t expires_in, const std::string& scope)
-{
-	JNIEnv* env = AndroidDiscordGetEnv();
-	if (!env)
-		return;
-	jclass bridge = AndroidDiscordGetBridgeClass(env);
-	if (!bridge)
-		return;
-	static jmethodID s_method = env->GetStaticMethodID(bridge, "onTokenUpdatedFromNative",
-		"(Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;I)V");
-	if (!s_method)
-		return;
+	// JNI dispatch helpers (safe regardless of SDK availability)
+	void AndroidDiscordDispatchUserInfo(const std::string& user_id, const std::string& username)
+	{
+		JNIEnv* env = AndroidDiscordGetEnv();
+		if (!env)
+			return;
+		jclass bridge = AndroidDiscordGetBridgeClass(env);
+		if (!bridge)
+			return;
+		static jmethodID s_method = env->GetStaticMethodID(bridge, "onUserInfoUpdatedFromNative",
+			"(Ljava/lang/String;Ljava/lang/String;)V");
+		if (!s_method)
+			return;
 
-	jstring j_access = env->NewStringUTF(access_token.c_str());
-	jstring j_refresh = env->NewStringUTF(refresh_token.c_str());
-	jstring j_scope = env->NewStringUTF(scope.c_str());
-	env->CallStaticVoidMethod(bridge, s_method, j_access, j_refresh, static_cast<jint>(token_type), j_scope,
-		static_cast<jint>(expires_in));
-	env->DeleteLocalRef(j_access);
-	env->DeleteLocalRef(j_refresh);
-	env->DeleteLocalRef(j_scope);
-}
+		jstring j_id = user_id.empty() ? nullptr : env->NewStringUTF(user_id.c_str());
+		jstring j_name = username.empty() ? nullptr : env->NewStringUTF(username.c_str());
+		env->CallStaticVoidMethod(bridge, s_method, j_id, j_name);
+		if (j_id)
+			env->DeleteLocalRef(j_id);
+		if (j_name)
+			env->DeleteLocalRef(j_name);
+	}
 
-void AndroidDiscordDispatchUserInfo(const std::string& user_id, const std::string& username)
-{
-	JNIEnv* env = AndroidDiscordGetEnv();
-	if (!env)
-		return;
-	jclass bridge = AndroidDiscordGetBridgeClass(env);
-	if (!bridge)
-		return;
-	static jmethodID s_method = env->GetStaticMethodID(bridge, "onUserInfoUpdatedFromNative",
-		"(Ljava/lang/String;Ljava/lang/String;)V");
-	if (!s_method)
-		return;
+	void AndroidDiscordDispatchLoginStateChanged(bool is_logged_in)
+	{
+		JNIEnv* env = AndroidDiscordGetEnv();
+		if (!env)
+			return;
+		jclass bridge = AndroidDiscordGetBridgeClass(env);
+		if (!bridge)
+			return;
+		static jmethodID s_method = env->GetStaticMethodID(bridge, "onLoginStateChangedFromNative", "(Z)V");
+		if (!s_method)
+			return;
+		env->CallStaticVoidMethod(bridge, s_method, static_cast<jboolean>(is_logged_in));
+	}
 
-	jstring j_id = user_id.empty() ? nullptr : env->NewStringUTF(user_id.c_str());
-	jstring j_name = username.empty() ? nullptr : env->NewStringUTF(username.c_str());
-	env->CallStaticVoidMethod(bridge, s_method, j_id, j_name);
-	if (j_id)
-		env->DeleteLocalRef(j_id);
-	if (j_name)
-		env->DeleteLocalRef(j_name);
-}
+#ifdef USE_DISCORD_SDK
+	void AndroidDiscordDispatchTokenUpdate(const std::string& access_token, const std::string& refresh_token,
+		discordpp::AuthorizationTokenType token_type, int32_t expires_in, const std::string& scope)
+	{
+		JNIEnv* env = AndroidDiscordGetEnv();
+		if (!env)
+			return;
+		jclass bridge = AndroidDiscordGetBridgeClass(env);
+		if (!bridge)
+			return;
+		static jmethodID s_method = env->GetStaticMethodID(bridge, "onTokenUpdatedFromNative",
+			"(Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;I)V");
+		if (!s_method)
+			return;
 
-void AndroidDiscordDispatchError(const std::string& message);
+		jstring j_access = env->NewStringUTF(access_token.c_str());
+		jstring j_refresh = env->NewStringUTF(refresh_token.c_str());
+		jstring j_scope = env->NewStringUTF(scope.c_str());
+		env->CallStaticVoidMethod(bridge, s_method, j_access, j_refresh, static_cast<jint>(token_type), j_scope,
+			static_cast<jint>(expires_in));
+		env->DeleteLocalRef(j_access);
+		env->DeleteLocalRef(j_refresh);
+		env->DeleteLocalRef(j_scope);
+	}
 
-void AndroidDiscordRequestUserInfo(std::shared_ptr<discordpp::Client> client,
-	discordpp::AuthorizationTokenType token_type, const std::string& access_token)
-{
-	if (!client || access_token.empty())
-		return;
+	void AndroidDiscordDispatchError(const std::string& message)
+	{
+		s_discord_last_error = message;
+		JNIEnv* env = AndroidDiscordGetEnv();
+		if (!env)
+			return;
+		jclass bridge = AndroidDiscordGetBridgeClass(env);
+		if (!bridge)
+			return;
+		static jmethodID s_method = env->GetStaticMethodID(bridge, "onErrorFromNative", "(Ljava/lang/String;)V");
+		if (!s_method)
+			return;
+		jstring j_message = env->NewStringUTF(message.c_str());
+		env->CallStaticVoidMethod(bridge, s_method, j_message);
+		env->DeleteLocalRef(j_message);
+	}
 
-	Console.WriteLn("(DiscordSDK) Requesting current user info.");
-	client->FetchCurrentUser(token_type, access_token,
-		[](discordpp::ClientResult result, uint64_t user_id, std::string username) {
+	void AndroidDiscordRequestUserInfo(std::shared_ptr<discordpp::Client> client,
+		discordpp::AuthorizationTokenType token_type, const std::string& access_token)
+	{
+		if (!client || access_token.empty())
+			return;
+
+		Console.WriteLn("(DiscordSDK) Requesting current user info.");
+		client->FetchCurrentUser(token_type, access_token,
+			[](discordpp::ClientResult result, uint64_t user_id, std::string username) {
+				if (!result.Successful())
+				{
+					AndroidDiscordDispatchError(fmt::format("Discord FetchCurrentUser failed: {}", result.Error()));
+					return;
+				}
+				Console.WriteLn(fmt::format("(DiscordSDK) Current user: {} ({})", username, user_id));
+				{
+					std::lock_guard lock(s_discord_mutex);
+					s_discord_presence_dirty = true;
+				}
+				AndroidDiscordDispatchUserInfo(fmt::format("{}", user_id), username);
+			});
+	}
+
+	void AndroidDiscordApplyPresenceLocked()
+	{
+		if (s_discord_presence_paused || !s_discord_presence_active || !s_discord_client || !s_discord_logged_in)
+			return;
+
+		std::string state = s_discord_last_state.empty() ? std::string("In the menus") : s_discord_last_state;
+		std::string details = s_discord_last_details;
+		const bool force_update = s_discord_presence_dirty;
+
+		if (!force_update && state == s_discord_applied_state && details == s_discord_applied_details)
+			return;
+
+		discordpp::Activity activity;
+		activity.SetName(s_discord_display_name.empty() ? std::string("ARMSX2") : s_discord_display_name);
+		activity.SetType(discordpp::ActivityTypes::Playing);
+		activity.SetStatusDisplayType(discordpp::StatusDisplayTypes::State);
+		activity.SetState(state);
+		if (!details.empty())
+			activity.SetDetails(details);
+
+		const bool has_large_asset = !s_discord_large_image_key.empty();
+		if (has_large_asset)
+		{
+			discordpp::ActivityAssets assets;
+			assets.SetLargeImage(s_discord_large_image_key);
+			assets.SetLargeText(s_discord_display_name.empty() ? std::string("ARMSX2") : s_discord_display_name);
+			activity.SetAssets(assets);
+		}
+
+		if (s_discord_session_start != std::chrono::system_clock::time_point::min() && !details.empty())
+		{
+			const auto start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+				s_discord_session_start.time_since_epoch()).count();
+			if (start_ms > 0)
+			{
+				discordpp::ActivityTimestamps ts;
+				ts.SetStart(static_cast<uint64_t>(start_ms));
+				activity.SetTimestamps(ts);
+			}
+		}
+
+		s_discord_client->UpdateRichPresence(activity, [has_large_asset](discordpp::ClientResult result) {
 			if (!result.Successful())
 			{
-				AndroidDiscordDispatchError(fmt::format("Discord FetchCurrentUser failed: {}", result.Error()));
+				const std::string error = result.Error();
+				Console.Warning(fmt::format("Discord presence update failed: {}", error));
+				if (has_large_asset && error.find("Unable to resolve large image asset") != std::string::npos)
+				{
+					std::lock_guard lock(s_discord_mutex);
+					s_discord_large_image_key.clear();
+					s_discord_applied_state.clear();
+					s_discord_applied_details.clear();
+				}
+			}
+		});
+		s_discord_presence_dirty = false;
+		s_discord_applied_state = std::move(state);
+		s_discord_applied_details = std::move(details);
+	}
+
+	void AndroidDiscordEnsureClientConnected()
+	{
+		std::shared_ptr<discordpp::Client> client;
+		std::string access_token;
+		discordpp::AuthorizationTokenType token_type = discordpp::AuthorizationTokenType::Bearer;
+		{
+			std::lock_guard lock(s_discord_mutex);
+			if (!s_discord_presence_active || s_discord_presence_paused)
+				return;
+			if (!s_discord_client || s_discord_application_id == 0 || s_discord_access_token.empty())
+				return;
+			if (s_discord_logged_in || s_discord_connect_in_progress || s_discord_authorizing)
+				return;
+			s_discord_connect_in_progress = true;
+			client = s_discord_client;
+			access_token = s_discord_access_token;
+			token_type = s_discord_token_type;
+		}
+
+		if (!client || access_token.empty())
+		{
+			std::lock_guard lock(s_discord_mutex);
+			s_discord_connect_in_progress = false;
+			return;
+		}
+
+		client->UpdateToken(token_type, access_token, [client, token_type, access_token](discordpp::ClientResult result) {
+			if (!result.Successful())
+			{
+				{
+					std::lock_guard lock(s_discord_mutex);
+					s_discord_connect_in_progress = false;
+				}
+				AndroidDiscordDispatchError(fmt::format("Discord UpdateToken failed: {}", result.Error()));
 				return;
 			}
-			Console.WriteLn(fmt::format("(DiscordSDK) Current user: {} ({})", username, user_id));
-			{
-				std::lock_guard lock(s_discord_mutex);
-				s_discord_presence_dirty = true;
-			}
-			AndroidDiscordDispatchUserInfo(fmt::format("{}", user_id), username);
+			AndroidDiscordRequestUserInfo(client, token_type, access_token);
+			client->Connect();
 		});
-}
-
-void AndroidDiscordDispatchError(const std::string& message)
-{
-	s_discord_last_error = message;
-	JNIEnv* env = AndroidDiscordGetEnv();
-	if (!env)
-		return;
-	jclass bridge = AndroidDiscordGetBridgeClass(env);
-	if (!bridge)
-		return;
-	static jmethodID s_method = env->GetStaticMethodID(bridge, "onErrorFromNative", "(Ljava/lang/String;)V");
-	if (!s_method)
-		return;
-	jstring j_message = env->NewStringUTF(message.c_str());
-	env->CallStaticVoidMethod(bridge, s_method, j_message);
-	env->DeleteLocalRef(j_message);
-}
-
-void AndroidDiscordDispatchLoginStateChanged(bool is_logged_in)
-{
-	JNIEnv* env = AndroidDiscordGetEnv();
-	if (!env)
-		return;
-	jclass bridge = AndroidDiscordGetBridgeClass(env);
-	if (!bridge)
-		return;
-	static jmethodID s_method = env->GetStaticMethodID(bridge, "onLoginStateChangedFromNative", "(Z)V");
-	if (!s_method)
-		return;
-	env->CallStaticVoidMethod(bridge, s_method, static_cast<jboolean>(is_logged_in));
-}
-
-void AndroidDiscordEnsureClientConnected();
-void AndroidDiscordNotifyVmStopped();
-void AndroidDiscordResetSessionLocked();
-
-void AndroidDiscordApplyPresenceLocked()
-{
-	if (s_discord_presence_paused || !s_discord_presence_active || !s_discord_client || !s_discord_logged_in)
-		return;
-
-	std::string state = s_discord_last_state.empty() ? std::string("In the menus") : s_discord_last_state;
-	std::string details = s_discord_last_details;
-	const bool force_update = s_discord_presence_dirty;
-
-	if (!force_update && state == s_discord_applied_state && details == s_discord_applied_details)
-		return;
-
-	discordpp::Activity activity;
-	activity.SetName(s_discord_display_name.empty() ? std::string("ARMSX2") : s_discord_display_name);
-	activity.SetType(discordpp::ActivityTypes::Playing);
-	activity.SetStatusDisplayType(discordpp::StatusDisplayTypes::State);
-	activity.SetState(state);
-	if (!details.empty())
-		activity.SetDetails(details);
-
-	const bool has_large_asset = !s_discord_large_image_key.empty();
-	if (has_large_asset)
-	{
-		discordpp::ActivityAssets assets;
-		assets.SetLargeImage(s_discord_large_image_key);
-		assets.SetLargeText(s_discord_display_name.empty() ? std::string("ARMSX2") : s_discord_display_name);
-		activity.SetAssets(assets);
 	}
 
-	if (s_discord_session_start != std::chrono::system_clock::time_point::min() && !details.empty())
-	{
-		const auto start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-			s_discord_session_start.time_since_epoch()).count();
-		if (start_ms > 0)
-		{
-			discordpp::ActivityTimestamps ts;
-			ts.SetStart(static_cast<uint64_t>(start_ms));
-			activity.SetTimestamps(ts);
-		}
-	}
-
-	s_discord_client->UpdateRichPresence(activity, [has_large_asset](discordpp::ClientResult result) {
-		if (!result.Successful())
-		{
-			const std::string error = result.Error();
-			Console.Warning(fmt::format("Discord presence update failed: {}", error));
-			if (has_large_asset && error.find("Unable to resolve large image asset") != std::string::npos)
-			{
-				std::lock_guard lock(s_discord_mutex);
-				s_discord_large_image_key.clear();
-				s_discord_applied_state.clear();
-				s_discord_applied_details.clear();
-			}
-		}
-	});
-	s_discord_presence_dirty = false;
-	s_discord_applied_state = std::move(state);
-	s_discord_applied_details = std::move(details);
-}
-
-void AndroidDiscordEnsureClientConnected()
-{
-	std::shared_ptr<discordpp::Client> client;
-	std::string access_token;
-	discordpp::AuthorizationTokenType token_type = discordpp::AuthorizationTokenType::Bearer;
+	void AndroidDiscordNotifyVmStopped()
 	{
 		std::lock_guard lock(s_discord_mutex);
-		if (!s_discord_presence_active || s_discord_presence_paused)
+		if (!s_discord_presence_active)
 			return;
-		if (!s_discord_client || s_discord_application_id == 0 || s_discord_access_token.empty())
-			return;
-		if (s_discord_logged_in || s_discord_connect_in_progress || s_discord_authorizing)
-			return;
-		s_discord_connect_in_progress = true;
-		client = s_discord_client;
-		access_token = s_discord_access_token;
-		token_type = s_discord_token_type;
+		AndroidDiscordResetSessionLocked();
+		s_discord_last_state = "In the menus";
+		s_discord_last_details.clear();
+		s_discord_presence_dirty = true;
+		if (s_discord_logged_in && !s_discord_presence_paused)
+			AndroidDiscordApplyPresenceLocked();
 	}
 
-	if (!client || access_token.empty())
+	void AndroidDiscordResetSessionLocked()
 	{
-		std::lock_guard lock(s_discord_mutex);
-		s_discord_connect_in_progress = false;
-		return;
+		s_discord_session_start = std::chrono::system_clock::time_point::min();
 	}
 
-	client->UpdateToken(token_type, access_token, [client, token_type, access_token](discordpp::ClientResult result) {
-		if (!result.Successful())
-		{
-			{
-				std::lock_guard lock(s_discord_mutex);
-				s_discord_connect_in_progress = false;
-			}
-			AndroidDiscordDispatchError(fmt::format("Discord UpdateToken failed: {}", result.Error()));
-			return;
-		}
-		AndroidDiscordRequestUserInfo(client, token_type, access_token);
-		client->Connect();
-	});
-}
-
-void AndroidDiscordNotifyVmStopped()
-{
-	std::lock_guard lock(s_discord_mutex);
-	if (!s_discord_presence_active)
-		return;
-	AndroidDiscordResetSessionLocked();
-	s_discord_last_state = "In the menus";
-	s_discord_last_details.clear();
-	s_discord_presence_dirty = true;
-	if (s_discord_logged_in && !s_discord_presence_paused)
-		AndroidDiscordApplyPresenceLocked();
-}
-
-void AndroidDiscordResetSessionLocked()
-{
-	s_discord_session_start = std::chrono::system_clock::time_point::min();
-}
-
-void AndroidDiscordRecordSessionStartLocked()
-{
-	s_discord_session_start = std::chrono::system_clock::now();
-	s_discord_presence_time_epoch = std::time(nullptr);
-}
+	void AndroidDiscordRecordSessionStartLocked()
+	{
+		s_discord_session_start = std::chrono::system_clock::now();
+		s_discord_presence_time_epoch = std::time(nullptr);
+	}
+#else
+	// Minimal stubs when the Discord SDK isn't available on Android. These keep the
+	// rest of the code compiling and provide safe no-op behavior. Note: JNI dispatch
+	// helpers such as AndroidDiscordDispatchUserInfo and AndroidDiscordDispatchLoginStateChanged
+	// are implemented above and should remain available; we avoid redefining them here.
+	void AndroidDiscordDispatchError(const std::string& /*message*/) { }
+	void AndroidDiscordApplyPresenceLocked() { }
+	void AndroidDiscordEnsureClientConnected() { }
+	void AndroidDiscordNotifyVmStopped() { s_discord_presence_active = false; s_discord_presence_time_epoch = std::time(nullptr); }
+	void AndroidDiscordResetSessionLocked() { }
+	void AndroidDiscordRecordSessionStartLocked() { s_discord_presence_time_epoch = std::time(nullptr); }
+#endif
 } // namespace
 #endif
 
@@ -637,7 +651,7 @@ std::string VMManager::GetTitle(bool prefer_en)
 	if (!s_title_en_search.empty())
 	{
 		size_t pos = out.find(s_title_en_search);
-		if (pos != out.npos)
+		if (pos != std::string::npos)
 			out.replace(pos, s_title_en_search.size(), s_title_en_replace);
 	}
 	return out;
@@ -686,7 +700,7 @@ bool VMManager::Internal::CPUThreadInitialize()
 	FPControlRegister::SetCurrent(FPControlRegister::GetDefault());
 
 	if (!cpuinfo_initialize())
-		Console.Error("cpuinfo_initialize() failed.");
+		ConsoleLogWriter<LOGLEVEL_INFO>::Error("cpuinfo_initialize() failed.");
 
 	LogCPUCapabilities();
 
@@ -704,7 +718,7 @@ bool VMManager::Internal::CPUThreadInitialize()
 	// This also sorts out input sources.
 	LoadSettings();
 
-	if (EmuConfig.Achievements.Enabled && !Achievements::IsActive()) // this shit fucking explodes on android 
+	if (EmuConfig.Achievements.Enabled && !Achievements::IsActive()) // this shit fucking explodes on android
 		Achievements::Initialize();
 
 	ReloadPINE();
@@ -714,7 +728,7 @@ bool VMManager::Internal::CPUThreadInitialize()
 
 	// Check for advanced settings status and warn the user if its enabled
 	if (Host::GetBaseBoolSettingValue("UI", "ShowAdvancedSettings", false))
-		Console.Warning("Settings: Advanced Settings are enabled; only proceed if you know what you're doing! No support will be provided if you have the option enabled.");
+		ConsoleLogWriter<LOGLEVEL_INFO>::Warning("Settings: Advanced Settings are enabled; only proceed if you know what you're doing! No support will be provided if you have the option enabled.");
 
 	return true;
 }
@@ -770,7 +784,7 @@ void VMManager::UpdateLoggingSettings(SettingsInterface& si)
 #ifdef _DEBUG
 	constexpr LOGLEVEL level = LOGLEVEL_DEBUG;
 #else
-	const LOGLEVEL level = (IsDevBuild || si.GetBoolValue("Logging", "EnableVerbose", false)) ? LOGLEVEL_DEV : LOGLEVEL_INFO;
+	const LOGLEVEL level = si.GetBoolValue("Logging", "EnableVerbose", false) ? LOGLEVEL_DEV : LOGLEVEL_INFO;
 #endif
 
 	const bool system_console_enabled = !s_log_block_system_console && si.GetBoolValue("Logging", "EnableSystemConsole", false);
@@ -791,7 +805,8 @@ void VMManager::UpdateLoggingSettings(SettingsInterface& si)
 	const bool timestamps_enabled = si.GetBoolValue("Logging", "EnableTimestamps", true);
 	Log::SetTimestampsEnabled(timestamps_enabled);
 
-	const bool any_logging_sinks = system_console_enabled || log_window_enabled || file_logging_enabled || debug_console_enabled;
+	const bool any_logging_sinks =
+            system_console_enabled || log_window_enabled || file_logging_enabled;
 
 	const bool ee_console_enabled = any_logging_sinks && si.GetBoolValue("Logging", "EnableEEConsole", false);
 	ConsoleLogging.eeConsole.Enabled = ee_console_enabled;
@@ -1011,7 +1026,7 @@ void VMManager::ApplyGameFixes()
 
 void VMManager::ApplySettings()
 {
-	Console.WriteLn("Applying settings...");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Applying settings...");
 
 	// If we're running, ensure the threads are synced.
 	if (GetState() == VMState::Running)
@@ -1034,7 +1049,7 @@ void VMManager::ApplyCoreSettings()
 {
 	// Lightweight version of above, called when ELF changes. This should not get called without an active VM.
 	pxAssertRel(HasValidOrInitializingVM(), "Reloading core settings requires a valid VM.");
-	Console.WriteLn("Applying core settings...");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Applying core settings...");
 
 	// If we're running, ensure the threads are synced.
 	if (GetState() == VMState::Running)
@@ -1096,7 +1111,7 @@ std::string VMManager::GetDiscOverrideFromGameSettings(const std::string& elf_pa
 		{
 			iso_path = si.GetStringValue("EmuCore", "DiscPath");
 			if (!iso_path.empty())
-				Console.WriteLn(fmt::format("Disc override for ELF at '{}' is '{}'", elf_path, iso_path));
+				ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(fmt::format("Disc override for ELF at '{}' is '{}'", elf_path, iso_path));
 		}
 	}
 
@@ -1143,7 +1158,7 @@ void VMManager::Internal::UpdateEmuFolders()
 
 		if (EmuFolders::MemoryCards != old_memcards_directory)
 		{
-			std::string memcardFilters = "";
+			std::string memcardFilters;
 			if (const GameDatabaseSchema::GameEntry* game = GameDatabase::findGame(s_disc_serial))
 			{
 				memcardFilters = game->memcardFiltersAsString();
@@ -1206,7 +1221,7 @@ void VMManager::RequestDisplaySize(float scale /*= 0.0f*/)
 	}
 
 	float width = static_cast<float>(iwidth) * x_scale;
-	float height = static_cast<float>(iheight);
+	auto height = static_cast<float>(iheight);
 
 	if (scale != 0.0f)
 	{
@@ -1244,17 +1259,17 @@ bool VMManager::UpdateGameSettingsLayer()
 
 		if (FileSystem::FileExists(filename.c_str()))
 		{
-			Console.WriteLn("Loading game settings from '%s'...", filename.c_str());
+			ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Loading game settings from '%s'...", filename.c_str());
 			new_interface = std::make_unique<INISettingsInterface>(std::move(filename));
 			if (!new_interface->Load())
 			{
-				Console.Error("Failed to parse game settings ini '%s'", new_interface->GetFileName().c_str());
+				ConsoleLogWriter<LOGLEVEL_INFO>::Error("Failed to parse game settings ini '%s'", new_interface->GetFileName().c_str());
 				new_interface.reset();
 			}
 		}
 		else
 		{
-			DevCon.WriteLn("No game settings found (tried '%s')", filename.c_str());
+			ConsoleLogWriter<LOGLEVEL_DEV>::WriteLn("No game settings found (tried '%s')", filename.c_str());
 		}
 	}
 
@@ -1275,18 +1290,18 @@ bool VMManager::UpdateGameSettingsLayer()
 		const std::string filename(GetInputProfilePath(input_profile_name));
 		if (FileSystem::FileExists(filename.c_str()))
 		{
-			Console.WriteLn("Loading input profile from '%s'...", filename.c_str());
-			input_interface = std::make_unique<INISettingsInterface>(std::move(filename));
+			ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Loading input profile from '%s'...", filename.c_str());
+			input_interface = std::make_unique<INISettingsInterface>(filename);
 			if (!input_interface->Load())
 			{
-				Console.Error("Failed to parse input profile ini '%s'", input_interface->GetFileName().c_str());
+				ConsoleLogWriter<LOGLEVEL_INFO>::Error("Failed to parse input profile ini '%s'", input_interface->GetFileName().c_str());
 				input_interface.reset();
 				input_profile_name = {};
 			}
 		}
 		else
 		{
-			DevCon.WriteLn("No game settings found (tried '%s')", filename.c_str());
+			ConsoleLogWriter<LOGLEVEL_DEV>::WriteLn("No game settings found (tried '%s')", filename.c_str());
 			input_profile_name = {};
 		}
 	}
@@ -1341,7 +1356,7 @@ void VMManager::UpdateDiscDetails(bool booting)
 
 		if (!booting && s_disc_serial == old_serial && s_disc_crc == old_crc)
 		{
-			Console.WriteLn("Skipping disc details update, no change.");
+			ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Skipping disc details update, no change.");
 			return;
 		}
 
@@ -1360,7 +1375,7 @@ void VMManager::UpdateDiscDetails(bool booting)
 					s_title_en_replace = game->name_en;
 				}
 
-				std::string game_title = custom_title.empty() ? game->name : std::move(custom_title);
+				std::string game_title = custom_title.empty() ? game->name : custom_title;
 
 				// Append the ELF override if we're using it with a disc.
 				if (!s_elf_override.empty())
@@ -1377,7 +1392,7 @@ void VMManager::UpdateDiscDetails(bool booting)
 			}
 			else
 			{
-				Console.Warning(fmt::format("Serial '{}' not found in GameDB.", s_disc_serial));
+				ConsoleLogWriter<LOGLEVEL_INFO>::Warning(fmt::format("Serial '{}' not found in GameDB.", s_disc_serial));
 			}
 		}
 
@@ -1399,12 +1414,12 @@ void VMManager::UpdateDiscDetails(bool booting)
 		s_title = std::move(title);
 	}
 
-	Console.WriteLn(Color_StrongGreen,
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(Color_StrongGreen,
 		fmt::format("Disc changed to {}.", Path::GetFileName(CDVDsys_GetFile(CDVDsys_GetSourceType()))));
-	Console.WriteLn(Color_StrongGreen, fmt::format("  Name: {}", s_title));
-	Console.WriteLn(Color_StrongGreen, fmt::format("  Serial: {}", s_disc_serial));
-	Console.WriteLn(Color_StrongGreen, fmt::format("  Version: {}", s_disc_version));
-	Console.WriteLn(Color_StrongGreen, fmt::format("  CRC: {:08X}", s_disc_crc));
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(Color_StrongGreen, fmt::format("  Name: {}", s_title));
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(Color_StrongGreen, fmt::format("  Serial: {}", s_disc_serial));
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(Color_StrongGreen, fmt::format("  Version: {}", s_disc_version));
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(Color_StrongGreen, fmt::format("  CRC: {:08X}", s_disc_crc));
 
 	UpdateGameSettingsLayer();
 	ApplySettings();
@@ -1446,7 +1461,7 @@ void VMManager::HandleELFChange(bool verbose_patches_if_changed)
 	ReportGameChangeToHost();
 	Achievements::GameChanged(s_disc_crc, crc_to_report);
 
-	Console.WriteLn(Color_StrongOrange, fmt::format("ELF changed, active CRC {:08X} ({})", crc_to_report, s_elf_path));
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(Color_StrongOrange, fmt::format("ELF changed, active CRC {:08X} ({})", crc_to_report, s_elf_path));
 	Patch::ReloadPatches(s_disc_serial, crc_to_report, false, false, false, verbose_patches_if_changed);
 	ApplyCoreSettings();
 }
@@ -1458,7 +1473,7 @@ void VMManager::UpdateELFInfo(std::string elf_path)
 	if (elf_path.empty() || !cdvdLoadElf(&elfo, elf_path, false, &error))
 	{
 		if (!elf_path.empty())
-			Console.Error(fmt::format("Failed to read ELF being loaded: {}: {}", elf_path, error.GetDescription()));
+			ConsoleLogWriter<LOGLEVEL_INFO>::Error(fmt::format("Failed to read ELF being loaded: {}: {}", elf_path, error.GetDescription()));
 
 		s_elf_path = {};
 		s_elf_text_range = {};
@@ -1655,7 +1670,7 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	// Playing GS dumps don't need a BIOS.
 	if (!GSDumpReplayer::IsReplayingDump())
 	{
-		Console.WriteLn("Loading BIOS...");
+		ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Loading BIOS...");
 		if (!LoadBIOS())
 		{
 			Host::ReportErrorAsync(TRANSLATE_SV("VMManager", "Error"),
@@ -1674,7 +1689,7 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	}
 
 	Error error;
-	Console.WriteLn("Opening CDVD...");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Opening CDVD...");
 	if (!DoCDVDopen(&error))
 	{
 		Host::ReportErrorAsync("Startup Error", fmt::format("Failed to open CDVD '{}': {}.",
@@ -1774,12 +1789,12 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	SysMemory::Reset();
 	cpuReset();
 
-	Console.WriteLn("Opening GS...");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Opening GS...");
 	s_gs_open_on_initialize = MTGS::IsOpen();
 	if (!s_gs_open_on_initialize && !MTGS::WaitForOpen())
 	{
 		// we assume GS is going to report its own error
-		Console.WriteLn("Failed to open GS.");
+		ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Failed to open GS.");
 		return false;
 	}
 
@@ -1788,7 +1803,7 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 			MTGS::WaitForClose();
 	};
 
-	Console.WriteLn("Opening SPU2...");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Opening SPU2...");
 	if (!SPU2::Open())
 	{
 		Host::ReportErrorAsync("Startup Error", "Failed to initialize SPU2.");
@@ -1797,7 +1812,7 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	ScopedGuard close_spu2(&SPU2::Close);
 
 
-	Console.WriteLn("Initializing Pad...");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Initializing Pad...");
 	if (!Pad::Initialize())
 	{
 		Host::ReportErrorAsync("Startup Error", "Failed to initialize PAD");
@@ -1805,7 +1820,7 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	}
 	ScopedGuard close_pad = &Pad::Shutdown;
 
-	Console.WriteLn("Initializing SIO2...");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Initializing SIO2...");
 	if (!g_Sio2.Initialize())
 	{
 		Host::ReportErrorAsync("Startup Error", "Failed to initialize SIO2");
@@ -1815,7 +1830,7 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 		g_Sio2.Shutdown();
 	};
 
-	Console.WriteLn("Initializing SIO0...");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Initializing SIO0...");
 	if (!g_Sio0.Initialize())
 	{
 		Host::ReportErrorAsync("Startup Error", "Failed to initialize SIO0");
@@ -1825,7 +1840,7 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 		g_Sio0.Shutdown();
 	};
 
-	Console.WriteLn("Opening DEV9...");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Opening DEV9...");
 	if (DEV9init() != 0 || DEV9open() != 0)
 	{
 		Host::ReportErrorAsync("Startup Error", "Failed to initialize DEV9.");
@@ -1836,7 +1851,7 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 		DEV9shutdown();
 	};
 
-	Console.WriteLn("Opening USB...");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Opening USB...");
 	if (!USBopen())
 	{
 		Host::ReportErrorAsync("Startup Error", "Failed to initialize USB.");
@@ -1844,7 +1859,7 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	}
 	ScopedGuard close_usb = []() { USBclose(); };
 
-	Console.WriteLn("Opening FW...");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Opening FW...");
 	if (FWopen() != 0)
 	{
 		Host::ReportErrorAsync("Startup Error", "Failed to initialize FW.");
@@ -1871,7 +1886,7 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 
 	hwReset();
 
-	Console.WriteLn("VM subsystems initialized in %.2f ms", init_timer.GetTimeMilliseconds());
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("VM subsystems initialized in %.2f ms", init_timer.GetTimeMilliseconds());
 	s_state.store(VMState::Paused, std::memory_order_release);
 	Host::OnVMStarted();
 	FullscreenUI::OnVMStarted();
@@ -1910,7 +1925,7 @@ void VMManager::Shutdown(bool save_resume_state)
 	{
 		std::string resume_file_name(GetCurrentSaveStateFileName(-1));
 		if (!resume_file_name.empty() && !DoSaveState(resume_file_name.c_str(), -1, true, false))
-			Console.Error("Failed to save resume state");
+			ConsoleLogWriter<LOGLEVEL_INFO>::Error("Failed to save resume state");
 	}
 
 	// end input recording before clearing state
@@ -2056,7 +2071,7 @@ bool SaveStateBase::vmFreeze()
 			{
 				// Shouldn't have executed a non-existant ELF.. unless you load state created from a deleted ELF override I guess.
 				if (s_elf_executed)
-					Console.Error("Somehow executed a non-existant ELF");
+					ConsoleLogWriter<LOGLEVEL_INFO>::Error("Somehow executed a non-existant ELF");
 				VMManager::ClearELFInfo();
 			}
 			else
@@ -2162,7 +2177,7 @@ bool VMManager::DoSaveState(const char* filename, s32 slot_for_message, bool zip
 	if (FileSystem::FileExists(filename) && backup_old_state)
 	{
 		const std::string backup_filename(fmt::format("{}.backup", filename));
-		Console.WriteLn(fmt::format("Creating save state backup {}...", backup_filename));
+		ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(fmt::format("Creating save state backup {}...", backup_filename));
 		if (!FileSystem::RenamePath(filename, backup_filename.c_str()))
 		{
 			Host::AddIconOSDMessage(osd_key, ICON_FA_EXCLAMATION_TRIANGLE,
@@ -2211,11 +2226,11 @@ void VMManager::ZipSaveState(std::unique_ptr<ArchiveEntryList> elist,
 				Host::OSD_ERROR_DURATION));
 	}
 
-	DevCon.WriteLn("Zipping save state to '%s' took %.2f ms", filename, timer.GetTimeMilliseconds());
+	ConsoleLogWriter<LOGLEVEL_DEV>::WriteLn("Zipping save state to '%s' took %.2f ms", filename, timer.GetTimeMilliseconds());
 }
 
 void VMManager::ZipSaveStateOnThread(std::unique_ptr<ArchiveEntryList> elist,
-	std::unique_ptr<SaveStateScreenshotData> screenshot, std::string osd_key, std::string filename,
+	std::unique_ptr<SaveStateScreenshotData> screenshot, std::string osd_key, const std::string& filename,
 	s32 slot_for_message)
 {
 	ZipSaveState(std::move(elist), std::move(screenshot), std::move(osd_key), filename.c_str(), slot_for_message);
@@ -2432,7 +2447,7 @@ void VMManager::UpdateTargetSpeed()
 			s_use_vsync_for_timing = (s_target_speed_synced_to_host && !EmuConfig.GS.SkipDuplicateFrames && EmuConfig.GS.VsyncEnable &&
 									  EmuConfig.EmulationSpeed.UseVSyncForTiming);
 
-			Console.WriteLn("Refresh rate: Host=%fhz Guest=%fhz Ratio=%f - %s %s",
+			ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Refresh rate: Host=%fhz Guest=%fhz Ratio=%f - %s %s",
 				host_refresh_rate.value(), frame_rate, host_to_guest_ratio,
 				s_target_speed_can_sync_to_host ? "can sync" : "can't sync",
 				s_use_vsync_for_timing ? "and using vsync for pacing" : "and using sleep for pacing");
@@ -2448,7 +2463,7 @@ void VMManager::UpdateTargetSpeed()
 	s_limiter_ticks_per_frame =
 		static_cast<s64>(static_cast<double>(GetTickFrequency()) / static_cast<double>(std::max(frame_rate * target_speed, 1.0f)));
 
-	DevCon.WriteLn(fmt::format("Frame rate: {}, target speed: {}, target frame rate: {}, ticks per frame: {}", frame_rate, target_speed,
+	ConsoleLogWriter<LOGLEVEL_DEV>::WriteLn(fmt::format("Frame rate: {}, target speed: {}, target frame rate: {}, ticks per frame: {}", frame_rate, target_speed,
 		target_frame_rate, s_limiter_ticks_per_frame));
 
 	if (s_target_speed != target_speed)
@@ -2541,7 +2556,7 @@ void VMManager::FrameAdvance(u32 num_frames /*= 1*/)
 	SetState(VMState::Running);
 }
 
-bool VMManager::ChangeDisc(CDVD_SourceType source, std::string path)
+bool VMManager::ChangeDisc(CDVD_SourceType source, const std::string& path)
 {
 	const CDVD_SourceType old_type = CDVDsys_GetSourceType();
 	const std::string old_path(CDVDsys_GetFile(old_type));
@@ -2810,13 +2825,13 @@ void LogGPUCapabilities()
 
 void VMManager::LogCPUCapabilities()
 {
-	Console.WriteLn(Color_StrongGreen, "PCSX2 %s", BuildVersion::GitRev);
-	Console.WriteLnFmt("Savestate version: 0x{:x}\n", g_SaveVersion);
-	Console.WriteLn();
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(Color_StrongGreen, "PCSX2 %s", BuildVersion::GitRev);
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLnFmt("Savestate version: 0x{:x}\n", g_SaveVersion);
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn();
 
-	Console.WriteLn(Color_StrongBlack, "Host Machine Init:");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(Color_StrongBlack, "Host Machine Init:");
 
-	Console.WriteLnFmt(
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLnFmt(
 		"  Operating System = {}\n"
 		"  Available RAM    = {} MB ({:.2f} GB)\n"
 		"  Physical RAM     = {} MB ({:.2f} GB)\n",
@@ -2826,10 +2841,10 @@ void VMManager::LogCPUCapabilities()
 		GetPhysicalMemory() / _1mb,
 		static_cast<double>(GetPhysicalMemory()) / static_cast<double>(_1gb));
 
-	Console.WriteLnFmt("  Processor        = {}", cpuinfo_get_package(0)->name);
-	Console.WriteLnFmt("  Core Count       = {} cores", cpuinfo_get_cores_count());
-	Console.WriteLnFmt("  Thread Count     = {} threads", cpuinfo_get_processors_count());
-	Console.WriteLnFmt("  Cluster Count    = {} clusters", cpuinfo_get_clusters_count());
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLnFmt("  Processor        = {}", cpuinfo_get_package(0)->name);
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLnFmt("  Core Count       = {} cores", cpuinfo_get_cores_count());
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLnFmt("  Thread Count     = {} threads", cpuinfo_get_processors_count());
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLnFmt("  Cluster Count    = {} clusters", cpuinfo_get_clusters_count());
 #ifdef _WIN32
 	LogUserPowerPlan();
 #endif
@@ -2896,11 +2911,8 @@ void VMManager::InitializeCPUProviders()
 
 void VMManager::ShutdownCPUProviders()
 {
-	if (newVifDynaRec)
-	{
-		dVifRelease(1);
-		dVifRelease(0);
-	}
+    dVifRelease(1);
+    dVifRelease(0);
 
 //#ifdef _M_X86 // TODO(Stenzek): Remove me once EE/VU/IOP recs are added.
 	CpuMicroVU1.Shutdown();
@@ -3024,7 +3036,7 @@ void VMManager::SetPaused(bool paused)
 	if (!HasValidVM())
 		return;
 
-	Console.WriteLn(paused ? "(VMManager) Pausing..." : "(VMManager) Resuming...");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(paused ? "(VMManager) Pausing..." : "(VMManager) Resuming...");
 	SetState(paused ? VMState::Paused : VMState::Running);
 }
 
@@ -3104,7 +3116,7 @@ void VMManager::Internal::ELFLoadingOnCPUThread(std::string elf_path)
 	const bool was_running_bios = (s_current_crc == 0);
 
 	UpdateELFInfo(std::move(elf_path));
-	Console.WriteLn(Color_StrongBlue, fmt::format("ELF Loading: {}, Game CRC = {:08X}, EntryPoint = 0x{:08X}",
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(Color_StrongBlue, fmt::format("ELF Loading: {}, Game CRC = {:08X}, EntryPoint = 0x{:08X}",
 										  s_elf_path, s_current_crc, s_elf_entry_point));
 	s_elf_executed = false;
 
@@ -3123,7 +3135,7 @@ void VMManager::Internal::EntryPointCompilingOnCPUThread()
 
 	const bool reset_speed_limiter = (EmuConfig.EnableFastBootFastForward && IsFastBootInProgress());
 
-	Console.WriteLn(
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(
 		Color_StrongGreen, fmt::format("ELF {} with entry point at 0x{:08X} is executing.", s_elf_path, s_elf_entry_point));
 	s_elf_executed = true;
 
@@ -3206,7 +3218,7 @@ void VMManager::CheckForCPUConfigChanges(const Pcsx2Config& old_config)
 		return;
 	}
 
-	Console.WriteLn("Updating CPU configuration...");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Updating CPU configuration...");
 	FPControlRegister::SetCurrent(EmuConfig.Cpu.FPUFPCR);
 	Internal::ClearCPUExecutionCaches();
 	memBindConditionalHandlers();
@@ -3238,7 +3250,7 @@ void VMManager::CheckForGSConfigChanges(const Pcsx2Config& old_config)
 	if (EmuConfig.GS == old_config.GS)
 		return;
 
-	Console.WriteLn("Updating GS configuration...");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Updating GS configuration...");
 
 	// We could just check whichever NTSC or PAL is appropriate for our current mode,
 	// but people _really_ shouldn't be screwing with framerate, so whatever.
@@ -3264,7 +3276,7 @@ void VMManager::CheckForEmulationSpeedConfigChanges(const Pcsx2Config& old_confi
 	if (EmuConfig.EmulationSpeed == old_config.EmulationSpeed)
 		return;
 
-	Console.WriteLn("Updating emulation speed configuration");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Updating emulation speed configuration");
 	UpdateTargetSpeed();
 }
 
@@ -3313,7 +3325,7 @@ void VMManager::CheckForMemoryCardConfigChanges(const Pcsx2Config& old_config)
 	if (!changed)
 		return;
 
-	Console.WriteLn("Updating memory card configuration");
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Updating memory card configuration");
 
 	// force card eject when files change
 	for (u32 port = 0; port < 2; port++)
@@ -3324,7 +3336,7 @@ void VMManager::CheckForMemoryCardConfigChanges(const Pcsx2Config& old_config)
 			if (EmuConfig.Mcd[index].Enabled != old_config.Mcd[index].Enabled ||
 				EmuConfig.Mcd[index].Filename != old_config.Mcd[index].Filename)
 			{
-				Console.WriteLn("Ejecting memory card %u (port %u slot %u) due to source change", index, port, slot);
+				ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("Ejecting memory card %u (port %u slot %u) due to source change", index, port, slot);
 				AutoEject::Set(port, slot);
 			}
 		}
@@ -3467,7 +3479,7 @@ void VMManager::LogUnsafeSettingsToConsole(const std::string& messages)
 			break;
 		}
 	}
-	Console.Warning(console_messages);
+	ConsoleLogWriter<LOGLEVEL_INFO>::Warning(console_messages);
 }
 
 void VMManager::WarnAboutUnsafeSettings()
@@ -3804,7 +3816,7 @@ static void InitializeProcessorList()
 		str.append_format("{}{}", (proc == processors.front()) ? "" : ", ", proc_id);
 		s_processor_list.push_back(proc_id);
 	}
-	Console.WriteLn(str.view());
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(str.view());
 }
 
 void VMManager::SetHardwareDependentDefaultSettings(SettingsInterface& si)
@@ -3814,25 +3826,25 @@ void VMManager::SetHardwareDependentDefaultSettings(SettingsInterface& si)
 	const u32 core_count = cpuinfo_get_cores_count();
 	if (core_count == 0)
 	{
-		Console.Error("Invalid CPU count returned");
+		ConsoleLogWriter<LOGLEVEL_INFO>::Error("Invalid CPU count returned");
 		return;
 	}
 
-	Console.WriteLn(fmt::format("CPU cores count: {}", core_count));
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(fmt::format("CPU cores count: {}", core_count));
 
 	if (core_count >= 3)
 	{
-		Console.WriteLn("  Enabling MTVU.");
+		ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("  Enabling MTVU.");
 		si.SetBoolValue("EmuCore/Speedhacks", "vuThread", true);
 	}
 	else
 	{
-		Console.WriteLn("  Disabling MTVU.");
+		ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn("  Disabling MTVU.");
 		si.SetBoolValue("EmuCore/Speedhacks", "vuThread", false);
 	}
 
 	const int extra_threads = (core_count > 3) ? 3 : 2;
-	Console.WriteLn(fmt::format("  Setting Extra Software Rendering Threads to {}.", extra_threads));
+	ConsoleLogWriter<LOGLEVEL_INFO>::WriteLn(fmt::format("  Setting Extra Software Rendering Threads to {}.", extra_threads));
 	si.SetIntValue("EmuCore/GS", "extrathreads", extra_threads);
 }
 
@@ -3989,6 +4001,7 @@ void VMManager::ReloadPINE()
 void VMManager::InitializeDiscordPresence()
 {
 #if defined(__ANDROID__)
+#if defined(USE_DISCORD_SDK)
 	std::shared_ptr<discordpp::Client> client;
 	{
 		std::lock_guard lock(s_discord_mutex);
@@ -4126,6 +4139,9 @@ void VMManager::InitializeDiscordPresence()
 	}
 	AndroidDiscordEnsureClientConnected();
 #else
+	(void)0;
+#endif
+#else
 	if (s_discord_presence_active)
 		return;
 
@@ -4140,6 +4156,7 @@ void VMManager::InitializeDiscordPresence()
 void VMManager::ShutdownDiscordPresence()
 {
 #if defined(__ANDROID__)
+#if defined(USE_DISCORD_SDK)
 	std::shared_ptr<discordpp::Client> client;
 	{
 		std::lock_guard lock(s_discord_mutex);
@@ -4166,6 +4183,11 @@ void VMManager::ShutdownDiscordPresence()
 #else
 	if (!s_discord_presence_active)
 		return;
+	s_discord_presence_active = false;
+#endif
+#else
+	if (!s_discord_presence_active)
+		return;
 
 	Discord_ClearPresence();
 	Discord_RunCallbacks();
@@ -4177,6 +4199,7 @@ void VMManager::ShutdownDiscordPresence()
 void VMManager::UpdateDiscordPresence(bool update_session_time)
 {
 #if defined(__ANDROID__)
+#if defined(USE_DISCORD_SDK)
 	std::lock_guard lock(s_discord_mutex);
 	if (!s_discord_presence_active)
 		return;
@@ -4199,6 +4222,12 @@ void VMManager::UpdateDiscordPresence(bool update_session_time)
 	}
 
 	AndroidDiscordApplyPresenceLocked();
+#else
+	if (!s_discord_presence_active)
+		return;
+	if (update_session_time)
+		s_discord_presence_time_epoch = std::time(nullptr);
+#endif
 #else
 	if (!s_discord_presence_active)
 		return;
@@ -4236,6 +4265,7 @@ void VMManager::UpdateDiscordPresence(bool update_session_time)
 void VMManager::PollDiscordPresence()
 {
 #if defined(__ANDROID__)
+	#if defined(USE_DISCORD_SDK)
 	{
 		std::lock_guard lock(s_discord_mutex);
 		if (!s_discord_presence_active)
@@ -4243,6 +4273,9 @@ void VMManager::PollDiscordPresence()
 	}
 
 	discordpp::RunCallbacks();
+	#else
+	(void)0;
+	#endif
 #else
 	if (!s_discord_presence_active)
 		return;
@@ -4252,6 +4285,7 @@ void VMManager::PollDiscordPresence()
 }
 
 #if defined(__ANDROID__)
+#if defined(USE_DISCORD_SDK)
 void VMManager::AndroidDiscordConfigure(uint64_t app_id, std::string custom_scheme, std::string display_name,
 	std::string large_image_key)
 {
@@ -4562,4 +4596,24 @@ std::string VMManager::AndroidDiscordConsumeLastError()
 	s_discord_last_error.clear();
 	return out;
 }
+#else
+// Stubs when the Discord SDK is not available on Android.
+void VMManager::AndroidDiscordConfigure(uint64_t app_id, const std::string& custom_scheme, std::string display_name,
+	const std::string& large_image_key) { }
+
+void VMManager::AndroidDiscordProvideStoredToken(const std::string& access_token, const std::string& refresh_token,
+	const std::string& token_type_str, int64_t expires_at_epoch_seconds, const std::string& scope) { }
+
+void VMManager::AndroidDiscordBeginAuthorize() { }
+
+void VMManager::AndroidDiscordSetAppForeground(bool is_foreground) { }
+
+void VMManager::AndroidDiscordClearTokens() { }
+
+bool VMManager::AndroidDiscordIsLoggedIn() { return false; }
+
+bool VMManager::AndroidDiscordIsClientReady() { return false; }
+
+std::string VMManager::AndroidDiscordConsumeLastError() { return {}; }
+#endif
 #endif
