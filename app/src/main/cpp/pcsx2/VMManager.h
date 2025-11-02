@@ -174,7 +174,7 @@ namespace VMManager
 
 	/// Changes the disc in the virtual CD/DVD drive. Passing an empty will remove any current disc.
 	/// Returns false if the new disc can't be opened.
-	bool ChangeDisc(CDVD_SourceType source, std::string path);
+	bool ChangeDisc(CDVD_SourceType source, const std::string& path);
 
 	/// Changes the ELF to boot ("ELF override"). The VM will be reset.
 	bool SetELFOverride(std::string path);
@@ -183,37 +183,37 @@ namespace VMManager
 	bool ChangeGSDump(const std::string& path);
 
 	/// Returns true if the specified path is an ELF.
-	bool IsElfFileName(const std::string_view path);
+	bool IsElfFileName(std::string_view path);
 
 	/// Returns true if the specified path is a blockdump.
-	bool IsBlockDumpFileName(const std::string_view path);
+	bool IsBlockDumpFileName(std::string_view path);
 
 	/// Returns true if the specified path is a GS Dump.
-	bool IsGSDumpFileName(const std::string_view path);
+	bool IsGSDumpFileName(std::string_view path);
 
 	/// Returns true if the specified path is a save state.
-	bool IsSaveStateFileName(const std::string_view path);
+	bool IsSaveStateFileName(std::string_view path);
 
 	/// Returns true if the specified path is a disc image.
-	bool IsDiscFileName(const std::string_view path);
+	bool IsDiscFileName(std::string_view path);
 
 	/// Returns true if the specified path is a disc/elf/etc.
-	bool IsLoadableFileName(const std::string_view path);
+	bool IsLoadableFileName(std::string_view path);
 
 	/// Returns the serial to use when computing the game settings path for the current game.
 	std::string GetSerialForGameSettings();
 
 	/// Returns the path for the game settings ini file for the specified CRC.
-	std::string GetGameSettingsPath(const std::string_view game_serial, u32 game_crc);
+	std::string GetGameSettingsPath(std::string_view game_serial, u32 game_crc);
 
 	/// Returns the ISO override for an ELF via gamesettings.
 	std::string GetDiscOverrideFromGameSettings(const std::string& elf_path);
 
 	/// Returns the path for the input profile ini file with the specified name (may not exist).
-	std::string GetInputProfilePath(const std::string_view name);
+	std::string GetInputProfilePath(std::string_view name);
 
 	/// Returns the path for the debugger settings json file for the specified game serial and CRC.
-	std::string GetDebuggerSettingsFilePath(const std::string_view game_serial, u32 game_crc);
+	std::string GetDebuggerSettingsFilePath(std::string_view game_serial, u32 game_crc);
 
 	/// Returns the path for the debugger settings json file for the current game.
 	std::string GetDebuggerSettingsFilePathForCurrentGame();
@@ -236,8 +236,8 @@ namespace VMManager
 	void UpdateDiscordPresence(bool update_session_time);
 
 #if defined(__ANDROID__)
-	void AndroidDiscordConfigure(uint64_t app_id, std::string custom_scheme, std::string display_name,
-		std::string large_image_key);
+	void AndroidDiscordConfigure(uint64_t app_id, const std::string& custom_scheme, std::string display_name,
+		const std::string& large_image_key);
 	void AndroidDiscordProvideStoredToken(const std::string& access_token, const std::string& refresh_token,
 		const std::string& token_type, int64_t expires_at_epoch_seconds, const std::string& scope);
 	void AndroidDiscordBeginAuthorize();
@@ -339,14 +339,14 @@ namespace Host
 	void OnPerformanceMetricsUpdated();
 
 	/// Called when a save state is loading, before the file is processed.
-	void OnSaveStateLoading(const std::string_view filename);
+	void OnSaveStateLoading(std::string_view filename);
 
 	/// Called after a save state is successfully loaded. If the save state was invalid, was_successful will be false.
-	void OnSaveStateLoaded(const std::string_view filename, bool was_successful);
+	void OnSaveStateLoaded(std::string_view filename, bool was_successful);
 
 	/// Called when a save state is being created/saved. The compression/write to disk is asynchronous, so this callback
 	/// just signifies that the save has started, not necessarily completed.
-	void OnSaveStateSaved(const std::string_view filename);
+	void OnSaveStateSaved(std::string_view filename);
 
 	/// Provided by the host; called when the running executable changes.
 	void OnGameChanged(const std::string& title, const std::string& elf_override, const std::string& disc_path,

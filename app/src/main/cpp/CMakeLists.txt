@@ -38,8 +38,12 @@ detect_compiler()
 include(BuildParameters)
 include(SearchForStuff)
 
+option(USE_DISCORD_SDK "Enable Discord SDK / Discord Rich Presence support" OFF)
+
 if(ANDROID)
-	find_package(discord_partner_sdk REQUIRED CONFIG)
+	if(USE_DISCORD_SDK)
+		find_package(discord_partner_sdk CONFIG)
+	endif()
 	# Link all native binaries with 16KB page support for newer devices.
 	add_link_options(-Wl,-z,max-page-size=16384)
 endif()
