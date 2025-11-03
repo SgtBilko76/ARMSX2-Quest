@@ -31,6 +31,7 @@
     <string name="settings_section_general">General</string>
     <string name="settings_section_graphics">Graphics</string>
     <string name="settings_section_performance">Performance</string>
+    <string name="settings_section_stats">Stats</string>
     <string name="settings_section_controller">Controller</string>
     <string name="settings_section_customization">Customization</string>
     <string name="settings_section_storage">Storage &amp; Data</string>
