@@ -29,6 +29,8 @@ import androidx.annotation.NonNull;
 
 import com.google.android.material.color.DynamicColors;
 
+import kr.co.iefriends.pcsx2.utils.DiscordBridge;
+
 public class App extends Application {
     @Override
     public void onCreate() {

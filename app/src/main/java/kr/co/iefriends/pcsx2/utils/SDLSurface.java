@@ -1,4 +1,4 @@
-package kr.co.iefriends.pcsx2;
+package kr.co.iefriends.pcsx2.utils;
 
 import android.content.Context;
 import android.util.AttributeSet;
@@ -6,6 +6,9 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
 import androidx.annotation.NonNull;
+
+import kr.co.iefriends.pcsx2.NativeApp;
+import kr.co.iefriends.pcsx2.activities.MainActivity;
 
 public class SDLSurface extends SurfaceView implements SurfaceHolder.Callback {
     public SDLSurface(Context p_context) {

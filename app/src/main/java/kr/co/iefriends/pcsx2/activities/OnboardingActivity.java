@@ -1,4 +1,4 @@
-package kr.co.iefriends.pcsx2;
+package kr.co.iefriends.pcsx2.activities;
 
 import android.app.Activity;
 import android.content.Context;
@@ -33,7 +33,10 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import kr.co.iefriends.pcsx2.LogcatRecorder;
+import kr.co.iefriends.pcsx2.utils.DataDirectoryManager;
+import kr.co.iefriends.pcsx2.utils.LogcatRecorder;
+import kr.co.iefriends.pcsx2.NativeApp;
+import kr.co.iefriends.pcsx2.R;
 
 public class OnboardingActivity extends AppCompatActivity {
 

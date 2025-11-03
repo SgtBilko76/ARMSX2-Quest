@@ -559,8 +559,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 //    register_methods(env, "kr/co/iefriends/pcsx2/SDLActivity", SDLActivity_tab, SDL_arraysize(SDLActivity_tab));
 //    register_methods(env, "kr/co/iefriends/pcsx2/SDLInputConnection", SDLInputConnection_tab, SDL_arraysize(SDLInputConnection_tab));
 //    register_methods(env, "kr/co/iefriends/pcsx2/SDLAudioManager", SDLAudioManager_tab, SDL_arraysize(SDLAudioManager_tab));
-    register_methods(env, "kr/co/iefriends/pcsx2/SDLControllerManager", SDLControllerManager_tab, SDL_arraysize(SDLControllerManager_tab));
-    register_methods(env, "kr/co/iefriends/pcsx2/HIDDeviceManager", HIDDeviceManager_tab, SDL_arraysize(HIDDeviceManager_tab));
+    register_methods(env, "kr/co/iefriends/pcsx2/utils/SDLControllerManager", SDLControllerManager_tab, SDL_arraysize(SDLControllerManager_tab));
+    register_methods(env, "kr/co/iefriends/pcsx2/hid/HIDDeviceManager", HIDDeviceManager_tab, SDL_arraysize(HIDDeviceManager_tab));
 
     return JNI_VERSION_1_4;
 }

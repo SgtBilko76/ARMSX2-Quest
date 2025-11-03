@@ -1,4 +1,4 @@
-package kr.co.iefriends.pcsx2;
+package kr.co.iefriends.pcsx2.hid;
 
 import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;

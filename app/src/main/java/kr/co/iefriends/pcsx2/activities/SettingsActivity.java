@@ -4,7 +4,7 @@ may the android, pcsx2 and the java gods bless me with material you support for 
 
 */
 
-package kr.co.iefriends.pcsx2;
+package kr.co.iefriends.pcsx2.activities;
 
 import android.app.Activity;
 import android.content.DialogInterface;
@@ -49,9 +49,16 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import kr.co.iefriends.pcsx2.input.ControllerMappingDialog;
+import kr.co.iefriends.pcsx2.utils.DataDirectoryManager;
+import kr.co.iefriends.pcsx2.utils.DiscordBridge;
+import kr.co.iefriends.pcsx2.utils.LogcatRecorder;
+import kr.co.iefriends.pcsx2.NativeApp;
+import kr.co.iefriends.pcsx2.R;
+import kr.co.iefriends.pcsx2.utils.RetroAchievementsBridge;
 import kr.co.iefriends.pcsx2.input.ControllerMappingManager;
-import kr.co.iefriends.pcsx2.util.DeviceProfiles;
-import kr.co.iefriends.pcsx2.util.AvatarLoader;
+import kr.co.iefriends.pcsx2.utils.DeviceProfiles;
+import kr.co.iefriends.pcsx2.utils.AvatarLoader;
 
 public class SettingsActivity extends AppCompatActivity {
 

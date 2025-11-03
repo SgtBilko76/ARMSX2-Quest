@@ -18,7 +18,7 @@ By MoonPower (Momo-AUX1) GPLv3 License
 
 */
 
-package kr.co.iefriends.pcsx2.util;
+package kr.co.iefriends.pcsx2.utils;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
