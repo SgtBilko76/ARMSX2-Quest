@@ -1449,18 +1449,18 @@ public class SettingsActivity extends AppCompatActivity {
         TextView tvOsdScale = findViewById(R.id.tv_osd_scale);
         if (sbOsdScale != null && tvOsdScale != null) {
             try {
-                String skip = NativeApp.getSetting("EmuCore/GS", "OsdScale", "int");
-                int v = (skip == null || skip.isEmpty()) ? 0 : Integer.parseInt(skip);
-                if (v < 0) v = 0;
+                String scale = NativeApp.getSetting("EmuCore/GS", "OsdScale", "int");
+                int v = (scale == null || scale.isEmpty()) ? 50 : Integer.parseInt(scale);
+                if (v < 50) v = 50;
                 if (v > 100) v = 100;
                 sbOsdScale.setValue(v);
                 tvOsdScale.setText("On-Screen Display Scale: " + v);
             } catch (Exception ignored) {
-                sbOsdScale.setValue(0f);
+                sbOsdScale.setValue(100f);
                 tvOsdScale.setText("On-Screen Display Scale: 100");
             }
             sbOsdScale.addOnChangeListener((slider, value, fromUser) -> {
-                int v = Math.max(0, Math.min(100, Math.round(value)));
+                int v = Math.max(50, Math.min(100, Math.round(value)));
                 if (v != Math.round(value)) slider.setValue(v);
                 tvOsdScale.setText("On-Screen Display Scale: " + v);
                 NativeApp.setSetting("EmuCore/GS", "OsdScale", "int", Integer.toString(v));
