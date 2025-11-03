@@ -18,7 +18,7 @@ By MoonPower (Momo-AUX1) GPLv3 License
 
 */
 
-package kr.co.iefriends.pcsx2;
+package kr.co.iefriends.pcsx2.utils;
 
 import android.os.Handler;
 import android.os.Looper;
@@ -30,11 +30,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 
-final class RetroAchievementsBridge {
+public final class RetroAchievementsBridge {
 
     private static final String TAG = "RetroAchievementsBridge";
 
-    interface Listener {
+    public interface Listener {
         void onStateUpdated(State state);
 
         void onLoginRequested(int reason);
@@ -44,35 +44,35 @@ final class RetroAchievementsBridge {
         void onHardcoreModeChanged(boolean enabled);
     }
 
-    interface LoginCallback {
+    public interface LoginCallback {
         void onResult(boolean success, String message);
     }
 
     static final int LOGIN_REASON_USER = 0;
-    static final int LOGIN_REASON_TOKEN_INVALID = 1;
+    public static final int LOGIN_REASON_TOKEN_INVALID = 1;
 
-    static final class State {
-        final boolean achievementsEnabled;
-        final boolean loggedIn;
-        final String username;
-        final String displayName;
-        final String avatarPath;
-        final int points;
-        final int softcorePoints;
-        final int unreadMessages;
-        final boolean hardcorePreference;
-        final boolean hardcoreActive;
-        final boolean hasActiveGame;
-        final String gameTitle;
-        final String richPresence;
-        final String gameIconPath;
-        final int unlockedAchievements;
-        final int totalAchievements;
-        final int unlockedPoints;
-        final int totalPoints;
-        final int gameId;
+    public static final class State {
+        public final boolean achievementsEnabled;
+        public final boolean loggedIn;
+        public final String username;
+        public final String displayName;
+        public final String avatarPath;
+        public final int points;
+        public final int softcorePoints;
+        public final int unreadMessages;
+        public final boolean hardcorePreference;
+        public final boolean hardcoreActive;
+        public final boolean hasActiveGame;
+        public final String gameTitle;
+        public final String richPresence;
+        public final String gameIconPath;
+        public final int unlockedAchievements;
+        public final int totalAchievements;
+        public final int unlockedPoints;
+        public final int totalPoints;
+        public final int gameId;
         final boolean hasAchievements;
-        final boolean hasLeaderboards;
+        public final boolean hasLeaderboards;
         final boolean hasRichPresence;
 
         State(boolean achievementsEnabled,
@@ -138,18 +138,18 @@ final class RetroAchievementsBridge {
     private RetroAchievementsBridge() {
     }
 
-    static synchronized void setListener(Listener listener) {
+    public static synchronized void setListener(Listener listener) {
         sListener = listener;
         if (listener != null && sLastState != null) {
             postToMain(() -> listener.onStateUpdated(sLastState));
         }
     }
 
-    static void refreshState() {
+    public static void refreshState() {
         executeBackground(RetroAchievementsBridge::nativeRequestState);
     }
 
-    static void login(String username, String password, LoginCallback callback) {
+    public static void login(String username, String password, LoginCallback callback) {
         final String trimmedUser = username != null ? username.trim() : "";
         final String pwd = password != null ? password : "";
         if (TextUtils.isEmpty(trimmedUser) || TextUtils.isEmpty(pwd)) {
@@ -170,28 +170,28 @@ final class RetroAchievementsBridge {
         });
     }
 
-    static void logout() {
+    public static void logout() {
         executeBackground(() -> {
             nativeLogout();
             nativeRequestState();
         });
     }
 
-    static void setEnabled(boolean enabled) {
+    public static void setEnabled(boolean enabled) {
         executeBackground(() -> {
             nativeSetEnabled(enabled);
             nativeRequestState();
         });
     }
 
-    static void setHardcore(boolean enabled) {
+    public static void setHardcore(boolean enabled) {
         executeBackground(() -> {
             nativeSetHardcore(enabled);
             nativeRequestState();
         });
     }
 
-    static State getLastState() {
+    public static State getLastState() {
         synchronized (RetroAchievementsBridge.class) {
             return sLastState;
         }

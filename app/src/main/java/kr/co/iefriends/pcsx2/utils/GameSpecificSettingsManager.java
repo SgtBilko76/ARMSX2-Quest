@@ -1,4 +1,4 @@
-package kr.co.iefriends.pcsx2;
+package kr.co.iefriends.pcsx2.utils;
 
 import android.content.Context;
 import android.text.TextUtils;
@@ -17,7 +17,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 
-final class GameSpecificSettingsManager {
+import kr.co.iefriends.pcsx2.NativeApp;
+
+public final class GameSpecificSettingsManager {
     private static final String FILE_NAME = "IGS.json";
     private static final String KEY_VERSION = "version";
     private static final String KEY_GAMES = "games";
@@ -27,18 +29,27 @@ final class GameSpecificSettingsManager {
     private GameSpecificSettingsManager() {
     }
 
-    static final class GameSettings {
-        @Nullable Boolean enableCheats;
-        @Nullable Boolean widescreen;
-        @Nullable Boolean noInterlacing;
-        @Nullable Boolean loadTextures;
-        @Nullable Boolean asyncTextures;
-        @Nullable Boolean precacheTextures;
-        @Nullable Boolean showFps;
-        @Nullable Integer renderer;
-        @Nullable String aspectRatio;
+    public static final class GameSettings {
+        @Nullable
+        public Boolean enableCheats;
+        @Nullable
+        public Boolean widescreen;
+        @Nullable
+        public Boolean noInterlacing;
+        @Nullable
+        public Boolean loadTextures;
+        @Nullable
+        public Boolean asyncTextures;
+        @Nullable
+        public Boolean precacheTextures;
+        @Nullable
+        public Boolean showFps;
+        @Nullable
+        public Integer renderer;
+        @Nullable
+        public String aspectRatio;
 
-        boolean hasOverrides() {
+        public boolean hasOverrides() {
             return enableCheats != null || widescreen != null || noInterlacing != null
                     || loadTextures != null || asyncTextures != null || precacheTextures != null
                     || showFps != null || renderer != null || !TextUtils.isEmpty(aspectRatio);
@@ -80,7 +91,7 @@ final class GameSpecificSettingsManager {
     }
 
     @Nullable
-    static GameSettings getSettings(Context context, String key) {
+    public static GameSettings getSettings(Context context, String key) {
         if (context == null || TextUtils.isEmpty(key)) {
             return null;
         }
@@ -94,7 +105,7 @@ final class GameSpecificSettingsManager {
         }
     }
 
-    static void saveSettings(Context context, String key, GameSettings settings) {
+    public static void saveSettings(Context context, String key, GameSettings settings) {
         if (context == null || TextUtils.isEmpty(key)) {
             return;
         }
@@ -113,7 +124,7 @@ final class GameSpecificSettingsManager {
         }
     }
 
-    static void removeSettings(Context context, String key) {
+    public static void removeSettings(Context context, String key) {
         if (context == null || TextUtils.isEmpty(key)) {
             return;
         }

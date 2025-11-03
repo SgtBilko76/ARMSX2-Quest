@@ -1,4 +1,4 @@
-package kr.co.iefriends.pcsx2;
+package kr.co.iefriends.pcsx2.utils;
 
 import android.content.Context;
 import android.os.Build;
@@ -15,11 +15,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import kr.co.iefriends.pcsx2.NativeApp;
+
 
 public class SDLControllerManager
 {
 
-    static native int nativeSetupJNI();
+    public static native int nativeSetupJNI();
 
     static native void nativeAddJoystick(int device_id, String name, String desc,
                                                 int vendor_id, int product_id,
@@ -40,7 +42,7 @@ public class SDLControllerManager
 
     private static final String TAG = "SDLControllerManager";
 
-    static void initialize() {
+    public static void initialize() {
         if (mJoystickHandler == null) {
             if (Build.VERSION.SDK_INT >= 19 /* Android 4.4 (KITKAT) */) {
                 mJoystickHandler = new SDLJoystickHandler_API19();
@@ -82,21 +84,21 @@ public class SDLControllerManager
     /**
      * This method is called by SDL using JNI.
      */
-    static void hapticRun(int device_id, float intensity, int length) {
+    public static void hapticRun(int device_id, float intensity, int length) {
         mHapticHandler.run(device_id, intensity, length);
     }
 
     /**
      * This method is called by SDL using JNI.
      */
-    static void hapticRumble(int device_id, float low_frequency_intensity, float high_frequency_intensity, int length) {
+    public static void hapticRumble(int device_id, float low_frequency_intensity, float high_frequency_intensity, int length) {
         mHapticHandler.rumble(device_id, low_frequency_intensity, high_frequency_intensity, length);
     }
 
     /**
      * This method is called by SDL using JNI.
      */
-    static void hapticStop(int device_id)
+    public static void hapticStop(int device_id)
     {
         mHapticHandler.stop(device_id);
     }

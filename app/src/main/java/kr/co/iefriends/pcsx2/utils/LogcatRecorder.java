@@ -19,7 +19,7 @@ By MoonPower (Momo-AUX1) GPLv3 License
 
 */
 
-package kr.co.iefriends.pcsx2;
+package kr.co.iefriends.pcsx2.utils;
 
 import android.content.Context;
 import android.util.Log;
@@ -29,8 +29,7 @@ import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-
-final class LogcatRecorder {
+public final class LogcatRecorder {
 	private static final String TAG = "LogcatRecorder";
 	private static final Object LOCK = new Object();
 
@@ -42,7 +41,7 @@ final class LogcatRecorder {
 
 	private LogcatRecorder() {}
 
-	static void initialize(Context context) {
+	public static void initialize(Context context) {
 		if (context == null)
 			return;
 
@@ -52,7 +51,7 @@ final class LogcatRecorder {
 		}
 	}
 
-	static void setEnabled(boolean enable) {
+	public static void setEnabled(boolean enable) {
 		synchronized (LOCK) {
 			sCaptureRequested = enable;
 			if (enable) {
@@ -70,7 +69,7 @@ final class LogcatRecorder {
 		}
 	}
 
-	static void handleDataRootChanged() {
+	public static void handleDataRootChanged() {
 		synchronized (LOCK) {
 			if (!sIsRunning)
 				return;
@@ -81,7 +80,7 @@ final class LogcatRecorder {
 		}
 	}
 
-	static void shutdown() {
+	public static void shutdown() {
 		synchronized (LOCK) {
 			sCaptureRequested = false;
 			if (sIsRunning)

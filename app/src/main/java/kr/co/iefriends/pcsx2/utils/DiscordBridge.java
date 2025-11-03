@@ -19,7 +19,7 @@ By MoonPower (Momo-AUX1) GPLv3 License
 
 */
 
-package kr.co.iefriends.pcsx2;
+package kr.co.iefriends.pcsx2.utils;
 
 import android.app.Activity;
 import android.content.Context;
@@ -45,7 +45,11 @@ import java.util.concurrent.Executors;
 
 import org.json.JSONObject;
 
-final class DiscordBridge {
+import kr.co.iefriends.pcsx2.BuildConfig;
+import kr.co.iefriends.pcsx2.NativeApp;
+
+
+public final class DiscordBridge {
     private static final String TAG = "DiscordBridge";
     private static final String CREDS_FILE = "discord_creds.env";
     private static final String PREFS_NAME = "discord_bridge";
@@ -129,7 +133,7 @@ final class DiscordBridge {
     private static final ExecutorService sAvatarExecutor = Executors.newSingleThreadExecutor();
     private static boolean sAvatarFetchInProgress;
 
-    interface DiscordStateListener {
+    public interface DiscordStateListener {
         void onLoginStateChanged(boolean loggedIn);
 
         void onError(String message);
@@ -159,7 +163,7 @@ final class DiscordBridge {
     private DiscordBridge() {
     }
 
-    static boolean isAvailable() {
+    public static boolean isAvailable() {
         return sSdkAvailable && sApplicationId != 0L;
     }
 
@@ -174,7 +178,7 @@ final class DiscordBridge {
         }
     }
 
-    static void updateEngineActivity(Activity activity) {
+    public static void updateEngineActivity(Activity activity) {
         setEngineActivityInternal(activity);
     }
 
@@ -208,7 +212,7 @@ final class DiscordBridge {
         return scheme;
     }
 
-    static synchronized void initialize(Context context) {
+    public static synchronized void initialize(Context context) {
         if (sInitialized) {
             Log.d(TAG, "initialize(): already initialized");
             return;
@@ -245,7 +249,7 @@ final class DiscordBridge {
         }
     }
 
-    static synchronized void onActivityResumed(Activity activity) {
+    public static synchronized void onActivityResumed(Activity activity) {
         sLastResumedActivity = new WeakReference<>(activity);
         setEngineActivityInternal(activity);
         if (!sSdkAvailable) {
@@ -259,7 +263,7 @@ final class DiscordBridge {
         enterForegroundLocked(false);
     }
 
-    static synchronized void onActivityPaused(Activity activity) {
+    public static synchronized void onActivityPaused(Activity activity) {
         if (!sInitialized) {
             sPendingForeground = false;
             return;
@@ -286,22 +290,22 @@ final class DiscordBridge {
         }
     }
 
-    static void setListener(DiscordStateListener listener) {
+    public static void setListener(DiscordStateListener listener) {
         sListener = listener;
         if (sListener != null && !TextUtils.isEmpty(sUsername)) {
             sListener.onUserInfoUpdated(sUsername);
         }
     }
 
-    static boolean isLoggedIn() {
+    public static boolean isLoggedIn() {
         return sLoggedIn;
     }
 
-    static String getLoggedInUsername() {
+    public static String getLoggedInUsername() {
         return sUsername;
     }
 
-    static String getLoggedInAvatarUrl() {
+    public static String getLoggedInAvatarUrl() {
         return sAvatarUrl;
     }
 
@@ -312,7 +316,7 @@ final class DiscordBridge {
         return nativeIsClientReady();
     }
 
-    static void beginAuthorize(Activity activity) {
+    public static void beginAuthorize(Activity activity) {
         Log.d(TAG, "beginAuthorize(): initialized=" + sInitialized + " loggedIn=" + sLoggedIn);
         if (!sSdkAvailable) {
             if (sListener != null) {
@@ -334,7 +338,7 @@ final class DiscordBridge {
         nativeBeginAuthorize();
     }
 
-    static void clearTokens() {
+    public static void clearTokens() {
         Log.d(TAG, "clearTokens()");
         if (sSdkAvailable) {
             nativeClearTokens();
@@ -346,7 +350,7 @@ final class DiscordBridge {
         sLoggedIn = false;
     }
 
-    static String consumeLastError() {
+    public static String consumeLastError() {
         if (!sSdkAvailable) {
             return null;
         }

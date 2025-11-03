@@ -9,6 +9,9 @@ import android.view.Surface;
 import java.io.File;
 import java.lang.ref.WeakReference;
 
+import kr.co.iefriends.pcsx2.activities.MainActivity;
+import kr.co.iefriends.pcsx2.utils.DataDirectoryManager;
+
 public class NativeApp {
 	static {
 		try {

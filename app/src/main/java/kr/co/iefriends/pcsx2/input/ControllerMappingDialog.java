@@ -19,7 +19,7 @@ By MoonPower (Momo-AUX1) GPLv3 License
 
 */
 
-package kr.co.iefriends.pcsx2;
+package kr.co.iefriends.pcsx2.input;
 
 import android.app.Dialog;
 import android.content.Context;
@@ -44,7 +44,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.util.EnumMap;
 import java.util.Map;
 
-import kr.co.iefriends.pcsx2.input.ControllerMappingManager;
+import kr.co.iefriends.pcsx2.R;
 
 public class ControllerMappingDialog extends DialogFragment {
 

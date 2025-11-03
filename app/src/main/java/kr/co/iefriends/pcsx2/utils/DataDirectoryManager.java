@@ -19,7 +19,7 @@ By MoonPower (Momo-AUX1) GPLv3 License
 
 */
 
-package kr.co.iefriends.pcsx2;
+package kr.co.iefriends.pcsx2.utils;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -41,9 +41,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 
-import kr.co.iefriends.pcsx2.util.DebugLog;
-
-final class DataDirectoryManager {
+public final class DataDirectoryManager {
     private static final String PREFS = "armsx2";
     private static final String KEY_CUSTOM_PATH = "data_dir_path";
     private static final String KEY_CUSTOM_URI = "data_dir_uri";
@@ -52,7 +50,7 @@ final class DataDirectoryManager {
 
     private DataDirectoryManager() {}
 
-    static File getDataRoot(Context context) {
+    public static File getDataRoot(Context context) {
         SharedPreferences prefs = getPrefs(context);
         String custom = prefs.getString(KEY_CUSTOM_PATH, null);
         if (!TextUtils.isEmpty(custom)) {
@@ -66,7 +64,7 @@ final class DataDirectoryManager {
         return fallback;
     }
 
-    static File getDefaultDataRoot(Context context) {
+    public static File getDefaultDataRoot(Context context) {
         File base = context.getExternalFilesDir(null);
         if (base == null) {
             base = context.getDataDir();
@@ -74,12 +72,12 @@ final class DataDirectoryManager {
         return base != null ? base : new File("");
     }
 
-    static boolean hasCustomDataRoot(Context context) {
+    public static boolean hasCustomDataRoot(Context context) {
         SharedPreferences prefs = getPrefs(context);
         return !TextUtils.isEmpty(prefs.getString(KEY_CUSTOM_PATH, null));
     }
 
-    static void storeCustomDataRoot(Context context, String absolutePath, @Nullable String uriString) {
+    public static void storeCustomDataRoot(Context context, String absolutePath, @Nullable String uriString) {
         SharedPreferences.Editor editor = getPrefs(context).edit();
         editor.putString(KEY_CUSTOM_PATH, absolutePath);
         if (!TextUtils.isEmpty(uriString)) {
@@ -89,15 +87,15 @@ final class DataDirectoryManager {
         markPromptDone(context);
     }
 
-    static void clearCustomDataRoot(Context context) {
+    public static void clearCustomDataRoot(Context context) {
         getPrefs(context).edit().remove(KEY_CUSTOM_PATH).remove(KEY_CUSTOM_URI).apply();
     }
 
-    static boolean isPromptDone(Context context) {
+    public static boolean isPromptDone(Context context) {
         return getPrefs(context).getBoolean(KEY_PROMPT_DONE, false);
     }
 
-    static void markPromptDone(Context context) {
+    public static void markPromptDone(Context context) {
         getPrefs(context).edit().putBoolean(KEY_PROMPT_DONE, true).apply();
     }
 
@@ -105,7 +103,7 @@ final class DataDirectoryManager {
         getPrefs(context).edit().remove(KEY_PROMPT_DONE).apply();
     }
 
-    static boolean migrateData(File source, File target) {
+    public static boolean migrateData(File source, File target) {
         if (source == null || target == null) {
             return false;
         }
@@ -148,7 +146,7 @@ final class DataDirectoryManager {
     }
 
     @Nullable
-    static String resolveTreeUriToPath(Context context, Uri treeUri) {
+    public static String resolveTreeUriToPath(Context context, Uri treeUri) {
         if (treeUri == null) {
             return null;
         }
@@ -278,7 +276,7 @@ final class DataDirectoryManager {
         file.delete();
     }
 
-    static void copyAssetAll(Context context, String srcPath) {
+    public static void copyAssetAll(Context context, String srcPath) {
         AssetManager assetMgr = context.getAssets();
         try {
             String[] assets = assetMgr.list(srcPath);
@@ -350,7 +348,7 @@ final class DataDirectoryManager {
         return success;
     }
 
-    static boolean canUseDirectFileAccess(File dir) {
+    public static boolean canUseDirectFileAccess(File dir) {
         if (dir == null) {
             return false;
         }
@@ -378,7 +376,7 @@ final class DataDirectoryManager {
         }
     }
 
-    static boolean hasAllFilesAccess() {
+    public static boolean hasAllFilesAccess() {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager();
     }
 

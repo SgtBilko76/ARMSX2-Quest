@@ -107,7 +107,7 @@ namespace
         std::lock_guard<std::mutex> lock(s_ra_bridge_mutex);
         if (!s_ra_bridge_class)
 		{
-			jclass local = env->FindClass("kr/co/iefriends/pcsx2/RetroAchievementsBridge");
+			jclass local = env->FindClass("kr/co/iefriends/pcsx2/utils/RetroAchievementsBridge");
 			if (!local)
 				return false;
 
@@ -1008,7 +1008,7 @@ int FileSystem::OpenFDFileContent(const char* filename)
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_kr_co_iefriends_pcsx2_DiscordBridge_nativeConfigure(JNIEnv* env, jclass, jlong application_id,
+Java_kr_co_iefriends_pcsx2_utils_DiscordBridge_nativeConfigure(JNIEnv* env, jclass, jlong application_id,
                                                          jstring scheme, jstring display_name, jstring image_key)
 {
     VMManager::AndroidDiscordConfigure(static_cast<uint64_t>(application_id), GetJavaString(env, scheme),
@@ -1018,7 +1018,7 @@ Java_kr_co_iefriends_pcsx2_DiscordBridge_nativeConfigure(JNIEnv* env, jclass, jl
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_kr_co_iefriends_pcsx2_DiscordBridge_nativeProvideStoredToken(JNIEnv* env, jclass,
+Java_kr_co_iefriends_pcsx2_utils_DiscordBridge_nativeProvideStoredToken(JNIEnv* env, jclass,
                                                                   jstring access_token, jstring refresh_token,
                                                                   jstring token_type, jlong expires_at,
                                                                   jstring scope)
@@ -1029,49 +1029,49 @@ Java_kr_co_iefriends_pcsx2_DiscordBridge_nativeProvideStoredToken(JNIEnv* env, j
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_kr_co_iefriends_pcsx2_DiscordBridge_nativeBeginAuthorize(JNIEnv*, jclass)
+Java_kr_co_iefriends_pcsx2_utils_DiscordBridge_nativeBeginAuthorize(JNIEnv*, jclass)
 {
     VMManager::AndroidDiscordBeginAuthorize();
 }
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_kr_co_iefriends_pcsx2_DiscordBridge_nativeSetAppForeground(JNIEnv*, jclass, jboolean is_foreground)
+Java_kr_co_iefriends_pcsx2_utils_DiscordBridge_nativeSetAppForeground(JNIEnv*, jclass, jboolean is_foreground)
 {
     VMManager::AndroidDiscordSetAppForeground(is_foreground == JNI_TRUE);
 }
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_kr_co_iefriends_pcsx2_DiscordBridge_nativePollCallbacks(JNIEnv*, jclass)
+Java_kr_co_iefriends_pcsx2_utils_DiscordBridge_nativePollCallbacks(JNIEnv*, jclass)
 {
     VMManager::PollDiscordPresence();
 }
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_kr_co_iefriends_pcsx2_DiscordBridge_nativeClearTokens(JNIEnv*, jclass)
+Java_kr_co_iefriends_pcsx2_utils_DiscordBridge_nativeClearTokens(JNIEnv*, jclass)
 {
     VMManager::AndroidDiscordClearTokens();
 }
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_kr_co_iefriends_pcsx2_DiscordBridge_nativeIsLoggedIn(JNIEnv*, jclass)
+Java_kr_co_iefriends_pcsx2_utils_DiscordBridge_nativeIsLoggedIn(JNIEnv*, jclass)
 {
     return VMManager::AndroidDiscordIsLoggedIn() ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C"
 JNIEXPORT jboolean JNICALL
-Java_kr_co_iefriends_pcsx2_DiscordBridge_nativeIsClientReady(JNIEnv*, jclass)
+Java_kr_co_iefriends_pcsx2_utils_DiscordBridge_nativeIsClientReady(JNIEnv*, jclass)
 {
     return VMManager::AndroidDiscordIsClientReady() ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_kr_co_iefriends_pcsx2_DiscordBridge_nativeConsumeLastError(JNIEnv* env, jclass)
+Java_kr_co_iefriends_pcsx2_utils_DiscordBridge_nativeConsumeLastError(JNIEnv* env, jclass)
 {
     const std::string error = VMManager::AndroidDiscordConsumeLastError();
     if (error.empty())
@@ -1285,7 +1285,7 @@ Java_kr_co_iefriends_pcsx2_NativeApp_getImageSlot(JNIEnv *env, jclass clazz, jin
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_kr_co_iefriends_pcsx2_RetroAchievementsBridge_nativeRequestState(JNIEnv* env, jclass)
+Java_kr_co_iefriends_pcsx2_utils_RetroAchievementsBridge_nativeRequestState(JNIEnv* env, jclass)
 {
     (void)env;
     NotifyRetroAchievementsState();
@@ -1293,7 +1293,7 @@ Java_kr_co_iefriends_pcsx2_RetroAchievementsBridge_nativeRequestState(JNIEnv* en
 
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_kr_co_iefriends_pcsx2_RetroAchievementsBridge_nativeLogin(JNIEnv* env, jclass, jstring j_username, jstring j_password)
+Java_kr_co_iefriends_pcsx2_utils_RetroAchievementsBridge_nativeLogin(JNIEnv* env, jclass, jstring j_username, jstring j_password)
 {
     std::string username = GetJavaString(env, j_username);
     std::string password = GetJavaString(env, j_password);
@@ -1317,7 +1317,7 @@ Java_kr_co_iefriends_pcsx2_RetroAchievementsBridge_nativeLogin(JNIEnv* env, jcla
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_kr_co_iefriends_pcsx2_RetroAchievementsBridge_nativeLogout(JNIEnv* env, jclass)
+Java_kr_co_iefriends_pcsx2_utils_RetroAchievementsBridge_nativeLogout(JNIEnv* env, jclass)
 {
     (void)env;
     Achievements::Logout();
@@ -1326,7 +1326,7 @@ Java_kr_co_iefriends_pcsx2_RetroAchievementsBridge_nativeLogout(JNIEnv* env, jcl
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_kr_co_iefriends_pcsx2_RetroAchievementsBridge_nativeSetEnabled(JNIEnv* env, jclass, jboolean enabled)
+Java_kr_co_iefriends_pcsx2_utils_RetroAchievementsBridge_nativeSetEnabled(JNIEnv* env, jclass, jboolean enabled)
 {
     (void)env;
     const bool enable = (enabled == JNI_TRUE);
@@ -1349,7 +1349,7 @@ Java_kr_co_iefriends_pcsx2_RetroAchievementsBridge_nativeSetEnabled(JNIEnv* env,
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_kr_co_iefriends_pcsx2_RetroAchievementsBridge_nativeSetHardcore(JNIEnv* env, jclass, jboolean enabled)
+Java_kr_co_iefriends_pcsx2_utils_RetroAchievementsBridge_nativeSetHardcore(JNIEnv* env, jclass, jboolean enabled)
 {
     (void)env;
     const bool enable = (enabled == JNI_TRUE);

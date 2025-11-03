@@ -19,7 +19,7 @@ By MoonPower (Momo-AUX1) GPLv3 License
 
 */
 
-package kr.co.iefriends.pcsx2;
+package kr.co.iefriends.pcsx2.input.view;
 
 import android.content.Context;
 import android.graphics.Canvas;

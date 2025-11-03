@@ -1,4 +1,4 @@
-package kr.co.iefriends.pcsx2;
+package kr.co.iefriends.pcsx2.hid;
 
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
