@@ -67,10 +67,11 @@ public class SettingsActivity extends AppCompatActivity {
     private static final int SECTION_GENERAL = 0;
 	private static final int SECTION_GRAPHICS = 1;
 	private static final int SECTION_PERFORMANCE = 2;
-	private static final int SECTION_CONTROLLER = 3;
-	private static final int SECTION_CUSTOMIZATION = 4;
-	private static final int SECTION_STORAGE = 5;
-	private static final int SECTION_ACHIEVEMENTS = 6;
+	private static final int SECTION_STATS = 3;
+	private static final int SECTION_CONTROLLER = 4;
+	private static final int SECTION_CUSTOMIZATION = 5;
+	private static final int SECTION_STORAGE = 6;
+	private static final int SECTION_ACHIEVEMENTS = 7;
 	private static final String STATE_SELECTED_SECTION = "settings_selected_section";
 	private TextView tvDataDirPath;
 	private AlertDialog dataDirProgressDialog;
@@ -141,6 +142,7 @@ public class SettingsActivity extends AppCompatActivity {
 		initializeGraphicsSettings();
 		initializeControllerSettings();
 		initializePerformanceSettings();
+		initializeStatsSettings();
 		initializeCustomizationSettings();
 		initializeMemoryCardSettings();
 		initializeStorageSettings();
@@ -204,9 +206,9 @@ public class SettingsActivity extends AppCompatActivity {
         tvRaStatus = findViewById(R.id.tv_ra_status);
         tvRaProfile = findViewById(R.id.tv_ra_profile);
         tvRaGame = findViewById(R.id.tv_ra_game);
-	groupRaIdentity = findViewById(R.id.group_ra_identity);
-	imgRaAvatar = findViewById(R.id.img_ra_avatar);
-	tvRaLoggedInAs = findViewById(R.id.tv_ra_logged_in_as);
+	    groupRaIdentity = findViewById(R.id.group_ra_identity);
+	    imgRaAvatar = findViewById(R.id.img_ra_avatar);
+	    tvRaLoggedInAs = findViewById(R.id.tv_ra_logged_in_as);
 
         if (switchRaEnabled != null) {
             switchRaEnabled.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -245,31 +247,31 @@ public class SettingsActivity extends AppCompatActivity {
         RetroAchievementsBridge.setListener(retroAchievementsListener);
         RetroAchievementsBridge.refreshState();
 
-	tvDiscordStatus = findViewById(R.id.tv_discord_status);
-	groupDiscordIdentity = findViewById(R.id.group_discord_identity);
-	imgDiscordAvatar = findViewById(R.id.img_discord_avatar);
-	tvDiscordLoggedInAs = findViewById(R.id.tv_discord_logged_in_as);
-	btnDiscordConnect = findViewById(R.id.btn_discord_connect);
-	btnDiscordLogout = findViewById(R.id.btn_discord_logout);
+	    tvDiscordStatus = findViewById(R.id.tv_discord_status);
+	    groupDiscordIdentity = findViewById(R.id.group_discord_identity);
+	    imgDiscordAvatar = findViewById(R.id.img_discord_avatar);
+	    tvDiscordLoggedInAs = findViewById(R.id.tv_discord_logged_in_as);
+	    btnDiscordConnect = findViewById(R.id.btn_discord_connect);
+	    btnDiscordLogout = findViewById(R.id.btn_discord_logout);
 
-	boolean discordAvailable = DiscordBridge.isAvailable();
-	if (!discordAvailable) {
-		if (tvDiscordStatus != null) {
-			tvDiscordStatus.setText("Discord integration is unavailable in this build.");
-		}
-		if (btnDiscordConnect != null) {
-			btnDiscordConnect.setEnabled(false);
-			btnDiscordConnect.setText("Discord Unavailable");
-		}
-		if (btnDiscordLogout != null) {
-			btnDiscordLogout.setVisibility(View.GONE);
-		}
-		if (groupDiscordIdentity != null) {
-			groupDiscordIdentity.setVisibility(View.GONE);
-		}
-		DiscordBridge.setListener(null);
-		return;
-	}
+	    boolean discordAvailable = DiscordBridge.isAvailable();
+	    if (!discordAvailable) {
+	    	if (tvDiscordStatus != null) {
+		    	tvDiscordStatus.setText("Discord integration is unavailable in this build.");
+		    }
+		    if (btnDiscordConnect != null) {
+			    btnDiscordConnect.setEnabled(false);
+			    btnDiscordConnect.setText("Discord Unavailable");
+		    }
+            if (btnDiscordLogout != null) {
+                btnDiscordLogout.setVisibility(View.GONE);
+		    }
+		    if (groupDiscordIdentity != null) {
+                groupDiscordIdentity.setVisibility(View.GONE);
+		    }
+		    DiscordBridge.setListener(null);
+		    return;
+	    }
         if (btnDiscordConnect != null) {
             updateDiscordUi(DiscordBridge.isLoggedIn());
             btnDiscordConnect.setOnClickListener(v -> {
@@ -1217,32 +1219,6 @@ public class SettingsActivity extends AppCompatActivity {
 	}
 
     private void initializePerformanceSettings() {
-		// OSD FPS
-		MaterialSwitch swOsdFps = findViewById(R.id.sw_osd_fps);
-		if (swOsdFps != null) {
-			try {
-				String fps = NativeApp.getSetting("EmuCore/GS", "OsdShowFPS", "bool");
-				swOsdFps.setChecked("true".equalsIgnoreCase(fps));
-			} catch (Exception ignored) {}
-			swOsdFps.setOnCheckedChangeListener((buttonView, isChecked) ->
-					NativeApp.setSetting("EmuCore/GS", "OsdShowFPS", "bool", isChecked ? "true" : "false"));
-		}
-
-		// Performance Overlay
-		MaterialSwitch swPerfOverlay = findViewById(R.id.sw_perf_overlay);
-		if (swPerfOverlay != null) {
-			try {
-				String pos = NativeApp.getSetting("EmuCore/GS", "OsdPerformancePos", "int");
-				int v = (pos == null || pos.isEmpty()) ? 0 : Integer.parseInt(pos);
-				if (v < 0 || v > 2) v = 0;
-				swPerfOverlay.setChecked(v != 0);
-			} catch (Exception ignored) {}
-			swPerfOverlay.setOnCheckedChangeListener((buttonView, isChecked) -> {
-				int value = isChecked ? 2 : 0;
-				NativeApp.setSetting("EmuCore/GS", "OsdPerformancePos", "int", Integer.toString(value));
-			});
-		}
-
 		// CPU Core (Translator / Interpreter)
 		try {
 			Spinner spCpu = findViewById(R.id.sp_cpu_core);
@@ -1284,6 +1260,40 @@ public class SettingsActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
             swHwRead.setOnCheckedChangeListener((buttonView, isChecked) ->
                     NativeApp.setSetting("EmuCore/GS", "HardwareReadbacks", "bool", isChecked ? "true" : "false"));
+        }
+
+        // Hardware Download Mode
+        Slider sbHwDownloadMode = findViewById(R.id.sb_hw_download_mode);
+        TextView tvHwDownloadMode = findViewById(R.id.tv_hw_download_mode);
+        if (sbHwDownloadMode != null && tvHwDownloadMode != null) {
+            try {
+                String mode = NativeApp.getSetting("EmuCore/GS", "HWDownloadMode", "int");
+                int v = (mode == null || mode.isEmpty()) ? 0 : Integer.parseInt(mode);
+                if (v < 0) v = 0;
+                if (v > 3) v = 3;
+                sbHwDownloadMode.setValue(v);
+                tvHwDownloadMode.setText("Hardware Download Mode: " + v);
+            } catch (Exception ignored) {
+                sbHwDownloadMode.setValue(0f);
+                tvHwDownloadMode.setText("Hardware Download Mode: 0");
+            }
+            sbHwDownloadMode.addOnChangeListener((slider, value, fromUser) -> {
+                int v = Math.max(-3, Math.min(3, Math.round(value)));
+                if (v != Math.round(value)) slider.setValue(v);
+                tvHwDownloadMode.setText("Hardware Download Mode: " + v);
+                NativeApp.setSetting("EmuCore/GS", "HWDownloadMode", "int", Integer.toString(v));
+            });
+        }
+
+        // Skip Duplicate Frames
+        MaterialSwitch skipDuplicateFrames = findViewById(R.id.skip_duplicate_frames);
+        if (skipDuplicateFrames != null) {
+            try {
+                String sdf = NativeApp.getSetting("EmuCore/GS", "SkipDuplicateFrames", "bool");
+                skipDuplicateFrames.setChecked("true".equalsIgnoreCase(sdf));
+            } catch (Exception ignored) {}
+            skipDuplicateFrames.setOnCheckedChangeListener((buttonView, isChecked) ->
+                    NativeApp.setSetting("EmuCore/GS", "SkipDuplicateFrames", "bool", isChecked ? "true" : "false"));
         }
 
         Slider sbEeRate = findViewById(R.id.sb_ee_cycle_rate);
@@ -1417,6 +1427,210 @@ public class SettingsActivity extends AppCompatActivity {
             swFastCdvd.setOnCheckedChangeListener((b, isChecked) ->
                     NativeApp.setSetting("EmuCore/Speedhacks", "fastCDVD", "bool", isChecked ? "true" : "false"));
         }
+    }
+
+    private void initializeStatsSettings() {
+        // Performance Overlay
+        MaterialSwitch swPerfOverlay = findViewById(R.id.sw_perf_overlay);
+        if (swPerfOverlay != null) {
+            try {
+                String pos = NativeApp.getSetting("EmuCore/GS", "OsdPerformancePos", "int");
+                int v = (pos == null || pos.isEmpty()) ? 0 : Integer.parseInt(pos);
+                if (v < 0 || v > 2) v = 0;
+                swPerfOverlay.setChecked(v != 0);
+            } catch (Exception ignored) {}
+            swPerfOverlay.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                int value = isChecked ? 2 : 0;
+                NativeApp.setSetting("EmuCore/GS", "OsdPerformancePos", "int", Integer.toString(value));
+            });
+        }
+
+        Slider sbOsdScale = findViewById(R.id.sb_osd_scale);
+        TextView tvOsdScale = findViewById(R.id.tv_osd_scale);
+        if (sbOsdScale != null && tvOsdScale != null) {
+            try {
+                String scale = NativeApp.getSetting("EmuCore/GS", "OsdScale", "int");
+                int v = (scale == null || scale.isEmpty()) ? 50 : Integer.parseInt(scale);
+                if (v < 50) v = 50;
+                if (v > 100) v = 100;
+                sbOsdScale.setValue(v);
+                tvOsdScale.setText("On-Screen Display Scale: " + v);
+            } catch (Exception ignored) {
+                sbOsdScale.setValue(100f);
+                tvOsdScale.setText("On-Screen Display Scale: 100");
+            }
+            sbOsdScale.addOnChangeListener((slider, value, fromUser) -> {
+                int v = Math.max(50, Math.min(100, Math.round(value)));
+                if (v != Math.round(value)) slider.setValue(v);
+                tvOsdScale.setText("On-Screen Display Scale: " + v);
+                NativeApp.setSetting("EmuCore/GS", "OsdScale", "int", Integer.toString(v));
+            });
+        }
+
+        // OSD FPS
+		MaterialSwitch swOsdFps = findViewById(R.id.sw_osd_fps);
+		if (swOsdFps != null) {
+			try {
+				String fps = NativeApp.getSetting("EmuCore/GS", "OsdShowFPS", "bool");
+				swOsdFps.setChecked("true".equalsIgnoreCase(fps));
+			} catch (Exception ignored) {}
+			swOsdFps.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowFPS", "bool", isChecked ? "true" : "false"));
+		}
+
+        // OSD VPS
+		MaterialSwitch swOsdVps = findViewById(R.id.sw_osd_vps);
+		if (swOsdVps != null) {
+			try {
+				String vps = NativeApp.getSetting("EmuCore/GS", "OsdShowVPS", "bool");
+                swOsdVps.setChecked("true".equalsIgnoreCase(vps));
+			} catch (Exception ignored) {}
+            swOsdVps.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowVPS", "bool", isChecked ? "true" : "false"));
+		}
+
+        // OSD Speed
+		MaterialSwitch swOsdSpeed = findViewById(R.id.sw_osd_speed);
+		if (swOsdSpeed != null) {
+			try {
+				String speed = NativeApp.getSetting("EmuCore/GS", "OsdShowSpeed", "bool");
+                swOsdSpeed.setChecked("true".equalsIgnoreCase(speed));
+			} catch (Exception ignored) {}
+            swOsdSpeed.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowSpeed", "bool", isChecked ? "true" : "false"));
+		}
+
+        // OSD CPU
+		MaterialSwitch swOsdCpu = findViewById(R.id.sw_osd_cpu);
+		if (swOsdCpu != null) {
+			try {
+				String cpu = NativeApp.getSetting("EmuCore/GS", "OsdShowCPU", "bool");
+                swOsdCpu.setChecked("true".equalsIgnoreCase(cpu));
+			} catch (Exception ignored) {}
+            swOsdCpu.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowCPU", "bool", isChecked ? "true" : "false"));
+		}
+
+        // OSD GPU
+		MaterialSwitch swOsdGpu = findViewById(R.id.sw_osd_gpu);
+		if (swOsdGpu != null) {
+			try {
+				String gpu = NativeApp.getSetting("EmuCore/GS", "OsdShowGPU", "bool");
+                swOsdGpu.setChecked("true".equalsIgnoreCase(gpu));
+			} catch (Exception ignored) {}
+            swOsdGpu.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowGPU", "bool", isChecked ? "true" : "false"));
+		}
+
+        // OSD Resolution
+		MaterialSwitch swOsdRes = findViewById(R.id.sw_osd_res);
+		if (swOsdRes != null) {
+			try {
+				String res = NativeApp.getSetting("EmuCore/GS", "OsdShowResolution", "bool");
+                swOsdRes.setChecked("false".equalsIgnoreCase(res));
+			} catch (Exception ignored) {}
+            swOsdRes.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowResolution", "bool", isChecked ? "true" : "false"));
+		}
+
+        // OSD GS Stats
+		MaterialSwitch swOsdGs = findViewById(R.id.sw_osd_gs);
+		if (swOsdGs != null) {
+			try {
+				String gs = NativeApp.getSetting("EmuCore/GS", "OsdShowGSStats", "bool");
+                swOsdGs.setChecked("false".equalsIgnoreCase(gs));
+			} catch (Exception ignored) {}
+            swOsdGs.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowGSStats", "bool", isChecked ? "true" : "false"));
+		}
+
+        // OSD Indicators
+		MaterialSwitch swOsdIndicators = findViewById(R.id.sw_osd_indicators);
+		if (swOsdIndicators != null) {
+			try {
+				String indicators = NativeApp.getSetting("EmuCore/GS", "OsdShowIndicators", "bool");
+                swOsdIndicators.setChecked("false".equalsIgnoreCase(indicators));
+			} catch (Exception ignored) {}
+            swOsdIndicators.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowIndicators", "bool", isChecked ? "true" : "false"));
+		}
+
+        // OSD Settings
+		MaterialSwitch swOsdSettings = findViewById(R.id.sw_osd_settings);
+		if (swOsdSettings != null) {
+			try {
+				String settings = NativeApp.getSetting("EmuCore/GS", "OsdShowSettings", "bool");
+                swOsdSettings.setChecked("false".equalsIgnoreCase(settings));
+			} catch (Exception ignored) {}
+            swOsdSettings.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowSettings", "bool", isChecked ? "true" : "false"));
+		}
+
+        // OSD Inputs
+		MaterialSwitch swOsdInputs = findViewById(R.id.sw_osd_inputs);
+		if (swOsdInputs != null) {
+			try {
+				String inputs = NativeApp.getSetting("EmuCore/GS", "OsdShowInputs", "bool");
+                swOsdInputs.setChecked("false".equalsIgnoreCase(inputs));
+			} catch (Exception ignored) {}
+            swOsdInputs.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowInputs", "bool", isChecked ? "true" : "false"));
+		}
+
+        // OSD Frame Times
+		MaterialSwitch swOsdFrameTimes = findViewById(R.id.sw_osd_frame_times);
+		if (swOsdFrameTimes != null) {
+			try {
+				String ft = NativeApp.getSetting("EmuCore/GS", "OsdShowFrameTimes", "bool");
+                swOsdFrameTimes.setChecked("true".equalsIgnoreCase(ft));
+			} catch (Exception ignored) {}
+            swOsdFrameTimes.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowFrameTimes", "bool", isChecked ? "true" : "false"));
+		}
+
+        // OSD Version
+		MaterialSwitch swOsdVersion = findViewById(R.id.sw_osd_version);
+		if (swOsdVersion != null) {
+			try {
+				String ver = NativeApp.getSetting("EmuCore/GS", "OsdShowVersion", "bool");
+                swOsdVersion.setChecked("true".equalsIgnoreCase(ver));
+			} catch (Exception ignored) {}
+            swOsdVersion.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowVersion", "bool", isChecked ? "true" : "false"));
+		}
+
+        // OSD HW Info
+		MaterialSwitch swOsdHwInfo = findViewById(R.id.sw_osd_hw_info);
+		if (swOsdHwInfo != null) {
+			try {
+				String hw = NativeApp.getSetting("EmuCore/GS", "OsdShowHardwareInfo", "bool");
+                swOsdHwInfo.setChecked("true".equalsIgnoreCase(hw));
+			} catch (Exception ignored) {}
+            swOsdHwInfo.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowHardwareInfo", "bool", isChecked ? "true" : "false"));
+		}
+
+        // OSD Video Capture
+		MaterialSwitch swOsdVideoCapture = findViewById(R.id.sw_osd_video_capture);
+		if (swOsdVideoCapture != null) {
+			try {
+				String video = NativeApp.getSetting("EmuCore/GS", "OsdShowVideoCapture", "bool");
+                swOsdVideoCapture.setChecked("true".equalsIgnoreCase(video));
+			} catch (Exception ignored) {}
+            swOsdVideoCapture.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowVideoCapture", "bool", isChecked ? "true" : "false"));
+		}
+
+        // OSD Video Capture
+		MaterialSwitch swOsdInputRec = findViewById(R.id.sw_osd_input_rec);
+		if (swOsdInputRec != null) {
+			try {
+				String rec = NativeApp.getSetting("EmuCore/GS", "OsdShowInputRec", "bool");
+                swOsdInputRec.setChecked("true".equalsIgnoreCase(rec));
+			} catch (Exception ignored) {}
+            swOsdInputRec.setOnCheckedChangeListener((buttonView, isChecked) ->
+					NativeApp.setSetting("EmuCore/GS", "OsdShowInputRec", "bool", isChecked ? "true" : "false"));
+		}
     }
 
 	private void initializeCustomizationSettings() {
@@ -1664,6 +1878,7 @@ public class SettingsActivity extends AppCompatActivity {
         switch (section) {
             case SECTION_GRAPHICS: return R.string.settings_section_graphics;
             case SECTION_PERFORMANCE: return R.string.settings_section_performance;
+            case SECTION_STATS: return R.string.settings_section_stats;
             case SECTION_CONTROLLER: return R.string.settings_section_controller;
             case SECTION_CUSTOMIZATION: return R.string.settings_section_customization;
             case SECTION_STORAGE: return R.string.settings_section_storage;
@@ -1676,6 +1891,7 @@ public class SettingsActivity extends AppCompatActivity {
 	private int buttonIdToSection(int buttonId) {
         if (buttonId == R.id.btn_section_graphics) return SECTION_GRAPHICS;
         if (buttonId == R.id.btn_section_performance) return SECTION_PERFORMANCE;
+        if (buttonId == R.id.btn_section_stats) return SECTION_STATS;
         if (buttonId == R.id.btn_section_controller) return SECTION_CONTROLLER;
         if (buttonId == R.id.btn_section_customization) return SECTION_CUSTOMIZATION;
         if (buttonId == R.id.btn_section_storage) return SECTION_STORAGE;
@@ -1687,6 +1903,7 @@ public class SettingsActivity extends AppCompatActivity {
         switch (section) {
             case SECTION_GRAPHICS: return R.id.btn_section_graphics;
             case SECTION_PERFORMANCE: return R.id.btn_section_performance;
+            case SECTION_STATS: return R.id.btn_section_stats;
             case SECTION_CONTROLLER: return R.id.btn_section_controller;
             case SECTION_CUSTOMIZATION: return R.id.btn_section_customization;
             case SECTION_STORAGE: return R.id.btn_section_storage;

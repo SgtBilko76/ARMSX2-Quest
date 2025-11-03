@@ -44,28 +44,47 @@
         </LinearLayout>
 
         <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/sw_osd_fps"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:text="Show FPS"
-            app:useMaterialThemeColors="true" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/sw_perf_overlay"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:text="Performance Overlay"
-            app:useMaterialThemeColors="true" />
-
-        <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/sw_hw_readbacks"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
             android:text="Hardware Readbacks"
             app:useMaterialThemeColors="true" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/skip_duplicate_frames"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:text="Skip Duplicate Frames"
+            app:useMaterialThemeColors="true" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_hw_download_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Hardware Download Mode: 0"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="16sp" />
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/sb_hw_download_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:value="0"
+                android:valueFrom="0"
+                android:valueTo="3"
+                android:stepSize="1"
+                app:haloRadius="16dp"
+                app:labelBehavior="gone"
+                app:tickVisible="false" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
