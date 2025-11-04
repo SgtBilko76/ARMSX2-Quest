@@ -53,24 +53,38 @@ jobs:
         run: |
           APK_DEBUG_PATH=$(find app/build -name "*debug*.apk" -print -quit)
           if [ -z "$APK_DEBUG_PATH" ]; then
-            echo "ERRORE CRITICO: APK di Debug non trovato in app/build. Controllare i log dello step di build."
-            exit 1 # Fallisce se l'APK non viene trovato
+            echo "CRITICAL ERROR: Debug APK not found in app/build. Check build step logs.."
+            exit 1 # Fails if APK is not found
           fi
           echo "APK_DEBUG_PATH=$APK_DEBUG_PATH" >> $GITHUB_OUTPUT
           echo "DEBUG_PATH: $APK_DEBUG_PATH"
+
+      - name: ⬆️ Upload APK as Artifact (Temporary)
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk-original
+          path: ${{ steps.find_apk_debug.outputs.APK_DEBUG_PATH }}
+          retention-days: 1
+
+      - name: ⬇️ Download Artifact APK (Persistent)
+        uses: actions/download-artifact@v4
+        with:
+          name: debug-apk-original
+          path: .
 
       - name: ✏️ Rename the APK to *-nightly.apk
         id: rename_apk
         run: |
           # Replaces the wording '-debug.apk' con '-nightly.apk'
-          DEBUG_PATH="${{ steps.find_apk_debug.outputs.APK_DEBUG_PATH }}"
-          FILENAME=$(basename "$DEBUG_PATH")
-          NEW_FILENAME="${FILENAME/debug/nightly}"
-          DIRNAME=$(dirname "$DEBUG_PATH")
-          NIGHTLY_PATH="$DIRNAME/$NEW_FILENAME"
-          mv "$DEBUG_PATH" "$NIGHTLY_PATH"
-          echo "APK_FILE=$NIGHTLY_PATH" >> $GITHUB_OUTPUT
-          echo "NIGHTLY_PATH: $NIGHTLY_PATH"
+          ORIGINAL_FILENAME=$(find . -maxdepth 1 -name "*debug*.apk" -print -quit)
+          if [ -z "$ORIGINAL_FILENAME" ]; then
+            echo "CRITICAL ERROR: Artifact APK not found after download."
+            exit 1
+          fi
+          NEW_FILENAME="${ORIGINAL_FILENAME/debug/nightly}"
+          mv "$ORIGINAL_FILENAME" "$NEW_FILENAME"
+          echo "APK_FILE=$NEW_FILENAME" >> $GITHUB_OUTPUT
+          echo "NIGHTLY_PATH: $NEW_FILENAME"
 
 
       - name: 🚀 Create the Release on GitHub
