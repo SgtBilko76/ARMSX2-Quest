@@ -2062,7 +2062,7 @@ public class SettingsActivity extends AppCompatActivity {
         		"Core contributors:\n" +
         		"- MoonPower — App developer\n" +
         		"- jpolo — Management\n" +
-        		"- Medieval Shell — Web developer\n" +
+        		"- Medievalshell — Web developer\n" +
         		"- set l — Web developer\n" +
         		"- Alex — QA tester\n" +
         		"- Yua — QA tester\n\n" +
