@@ -51,8 +51,13 @@ jobs:
       - name: 📦 Find the path to the Debug APK
         id: find_apk
         run: |
-          APK_PATH=$(find app/build/outputs/apk/debug -name "*-debug.apk" -print -quit)
-          echo "APK_FILE=$APK_PATH" >> $GITHUB_OUTPUT
+          APK_DEBUG_PATH=$(find app/build -name "*debug*.apk" -print -quit)
+          if [ -z "$APK_DEBUG_PATH" ]; then
+            echo "ERRORE CRITICO: APK di Debug non trovato in app/build. Controllare i log dello step di build."
+            exit 1 # Fallisce se l'APK non viene trovato
+          fi
+          echo "APK_DEBUG_PATH=$APK_DEBUG_PATH" >> $GITHUB_OUTPUT
+          echo "DEBUG_PATH: $APK_DEBUG_PATH"
 
       - name: ✏️ Rename the APK to *-nightly.apk
         id: rename_apk
