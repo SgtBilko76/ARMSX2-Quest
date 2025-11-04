@@ -1,0 +1,77 @@
+name: Android Nightly Debug Build
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build_and_release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⬇️ Checkout of code
+        uses: actions/checkout@v4
+        
+      - name: 🛠️ Java and Android SDK Setup
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: ⚙️ Setup of Gradle Wrapper
+        uses: gradle/actions/setup-gradle@v3
+
+      # --- Build Phase ---
+      - name: 🏗️ Running the Debug Build (only Nightly)
+        run: ./gradlew assembleDebug
+
+      # --- Release Phase ---
+      - name: 🔎 Get Package Name and Version
+        id: package_info
+        run: |
+          PACKAGE_NAME=$(grep 'applicationId' app/build.gradle | head -n 1 | awk '{print $2}' | tr -d '"')
+          VERSION_NAME=$(grep 'versionName' app/build.gradle | head -n 1 | awk '{print $2}' | tr -d '"')
+          echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_OUTPUT
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
+
+      - name: 🏷️ Defining the Release Tag and Title
+        id: release_vars
+        run: |
+          # The release tag will be in the format: come.nanodata.armsx2-nightly-1.0.4-20251104-1411
+          DATE_TIME=$(date +%Y%m%d-%H%M)
+          FULL_TAG="${{ steps.package_info.outputs.PACKAGE_NAME }}-nightly-${{ steps.package_info.outputs.VERSION_NAME }}-${DATE_TIME}"
+          TITLE="Nightly Build (DEBUG - ${{ steps.package_info.outputs.VERSION_NAME }}) - ${DATE_TIME}"
+          
+          echo "RELEASE_TAG=$FULL_TAG" >> $GITHUB_OUTPUT
+          echo "RELEASE_TITLE=$TITLE" >> $GITHUB_OUTPUT
+
+      - name: 📦 Find the path to the Debug APK
+        id: find_apk
+        run: |
+          APK_PATH=$(find app/build/outputs/apk/debug -name "*-debug.apk" -print -quit)
+          echo "APK_FILE=$APK_PATH" >> $GITHUB_OUTPUT
+
+      - name: 🚀 Create the Release on GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_vars.outputs.RELEASE_TAG }}
+          name: ${{ steps.release_vars.outputs.RELEASE_TITLE }}
+          body: |
+            ## Automatic Night Release (DEBUG)
+            
+            Automated build for internal testing. This is an **unsigned** build for public distribution.
+            
+            * **Version:** ${{ steps.package_info.outputs.VERSION_NAME }}
+            * **Package Name:** ${{ steps.package_info.outputs.PACKAGE_NAME }}
+            * **Branch:** ${{ github.ref_name }}
+            * **Commit:** ${{ github.sha }}
+            
+            **Check the attached assets for the DEBUG APK.**
+          draft: true
+          prerelease: true
+          files: ${{ steps.find_apk.outputs.APK_FILE }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
