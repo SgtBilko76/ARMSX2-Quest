@@ -56,21 +56,8 @@ jobs:
             echo "CRITICAL ERROR: Debug APK not found in app/build. Check build step logs.."
             exit 1 # Fails if APK is not found
           fi
-          echo "APK_DEBUG_PATH=$APK_DEBUG_PATH" >> $GITHUB_OUTPUT
+          echo "APK_PATH_ENV=$APK_DEBUG_PATH" >> $GITHUB_ENV
           echo "DEBUG_PATH: $APK_DEBUG_PATH"
-
-      - name: ⬆️ Upload APK as Artifact (Temporary)
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-apk-original
-          path: ${{ steps.find_apk_debug.outputs.APK_DEBUG_PATH }}
-          retention-days: 1
-
-      - name: ⬇️ Download Artifact APK (Persistent)
-        uses: actions/download-artifact@v4
-        with:
-          name: debug-apk-original
-          path: .
 
       - name: ✏️ Rename the APK to *-nightly.apk
         id: rename_apk
