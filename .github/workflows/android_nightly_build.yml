@@ -63,15 +63,15 @@ jobs:
         id: rename_apk
         run: |
           # Replaces the wording '-debug.apk' con '-nightly.apk'
-          ORIGINAL_FILENAME=$(find . -maxdepth 1 -name "*debug*.apk" -print -quit)
-          if [ -z "$ORIGINAL_FILENAME" ]; then
-            echo "CRITICAL ERROR: Artifact APK not found after download."
+          ORIGINAL_PATH="$APK_PATH_ENV"
+          if [ -z "$ORIGINAL_PATH" ]; then
+            echo "CRITICAL ERROR: APK path not found in environment variable."
             exit 1
           fi
-          NEW_FILENAME="${ORIGINAL_FILENAME/debug/nightly}"
-          mv "$ORIGINAL_FILENAME" "$NEW_FILENAME"
-          echo "APK_FILE=$NEW_FILENAME" >> $GITHUB_OUTPUT
-          echo "NIGHTLY_PATH: $NEW_FILENAME"
+          NIGHTLY_PATH="${ORIGINAL_PATH/debug.apk/nightly.apk}"
+          mv "$ORIGINAL_PATH" "$NIGHTLY_PATH"
+          echo "APK_FILE=$NIGHTLY_PATH" >> $GITHUB_OUTPUT
+          echo "NIGHTLY_PATH: $NIGHTLY_PATH"
 
 
       - name: 🚀 Create the Release on GitHub
