@@ -59,9 +59,13 @@ jobs:
         run: |
           # Replaces the wording '-debug.apk' con '-nightly.apk'
           DEBUG_PATH="${{ steps.find_apk_debug.outputs.APK_DEBUG_PATH }}"
-          NIGHTLY_PATH="${DEBUG_PATH/-debug.apk/-nightly.apk}"
+          FILENAME=$(basename "$DEBUG_PATH")
+          NEW_FILENAME="${FILENAME/debug/nightly}"
+          DIRNAME=$(dirname "$DEBUG_PATH")
+          NIGHTLY_PATH="$DIRNAME/$NEW_FILENAME"
           mv "$DEBUG_PATH" "$NIGHTLY_PATH"
           echo "APK_FILE=$NIGHTLY_PATH" >> $GITHUB_OUTPUT
+          echo "NIGHTLY_PATH: $NIGHTLY_PATH"
 
 
       - name: 🚀 Create the Release on GitHub
