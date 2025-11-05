@@ -55,11 +55,18 @@ jobs:
           echo "RELEASE_TAG=$FULL_TAG" >> $GITHUB_OUTPUT
           echo "RELEASE_TITLE=$TITLE" >> $GITHUB_OUTPUT
 
-      - name: 📦 Find the path to the Debug APK
-        id: find_apk
+      - name: 📦 Find and Rename APK to Nightly
+        id: rename_apk
         run: |
-          APK_PATH=$(find ${{ github.workspace }}/app/build -type f -name "*debug.apk" -print -quit)
-          echo "APK_FILE=$APK_PATH" >> $GITHUB_OUTPUT
+          ORIGINAL_PATH=$(find ${{ github.workspace }}/app/build -type f -name "*debug.apk" -print -quit)
+          if [ -z "$ORIGINAL_PATH" ]; then
+            echo "CRITICAL ERROR: Debug APK non found."
+            exit 1 
+          fi
+          NEW_FILE_PATH=$(echo "$ORIGINAL_PATH" | sed 's/-debug.apk/-nightly.apk/')
+          mv "$ORIGINAL_PATH" "$NEW_FILE_PATH"
+          echo "APK_FILE_NIGHTLY=$NEW_FILE_PATH" >> $GITHUB_OUTPUT
+          echo "APK rinominato e salvato in: $NEW_FILE_PATH"
 
       - name: 🚀 Create the Release on GitHub
         uses: softprops/action-gh-release@v2
@@ -79,6 +86,6 @@ jobs:
             **Check the attached assets for the NIGHTLY APK.**
           draft: false
           prerelease: true
-          files: ${{ steps.find_apk.outputs.APK_FILE }}
+          files: ${{ steps.rename_apk.outputs.APK_FILE_NIGHTLY }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
