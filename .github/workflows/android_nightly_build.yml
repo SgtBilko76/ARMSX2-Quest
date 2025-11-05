@@ -37,8 +37,8 @@ jobs:
       - name: 📦 Find the path to the Debug APK
         id: find_apk
         run: |
-          # Ricerca ricorsiva più flessibile su tutta la cartella build
-          APK_DEBUG_PATH=$(find app/build -type f -name "*debug*.apk" -print -quit)
+          # More flexible recursive search across the entire build folder
+          APK_DEBUG_PATH=$(find ${{ github.workspace }}/app/build -type f -name "*debug.apk" -print -quit)
           
           if [ -z "$APK_DEBUG_PATH" ]; then
             echo "CRITICAL ERROR: Debug APK not found in app/build. Check build step logs."
