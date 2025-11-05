@@ -36,7 +36,7 @@ We are NOT affiliated with ARM Holding LTD in any way shape or form. We chose th
 
 [PCSX2_ARM64](https://github.com/pontos2024/PCSX2_ARM64) - ARMSX2 originally started off as a fork of developer Pontos work. 
 
-Thank you to [@fffathur](https://github.com/fffathur) and [@EM2008](https://github.com/EM20080) for creating and working on the logo! 
+Thank you to [@fffathur](https://github.com/fffathur) and [@Vivimagic](https://github.com/Vivimagic) for creating and working on the logo! 
 
 Thank you to developers [@tanosshi](https://github.com/tanosshi) [@jpolo1224](https://github.com/jpolo1224) [@MoonPower](https://github.com/momo-AUX1) for working on the ARMSX2 website!
 
