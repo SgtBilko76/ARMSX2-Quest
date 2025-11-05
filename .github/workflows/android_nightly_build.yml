@@ -55,7 +55,7 @@ jobs:
         id: package_info
         run: |
           # Referencing the APK path via environment variable
-          APK_FILE="APK_PATH_ENV"
+          APK_FILE="$APK_PATH_ENV"
 
           if [ -z "$APK_FILE" ]; then
             echo "CRITICAL ERROR: APK_PATH_ENV is empty. Find step failed."
