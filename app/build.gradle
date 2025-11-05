@@ -51,7 +51,7 @@ android {
 
 
     defaultConfig {
-    applicationId "come.nanodata.armsx2"
+    applicationId "com.nanodata.armsx2"
         minSdk 26
         targetSdk 36
         versionCode 12

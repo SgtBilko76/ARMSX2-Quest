@@ -58,7 +58,18 @@ jobs:
       - name: 📦 Find and Rename APK to Nightly
         id: rename_apk
         run: |
-          ORIGINAL_PATH=$(find ${{ github.workspace }}/app/build -type f -name "*debug.apk" -print -quit)
+          PACKAGE_NAME="com.nanodata.armsx2"
+          LATEST_RELEASE_TAG=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
+            jq -r '.tag_name')
+          if [ -z "$LATEST_RELEASE_TAG" ] || [ "$LATEST_RELEASE_TAG" == "null" ]; then
+            echo "WARNING: No stable release tag found. I'm using the fallback version (0.0.0).."
+            VERSION_NAME="0.0.0"
+          else
+            VERSION_NAME=$(echo "$LATEST_RELEASE_TAG" | sed 's/^v//')
+          fi
+          ORIGINAL_PATH="${{ steps.find_apk.outputs.APK_FILE_PATH }}"
+          
           if [ -z "$ORIGINAL_PATH" ]; then
             echo "CRITICAL ERROR: Debug APK non found."
             exit 1 
