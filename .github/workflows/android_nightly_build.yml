@@ -12,10 +12,15 @@ on:
 jobs:
   build_and_release:
     runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write 
 
     steps:
       - name: ⬇️ Checkout of code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
         
       - name: 🛠️ Java and Android SDK Setup
         uses: actions/setup-java@v4
@@ -31,64 +36,79 @@ jobs:
       - name: 🏗️ Running the Debug Build (only Nightly)
         run: ./gradlew assembleDebug
 
-      # --- Release Phase ---
-      - name: 🔎 Get Package Name and Version
-        id: package_info
-        run: |
-          PACKAGE_NAME=$(grep 'applicationId' app/build.gradle | head -n 1 | awk '{print $2}' | tr -d '"')
-          VERSION_NAME=$(grep 'versionName' app/build.gradle | head -n 1 | awk '{print $2}' | tr -d '"')
-          echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_OUTPUT
-          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
-
-      - name: 🏷️ Defining the Release Tag and Title
-        id: release_vars
-        run: |
-          # The release tag will be in the format: come.nanodata.armsx2-nightly-1.0.4-20251104-1411
-          DATE_TIME=$(date +%Y%m%d-%H%M)
-          FULL_TAG="${{ steps.package_info.outputs.PACKAGE_NAME }}-nightly-${{ steps.package_info.outputs.VERSION_NAME }}-${DATE_TIME}"
-          TITLE="Nightly Build (DEBUG - ${{ steps.package_info.outputs.VERSION_NAME }}) - ${DATE_TIME}"
-          
-          echo "RELEASE_TAG=$FULL_TAG" >> $GITHUB_OUTPUT
-          echo "RELEASE_TITLE=$TITLE" >> $GITHUB_OUTPUT
-
+      # --- Extraction Phase ---
       - name: 📦 Find the path to the Debug APK
         id: find_apk
         run: |
-          APK_DEBUG_PATH=$(find app/build -name "*debug*.apk" -print -quit)
+          # More flexible recursive search across the entire build folder
+          APK_DEBUG_PATH=$(find ${{ github.workspace }}/app/build -type f -name "*debug.apk" -print -quit)
+          
           if [ -z "$APK_DEBUG_PATH" ]; then
-            echo "CRITICAL ERROR: Debug APK not found in app/build. Check build step logs.."
+            echo "CRITICAL ERROR: Debug APK not found in app/build. Check build step logs."
             exit 1 # Fails if APK is not found
           fi
           echo "APK_PATH_ENV=$APK_DEBUG_PATH" >> $GITHUB_ENV
           echo "DEBUG_PATH: $APK_DEBUG_PATH"
 
+      # --- Release Phase ---
       - name: ✏️ Rename the APK to *-nightly.apk
         id: rename_apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Replaces the wording '-debug.apk' con '-nightly.apk'
-          ORIGINAL_PATH="$APK_PATH_ENV"
+          PACKAGE_NAME="come.nanodata.armsx2"
+          LATEST_RELEASE_TAG=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
+            jq -r '.tag_name')
+          if [ -z "$LATEST_RELEASE_TAG" ] || [ "$LATEST_RELEASE_TAG" == "null" ]; then
+            echo "WARNING: No stable release tag found. I'm using the fallback version (0.0.0).."
+            VERSION_NAME="0.0.0"
+          else
+            VERSION_NAME=$(echo "$LATEST_RELEASE_TAG" | sed 's/^v//')
+          fi
+          ORIGINAL_PATH="${{ steps.find_apk.outputs.APK_FILE_PATH }}"
+          
           if [ -z "$ORIGINAL_PATH" ]; then
-            echo "CRITICAL ERROR: APK path not found in environment variable."
+            echo "CRITICAL ERROR: APK path not found in environment variable. Cannot rename."
             exit 1
           fi
-          NIGHTLY_PATH="${ORIGINAL_PATH/debug.apk/nightly.apk}"
-          mv "$ORIGINAL_PATH" "$NIGHTLY_PATH"
-          echo "APK_FILE=$NIGHTLY_PATH" >> $GITHUB_OUTPUT
-          echo "NIGHTLY_PATH: $NIGHTLY_PATH"
 
+          DATE_TIME=$(date -u +%Y%m%d-%H%M)
+          NEW_FILE_NAME="nightly-${DATE_TIME}.apk"
+
+          NEW_FILE_NAME="${PACKAGE_NAME}-nightly-${VERSION_NAME}-${DATE_TIME}.apk"
+          NIGHTLY_PATH="$(dirname "$ORIGINAL_PATH")/$NEW_FILE_NAME"
+
+          if [ -f "$ORIGINAL_PATH" ]; then
+            mv "$ORIGINAL_PATH" "$NIGHTLY_PATH"
+          else
+            echo "CRITICAL ERROR: The original APK file was not found at the path: $ORIGINAL_PATH"
+            exit 1
+          fi
+
+          echo "APK_FILE=$NIGHTLY_PATH" >> $GITHUB_OUTPUT
+          echo "New route Nightly: $NIGHTLY_PATH"
+
+          TAG="${PACKAGE_NAME}-nightly-${VERSION_NAME}-${DATE_TIME}"
+          TITLE="Nightly Build (DEBUG - ${VERSION_NAME}) - ${DATE_TIME}"
+
+          echo "RELEASE_TAG=$TAG" >> $GITHUB_OUTPUT
+          echo "RELEASE_TITLE=$TITLE" >> $GITHUB_OUTPUT
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_OUTPUT
 
       - name: 🚀 Create the Release on GitHub
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.release_vars.outputs.RELEASE_TAG }}
-          name: ${{ steps.release_vars.outputs.RELEASE_TITLE }}
+          tag_name: ${{ steps.rename_apk.outputs.RELEASE_TAG }}
+          name: ${{ steps.rename_apk.outputs.RELEASE_TITLE }}
           body: |
             ## Automatic Night Release (DEBUG)
             
-            Automated build for internal testing. This is an **unsigned** build for public distribution.
+            Automated build for community testing. This is an **unsigned** build for public distribution.
             
-            * **Version:** ${{ steps.package_info.outputs.VERSION_NAME }}
-            * **Package Name:** ${{ steps.package_info.outputs.PACKAGE_NAME }}
+            * **Version:** ${{ steps.rename_apk.outputs.VERSION_NAME }}
+            * **Package Name:** ${{ steps.rename_apk.outputs.PACKAGE_NAME }}
             * **Branch:** ${{ github.ref_name }}
             * **Commit:** ${{ github.sha }}
             
