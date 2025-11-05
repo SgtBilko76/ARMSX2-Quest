@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: ⬇️ Checkout of code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
         
       - name: 🛠️ Java and Android SDK Setup
         uses: actions/setup-java@v4
@@ -34,6 +36,7 @@ jobs:
       - name: 🏗️ Running the Debug Build (only Nightly)
         run: ./gradlew assembleDebug
 
+      # --- Extraction Phase ---
       - name: 📦 Find the path to the Debug APK
         id: find_apk
         run: |
@@ -45,14 +48,19 @@ jobs:
             exit 1 # Fails if APK is not found
           fi
           echo "APK_PATH_ENV=$APK_DEBUG_PATH" >> $GITHUB_ENV
-          echo "DEBUG_PATH: $APK_DEBUG_PATH
+          echo "DEBUG_PATH: $APK_DEBUG_PATH"
 
-      # --- Release Phase ---
+      
       - name: 🔎 Get Package Name and Version (Using aapt)
         id: package_info
         run: |
           # Referencing the APK path via environment variable
-          APK_FILE="$APK_PATH_ENV"
+          APK_FILE="APK_PATH_ENV"
+
+          if [ -z "$APK_FILE" ]; then
+            echo "CRITICAL ERROR: APK_PATH_ENV is empty. Find step failed."
+            exit 1
+          fi
           
           # Extract info using aapt dump badging
           AAPT_OUTPUT=$(aapt dump badging "$APK_FILE")
@@ -87,22 +95,31 @@ jobs:
           echo "RELEASE_TAG=$TAG" >> $GITHUB_OUTPUT
           echo "RELEASE_TITLE=$TITLE" >> $GITHUB_OUTPUT
 
+      # --- Release Phase ---
       - name: ✏️ Rename the APK to *-nightly.apk
         id: rename_apk
         run: |
           ORIGINAL_PATH="$APK_PATH_ENV"
           
-          # Generate new name based on package name (more readable)
+          if [ -z "$ORIGINAL_PATH" ]; then
+            echo "CRITICAL ERROR: APK path not found in environment variable. Cannot rename."
+            exit 1
+          fi
+
           PACKAGE_NAME="${{ steps.package_info.outputs.PACKAGE_NAME }}"
           VERSION_NAME="${{ steps.package_info.outputs.VERSION_NAME }}"
           DATE_TIME=$(date -u +%Y%m%d-%H%M)
-          
-          # New format: com.nanodata.armsx2-1.0.4-nightly-20251104-1411.apk
+
           NEW_FILE_NAME="${PACKAGE_NAME}-${VERSION_NAME}-nightly-${DATE_TIME}.apk"
           NIGHTLY_PATH="$(dirname "$ORIGINAL_PATH")/$NEW_FILE_NAME"
-          
-          mv "$ORIGINAL_PATH" "$NIGHTLY_PATH"
-          
+
+          if [ -f "$ORIGINAL_PATH" ]; then
+            mv "$ORIGINAL_PATH" "$NIGHTLY_PATH"
+          else
+            echo "CRITICAL ERROR: The original APK file was not found at path: $ORIGINAL_PATH"
+            exit 1
+          fi
+
           echo "APK_FILE=$NIGHTLY_PATH" >> $GITHUB_OUTPUT
           echo "NIGHTLY_PATH: $NIGHTLY_PATH"
 
