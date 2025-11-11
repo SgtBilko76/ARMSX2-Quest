@@ -61,6 +61,9 @@
     <string name="onboarding_storage_status_default">Current location: %1$s</string>
     <string name="onboarding_storage_status_custom">Using custom folder: %1$s</string>
     <string name="onboarding_storage_status_missing">No storage folder selected yet.</string>
+    <string name="onboarding_storage_google_play_unavailable">Google Play builds use the default ARMSX2 data folder.
+Location: %1$s
+Open it later from Settings -> Open ARMSX2 directory.</string>
     <string name="onboarding_storage_default_set">Using default storage location</string>
     <string name="onboarding_storage_picker_error">Unable to open the folder picker</string>
     <string name="onboarding_storage_unusable">Unable to use the selected folder</string>
@@ -81,6 +84,21 @@
     <string name="settings_dev9_network_switch">Enable DEV9 Ethernet</string>
     <string name="settings_dev9_network_summary">Requires BIOS network setup and may need a restart to take effect.</string>
     <string name="settings_dev9_hdd_reset_toast">Using default DEV9hdd.raw image</string>
+    <string name="settings_storage_google_play_disabled">Unavailable in Google Play builds</string>
+    <string name="settings_open_data_directory">Open ARMSX2 directory</string>
+    <string name="settings_open_data_directory_error">No supported file manager was found to open the directory.</string>
+    <string name="settings_data_access_title">ARMSX2 data</string>
+    <string name="settings_open_data_directory_summary">Open the emulator\'s data folder in the system Files app.</string>
+    <string name="documents_provider_root_summary">App data</string>
+    <string name="settings_app_icon">App icon</string>
+    <string name="settings_app_icon_summary">Current icon: %1$s</string>
+    <string name="settings_app_icon_default">Default</string>
+    <string name="settings_app_icon_picker_title">Choose app icon</string>
+    <string name="settings_app_icon_picker_empty">No alternate icons found.</string>
+    <string name="settings_app_icon_apply_notice">Saved selection. Your launcher may prompt you to add the new icon.</string>
+    <string name="settings_app_icon_pin_success">Launcher shortcut for %1$s added.</string>
+    <string name="settings_app_icon_pin_not_supported">Your launcher does not support pinned shortcuts.</string>
+    <string name="settings_app_icon_error_loading">Unable to load this icon.</string>
     <string name="drawer_toggle_content_description">Toggle in-game options</string>
     <string name="drawer_reboot_content_description">Reboot the emulator</string>
     <string name="drawer_pause_content_description">Pause the game</string>

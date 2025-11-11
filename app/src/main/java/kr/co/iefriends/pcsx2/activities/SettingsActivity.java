@@ -7,18 +7,25 @@ may the android, pcsx2 and the java gods bless me with material you support for 
 package kr.co.iefriends.pcsx2.activities;
 
 import android.app.Activity;
+import android.content.Context;
+import android.graphics.Bitmap;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.DocumentsContract;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.BaseAdapter;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.Spinner;
@@ -45,11 +52,18 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import kr.co.iefriends.pcsx2.input.ControllerMappingDialog;
+import kr.co.iefriends.pcsx2.BuildConfig;
+import kr.co.iefriends.pcsx2.provider.Armsx2DocumentsProvider;
+import kr.co.iefriends.pcsx2.utils.AppIconManager;
 import kr.co.iefriends.pcsx2.utils.DataDirectoryManager;
 import kr.co.iefriends.pcsx2.utils.DiscordBridge;
 import kr.co.iefriends.pcsx2.utils.LogcatRecorder;
@@ -73,6 +87,8 @@ public class SettingsActivity extends AppCompatActivity {
 	private static final int SECTION_STORAGE = 6;
 	private static final int SECTION_ACHIEVEMENTS = 7;
 	private static final String STATE_SELECTED_SECTION = "settings_selected_section";
+	private static final String EXTRA_SHOW_ADVANCED = "android.provider.extra.SHOW_ADVANCED";
+	private static final String ACTION_BROWSE_DOCUMENT_ROOT = "android.provider.action.BROWSE_DOCUMENT_ROOT";
 	private TextView tvDataDirPath;
 	private AlertDialog dataDirProgressDialog;
     private boolean disableTouchControls;
@@ -88,6 +104,7 @@ public class SettingsActivity extends AppCompatActivity {
 	private ShapeableImageView imgDiscordAvatar;
 	private TextView tvDiscordLoggedInAs;
 	private TextView tvOnScreenUiStyleValue;
+	private TextView tvAppIconValue;
 	private MaterialButton btnDiscordLogout;
     private MaterialSwitch switchRaEnabled;
     private MaterialSwitch switchRaHardcore;
@@ -168,6 +185,8 @@ public class SettingsActivity extends AppCompatActivity {
 		DiscordBridge.updateEngineActivity(this);
         updateDataDirSummary();
         updateOnScreenUiStyleSummary();
+		updateAppIconSummary();
+		AppIconManager.applyTaskDescription(this);
         updateDiscordUi(DiscordBridge.isLoggedIn());
         RetroAchievementsBridge.refreshState();
     }
@@ -1640,6 +1659,13 @@ public class SettingsActivity extends AppCompatActivity {
 		if (btnUiStyle != null) {
 			btnUiStyle.setOnClickListener(v -> showOnScreenUiStyleDialog());
 		}
+
+		MaterialButton btnChangeAppIcon = findViewById(R.id.btn_change_app_icon);
+		tvAppIconValue = findViewById(R.id.tv_app_icon_value);
+		updateAppIconSummary();
+		if (btnChangeAppIcon != null) {
+			btnChangeAppIcon.setOnClickListener(v -> showAppIconPickerDialog());
+		}
 	}
 
 	private void updateOnScreenUiStyleSummary() {
@@ -1652,6 +1678,15 @@ public class SettingsActivity extends AppCompatActivity {
 				? R.string.on_screen_ui_style_nether
 				: R.string.on_screen_ui_style_default;
 		tvOnScreenUiStyleValue.setText(labelRes);
+	}
+
+	private void updateAppIconSummary() {
+		if (tvAppIconValue == null) {
+			return;
+		}
+		AppIconManager.AppIconOption option = AppIconManager.getCurrentSelection(this);
+		String label = option != null ? option.displayName : getString(R.string.settings_app_icon_default);
+		tvAppIconValue.setText(getString(R.string.settings_app_icon_summary, label));
 	}
 
 	private void showOnScreenUiStyleDialog() {
@@ -1681,6 +1716,76 @@ public class SettingsActivity extends AppCompatActivity {
 				.show();
 	}
 
+	private void showAppIconPickerDialog() {
+		if (isFinishing() || isDestroyed()) {
+			return;
+		}
+		List<AppIconManager.AppIconOption> options = AppIconManager.getAvailableIcons(this);
+		if (options.size() <= 1) {
+			try {
+				Toast.makeText(this, R.string.settings_app_icon_picker_empty, Toast.LENGTH_SHORT).show();
+			} catch (Throwable ignored) {}
+			return;
+		}
+		AppIconManager.AppIconOption current = AppIconManager.getCurrentSelection(this);
+		AppIconOptionAdapter adapter = new AppIconOptionAdapter(this, options);
+		AlertDialog dialog = new MaterialAlertDialogBuilder(this)
+				.setTitle(R.string.settings_app_icon_picker_title)
+				.setNegativeButton(android.R.string.cancel, null)
+				.setAdapter(adapter, (d, which) -> {
+					AppIconManager.AppIconOption option = adapter.getItem(which);
+					if (option != null) {
+						handleAppIconSelection(option);
+					}
+				})
+				.create();
+		dialog.setOnShowListener(d -> {
+			ListView listView = dialog.getListView();
+			if (listView == null) {
+				return;
+			}
+			listView.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+			int index = adapter.indexOf(current.id);
+			if (index >= 0) {
+				listView.setItemChecked(index, true);
+				listView.setSelection(index);
+			}
+			listView.setOnItemClickListener((parent, view, position, id) -> {
+				AppIconManager.AppIconOption option = adapter.getItem(position);
+				if (option != null) {
+					dialog.dismiss();
+					handleAppIconSelection(option);
+				}
+			});
+		});
+		dialog.show();
+	}
+
+	private void handleAppIconSelection(@NonNull AppIconManager.AppIconOption option) {
+		AppIconManager.saveSelection(this, option);
+		updateAppIconSummary();
+		AppIconManager.applyTaskDescription(this);
+		boolean showApplyNotice = true;
+		if (option.assetPath != null) {
+			boolean pinned = AppIconManager.requestPinnedShortcut(this, option);
+			if (pinned) {
+				showApplyNotice = false;
+				try {
+					Toast.makeText(this, getString(R.string.settings_app_icon_pin_success, option.displayName), Toast.LENGTH_SHORT).show();
+				} catch (Throwable ignored) {}
+			} else {
+				try {
+					Toast.makeText(this, R.string.settings_app_icon_pin_not_supported, Toast.LENGTH_SHORT).show();
+				} catch (Throwable ignored) {}
+			}
+		}
+		if (showApplyNotice) {
+			try {
+				Toast.makeText(this, R.string.settings_app_icon_apply_notice, Toast.LENGTH_SHORT).show();
+			} catch (Throwable ignored) {}
+		}
+	}
+
 	private void initializeMemoryCardSettings() {
 		Button btnImportMc = findViewById(R.id.btn_import_memcard);
 		btnImportMc.setOnClickListener(v -> {
@@ -1699,15 +1804,37 @@ public class SettingsActivity extends AppCompatActivity {
 		MaterialButton btnChange = findViewById(R.id.btn_change_data_dir);
 		updateDataDirSummary();
 		if (btnChange != null) {
-			btnChange.setOnClickListener(v -> launchDataDirectoryPicker());
+			if (BuildConfig.IS_GOOGLE_PLAY_BUILD) {
+				btnChange.setEnabled(false);
+				btnChange.setAlpha(0.6f);
+				btnChange.setText(R.string.settings_storage_google_play_disabled);
+				btnChange.setOnClickListener(null);
+			} else {
+				btnChange.setEnabled(true);
+				btnChange.setAlpha(1f);
+				btnChange.setOnClickListener(v -> launchDataDirectoryPicker());
+			}
+		}
+
+		MaterialButton btnOpenDataDir = findViewById(R.id.btn_open_data_dir);
+		if (btnOpenDataDir != null) {
+			boolean providerEnabled = getResources().getBoolean(R.bool.armsx2_documents_provider_enabled);
+			if (providerEnabled) {
+				btnOpenDataDir.setVisibility(View.VISIBLE);
+				btnOpenDataDir.setOnClickListener(v -> openDataDirectoryInFilesApp());
+			} else {
+				btnOpenDataDir.setVisibility(View.GONE);
+			}
 		}
 
 		MaterialButton btnAddSecondaryGameDir = findViewById(R.id.btn_add_secondary_game_dir);
 		if (btnAddSecondaryGameDir != null) {
+			btnAddSecondaryGameDir.setEnabled(true);
+			btnAddSecondaryGameDir.setAlpha(1f);
 			btnAddSecondaryGameDir.setOnClickListener(v -> {
 				Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
 				intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-				startActivityForResult(intent, 9912); 
+				startActivityForResult(intent, 9912);
 			});
 		}
 
@@ -2008,6 +2135,50 @@ public class SettingsActivity extends AppCompatActivity {
 		}
 	}
 
+		private void openDataDirectoryInFilesApp() {
+			try {
+				Uri rootDocumentUri = Armsx2DocumentsProvider.buildRootDocumentUri(this);
+				Uri rootUri = Armsx2DocumentsProvider.buildRootUri(this);
+				Uri initialTreeUri = rootDocumentUri;
+				try {
+					String rootDocId = DocumentsContract.getDocumentId(rootDocumentUri);
+					initialTreeUri = DocumentsContract.buildTreeDocumentUri(Armsx2DocumentsProvider.authorityFor(this), rootDocId);
+				} catch (Exception ignored) {}
+
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+					Intent browseIntent = new Intent(ACTION_BROWSE_DOCUMENT_ROOT);
+					browseIntent.setData(rootUri);
+					browseIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+					if (browseIntent.resolveActivity(getPackageManager()) != null) {
+						startActivity(browseIntent);
+						return;
+					}
+				}
+
+				Intent viewIntent = new Intent(Intent.ACTION_VIEW)
+					.setDataAndType(rootDocumentUri, DocumentsContract.Document.MIME_TYPE_DIR)
+					.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+				viewIntent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, rootDocumentUri);
+				viewIntent.putExtra(EXTRA_SHOW_ADVANCED, true);
+				if (viewIntent.resolveActivity(getPackageManager()) != null) {
+					startActivity(viewIntent);
+					return;
+				}
+
+				Intent treeIntent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+				treeIntent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, initialTreeUri);
+				treeIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+				if (treeIntent.resolveActivity(getPackageManager()) != null) {
+					startActivity(treeIntent);
+					return;
+				}
+			} catch (FileNotFoundException ignored) {
+			}
+			try {
+				Toast.makeText(this, R.string.settings_open_data_directory_error, Toast.LENGTH_LONG).show();
+			} catch (Throwable ignoredToast) {}
+		}
+
 	@Override
 	protected void onSaveInstanceState(@NonNull Bundle outState) {
 		super.onSaveInstanceState(outState);
@@ -2242,6 +2413,83 @@ public class SettingsActivity extends AppCompatActivity {
 			return true;
 		} catch (Exception e) {
 			return false;
+		}
+	}
+
+	private static final class AppIconOptionAdapter extends BaseAdapter {
+		private final LayoutInflater inflater;
+		private final List<AppIconManager.AppIconOption> options;
+		private final Context context;
+		private final Map<String, Bitmap> iconCache = new HashMap<>();
+		private final int previewSizePx;
+
+		AppIconOptionAdapter(@NonNull Context context, @NonNull List<AppIconManager.AppIconOption> options) {
+			this.inflater = LayoutInflater.from(context);
+			this.context = context;
+			this.options = options;
+			float density = context.getResources().getDisplayMetrics().density;
+			this.previewSizePx = Math.max(1, Math.round(40f * density));
+		}
+
+		int indexOf(@NonNull String id) {
+			for (int i = 0; i < options.size(); i++) {
+				AppIconManager.AppIconOption option = options.get(i);
+				if (TextUtils.equals(option.id, id)) {
+					return i;
+				}
+			}
+			return -1;
+		}
+
+		@Override
+		public int getCount() {
+			return options.size();
+		}
+
+		@Override
+		public AppIconManager.AppIconOption getItem(int position) {
+			return options.get(position);
+		}
+
+		@Override
+		public long getItemId(int position) {
+			return position;
+		}
+
+		@Override
+		public View getView(int position, View convertView, ViewGroup parent) {
+			View view = convertView;
+			ViewHolder holder;
+			if (view == null) {
+				view = inflater.inflate(R.layout.dialog_list_item_app_icon, parent, false);
+				holder = new ViewHolder();
+				holder.icon = view.findViewById(R.id.img_app_icon_preview);
+				holder.label = view.findViewById(R.id.tv_app_icon_label);
+				view.setTag(holder);
+			} else {
+				holder = (ViewHolder) view.getTag();
+			}
+
+			AppIconManager.AppIconOption option = getItem(position);
+			holder.label.setText(option.displayName);
+			Bitmap bitmap = iconCache.get(option.id);
+			if (bitmap == null) {
+				bitmap = AppIconManager.loadIconBitmap(context, option, previewSizePx);
+				if (bitmap != null) {
+					iconCache.put(option.id, bitmap);
+				}
+			}
+			if (bitmap != null) {
+				holder.icon.setImageBitmap(bitmap);
+			} else {
+				holder.icon.setImageResource(R.mipmap.ic_launcher);
+			}
+			return view;
+		}
+
+		private static final class ViewHolder {
+			ImageView icon;
+			TextView label;
 		}
 	}
 }

@@ -18,26 +18,25 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:text="@string/settings_section_customization"
+            android:text="@string/settings_data_access_title"
             android:textColor="?attr/colorPrimary"
             android:textSize="18sp"
             android:textStyle="bold" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_on_screen_ui_style"
-            style="@style/Widget.Material3.Button"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="@string/settings_on_screen_ui_style" />
-
         <TextView
-            android:id="@+id/tv_on_screen_ui_style_value"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/on_screen_ui_style_default"
+            android:layout_marginBottom="16dp"
+            android:text="@string/settings_open_data_directory_summary"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="14sp" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_open_data_dir"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_open_data_directory"
+            android:visibility="gone" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

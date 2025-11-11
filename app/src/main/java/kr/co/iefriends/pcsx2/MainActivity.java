@@ -1,4 +1,4 @@
-package kr.co.iefriends.pcsx2.activities;
+package kr.co.iefriends.pcsx2;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -38,13 +38,10 @@ import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.CompoundButton;
-import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -57,19 +54,12 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.SwitchCompat;
-import androidx.appcompat.widget.TooltipCompat;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.graphics.drawable.DrawableCompat;
-import androidx.core.util.Pair;
 import androidx.core.view.GravityCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.lifecycle.ViewModelProvider;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -79,56 +69,36 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.navigation.NavigationView;
-import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.slider.Slider;
-import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
-import com.google.android.material.textview.MaterialTextView;
-
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.lang.ref.WeakReference;
+import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.text.Collator;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -138,10 +108,10 @@ import java.util.stream.Collectors;
 import java.util.zip.Inflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.lang.ref.WeakReference;
 
-import kr.co.iefriends.pcsx2.BuildConfig;
-import kr.co.iefriends.pcsx2.NativeApp;
-import kr.co.iefriends.pcsx2.R;
+import kr.co.iefriends.pcsx2.activities.OnboardingActivity;
+import kr.co.iefriends.pcsx2.activities.SettingsActivity;
 import kr.co.iefriends.pcsx2.hid.HIDDeviceManager;
 import kr.co.iefriends.pcsx2.input.ControllerMappingDialog;
 import kr.co.iefriends.pcsx2.input.ControllerMappingManager;
@@ -2767,7 +2737,7 @@ public class MainActivity extends AppCompatActivity {
         "Core contributors:\n" +
         "- MoonPower — App developer\n" +
         "- jpolo — Management\n" +
-        "- Medievalshell — Web developer\n" +
+        "- Medieval Shell — Web developer\n" +
         "- set l — Web developer\n" +
         "- Alex — QA tester\n" +
         "- Yua — QA tester\n\n" +
@@ -3445,7 +3415,7 @@ public class MainActivity extends AppCompatActivity {
             "Core contributors:\n" +
             "- MoonPower — App developer\n" +
             "- jpolo — Management\n" +
-            "- Medievalshell — Web developer\n" +
+            "- Medieval Shell — Web developer\n" +
             "- set l — Web developer\n" +
             "- Alex — QA tester\n" +
             "- Yua — QA tester\n\n" +
@@ -3656,6 +3626,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void maybeShowDataDirectoryPrompt() {
+        if (BuildConfig.IS_GOOGLE_PLAY_BUILD) {
+            DataDirectoryManager.markPromptDone(this);
+            return;
+        }
         if (storagePromptShown) {
             return;
         }

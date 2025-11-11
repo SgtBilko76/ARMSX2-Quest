@@ -3,6 +3,7 @@ plugins {
 }
 
 def enableRN = rootProject.ext.has('enableRN') ? rootProject.ext.enableRN : false
+def isSwitchBuild = project.hasProperty('switchbuild') || gradle.startParameter.projectProperties.containsKey('switchbuild')
 
 if (enableRN) {
     apply from: file('react-native-plugin.gradle')
@@ -49,13 +50,14 @@ android {
     compileSdk 36
     ndkVersion '29.0.14206865'
 
+    flavorDimensions "distribution"
 
     defaultConfig {
     applicationId "com.nanodata.armsx2"
         minSdk 26
         targetSdk 36
         versionCode 12
-        versionName "1.0.4"
+        versionName "1.0.5"
 
         // APK
         def baseName = 'ARMSX2'
@@ -65,6 +67,11 @@ android {
             cmake {
                 def stlLib = enableRN ? "c++_shared" : "c++_static"
                 arguments "-DANDROID=true", "-DCMAKE_BUILD_TYPE=Release", "-DANDROID_STL=${stlLib}", "-DENABLE_RAINTEGRATION=ON"
+                if (isSwitchBuild) {
+                    arguments "-DSWITCHBUILD=ON"
+                    cFlags "-D__NINTENDO_SWITCH__"
+                    cppFlags "-D__NINTENDO_SWITCH__"
+                }
 //                arguments '-DANDROID=true','-DCMAKE_BUILD_TYPE=Debug','-DANDROID_STL=c++_static'
             }
         }
@@ -78,6 +85,19 @@ android {
         ]
         buildConfigField "boolean", "ENABLE_RN", enableRN ? "true" : "false"
         buildConfigField "boolean", "DISCORD_INTEGRATION_ENABLED", isDiscordSdkAvailable ? "true" : "false"
+        buildConfigField "boolean", "IS_GOOGLE_PLAY_BUILD", "false"
+    resValue "bool", "armsx2_documents_provider_enabled", "true"
+    }
+
+    productFlavors {
+        unrestricted {
+            dimension "distribution"
+        }
+        googlePlay {
+            dimension "distribution"
+            buildConfigField "boolean", "IS_GOOGLE_PLAY_BUILD", "true"
+            resValue "bool", "armsx2_documents_provider_enabled", "true"
+        }
     }
 
     def keystorePropertiesFile = rootProject.file("app/armsx2_keystore.properties")
@@ -172,6 +192,7 @@ if (enableRN) {
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
     implementation 'com.google.android.material:material:1.13.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
     implementation 'com.caverock:androidsvg:1.4'

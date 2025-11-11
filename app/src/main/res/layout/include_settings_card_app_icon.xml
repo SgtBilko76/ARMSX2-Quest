@@ -18,26 +18,24 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:text="@string/settings_section_customization"
+            android:text="@string/settings_app_icon"
             android:textColor="?attr/colorPrimary"
             android:textSize="18sp"
             android:textStyle="bold" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_on_screen_ui_style"
+            android:id="@+id/btn_change_app_icon"
             style="@style/Widget.Material3.Button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="@string/settings_on_screen_ui_style" />
+            android:text="@string/settings_app_icon" />
 
         <TextView
-            android:id="@+id/tv_on_screen_ui_style_value"
+            android:id="@+id/tv_app_icon_value"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/on_screen_ui_style_default"
+            android:layout_marginTop="8dp"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="14sp" />
-
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

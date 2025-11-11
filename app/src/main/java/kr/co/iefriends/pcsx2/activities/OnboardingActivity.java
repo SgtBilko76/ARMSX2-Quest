@@ -33,6 +33,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import kr.co.iefriends.pcsx2.BuildConfig;
 import kr.co.iefriends.pcsx2.utils.DataDirectoryManager;
 import kr.co.iefriends.pcsx2.utils.LogcatRecorder;
 import kr.co.iefriends.pcsx2.NativeApp;
@@ -104,6 +105,9 @@ public class OnboardingActivity extends AppCompatActivity {
         biosConfigured = hasBios();
         storageConfigured = DataDirectoryManager.isPromptDone(this);
         storageStatusText = buildInitialStorageStatus();
+        if (BuildConfig.IS_GOOGLE_PLAY_BUILD) {
+            storageConfigured = true;
+        }
 
         adapter = new OnboardingPagerAdapter(new OnboardingCallbacks() {
             @Override
@@ -113,12 +117,16 @@ public class OnboardingActivity extends AppCompatActivity {
 
             @Override
             public void onChooseStorage() {
-                openStoragePicker();
+                if (!BuildConfig.IS_GOOGLE_PLAY_BUILD) {
+                    openStoragePicker();
+                }
             }
 
             @Override
             public void onUseDefaultStorage() {
-                applyDefaultStorage();
+                if (!BuildConfig.IS_GOOGLE_PLAY_BUILD) {
+                    applyDefaultStorage();
+                }
             }
         });
         adapter.setBiosConfigured(biosConfigured);
@@ -393,6 +401,13 @@ public class OnboardingActivity extends AppCompatActivity {
     }
 
     private String buildInitialStorageStatus() {
+        if (BuildConfig.IS_GOOGLE_PLAY_BUILD) {
+            File dataRoot = DataDirectoryManager.getDataRoot(getApplicationContext());
+            String path = (dataRoot != null && !TextUtils.isEmpty(dataRoot.getAbsolutePath()))
+                    ? dataRoot.getAbsolutePath()
+                    : getString(R.string.onboarding_storage_status_missing);
+            return getString(R.string.onboarding_storage_google_play_unavailable, path);
+        }
         File dataRoot = DataDirectoryManager.getDataRoot(getApplicationContext());
         boolean custom = DataDirectoryManager.hasCustomDataRoot(getApplicationContext());
         if (dataRoot == null || TextUtils.isEmpty(dataRoot.getAbsolutePath())) {
@@ -476,11 +491,33 @@ public class OnboardingActivity extends AppCompatActivity {
             } else if (layout == R.layout.onboarding_page_storage) {
                 MaterialButton choose = holder.itemView.findViewById(R.id.btn_onboarding_choose_storage);
                 if (choose != null) {
-                    choose.setOnClickListener(v -> callbacks.onChooseStorage());
+                    if (BuildConfig.IS_GOOGLE_PLAY_BUILD) {
+                        choose.setEnabled(false);
+                        choose.setClickable(false);
+                        choose.setAlpha(0.6f);
+                        choose.setText(R.string.settings_storage_google_play_disabled);
+                        choose.setOnClickListener(null);
+                    } else {
+                        choose.setEnabled(true);
+                        choose.setAlpha(1f);
+                        choose.setText(R.string.onboarding_storage_choose);
+                        choose.setOnClickListener(v -> callbacks.onChooseStorage());
+                    }
                 }
                 MaterialButton useDefault = holder.itemView.findViewById(R.id.btn_onboarding_use_default);
                 if (useDefault != null) {
-                    useDefault.setOnClickListener(v -> callbacks.onUseDefaultStorage());
+                    if (BuildConfig.IS_GOOGLE_PLAY_BUILD) {
+                        useDefault.setEnabled(false);
+                        useDefault.setClickable(false);
+                        useDefault.setAlpha(0.6f);
+                        useDefault.setText(R.string.settings_storage_google_play_disabled);
+                        useDefault.setOnClickListener(null);
+                    } else {
+                        useDefault.setEnabled(true);
+                        useDefault.setAlpha(1f);
+                        useDefault.setText(R.string.onboarding_storage_use_default);
+                        useDefault.setOnClickListener(v -> callbacks.onUseDefaultStorage());
+                    }
                 }
                 TextView status = holder.itemView.findViewById(R.id.tv_onboarding_storage_status);
                 if (status != null) {

@@ -215,6 +215,8 @@
                 android:orientation="vertical">
 
                 <include layout="@layout/include_settings_card_customization" />
+
+                <include layout="@layout/include_settings_card_app_icon" />
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
 
@@ -231,6 +233,8 @@
                 android:orientation="vertical">
 
                 <include layout="@layout/include_settings_card_storage" />
+
+                <include layout="@layout/include_settings_card_data_access" />
 
                 <include layout="@layout/include_settings_card_memory" />
 

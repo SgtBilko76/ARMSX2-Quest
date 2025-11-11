@@ -239,6 +239,11 @@ static const void* _DynGen_EnterRecompiledCode()
 //		xScopedStackFrame frame(false, true);
         armBeginStackFrame();
 #endif
+#ifdef __NINTENDO_SWITCH__
+	// Nintendo Switch builds rely on the packed CPU register view for PSX stores.
+	// Ensure RSTATE_CPU always points at g_cpuRegistersPack before any PTR_CPU writes.
+	armMoveAddressToReg(RSTATE_CPU, &g_cpuRegistersPack);
+#endif
         armMoveAddressToReg(RSTATE_x26, iopMem->Main);
         armMoveAddressToReg(RSTATE_x29, &psxRecLUT);
 
@@ -377,7 +382,14 @@ void _psxMoveGPRtoM(uptr to, int fromgpr)
 void _psxFlushCall(int flushtype)
 {
 	// Free registers that are not saved across function calls (x86-32 ABI):
-	for (u32 i = 0; i < iREGCNT_GPR; i++)
+
+#ifdef __NINTENDO_SWITCH__
+	// Clamp iteration to the backing array size to avoid Switch-specific overflow crashes.
+	const u32 max_regs = iREGCNT_GPR < (sizeof(x86regs) / sizeof(x86regs[0])) ? iREGCNT_GPR : static_cast<u32>(sizeof(x86regs) / sizeof(x86regs[0]));
+#else
+	const u32 max_regs = iREGCNT_GPR;
+#endif
+	for (u32 i = 0; i < max_regs; i++)
 	{
 		if (!x86regs[i].inuse)
 			continue;
