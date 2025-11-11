@@ -61,7 +61,7 @@ android {
 
         // APK
         def baseName = 'ARMSX2'
-        setProperty('archivesBaseName', "${baseName}_${versionCode}_${new Date().format('yyyyMMddHHmm')}")
+        setProperty('archivesBaseName', "${baseName}_${versionCode}_${new Date().format('yyyyMMddHHmm')}${isSwitchBuild ? '-switch' : ''}")
 
         externalNativeBuild {
             cmake {
