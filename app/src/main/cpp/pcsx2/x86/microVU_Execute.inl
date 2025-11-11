@@ -27,6 +27,12 @@ void mVUdispatcherAB(mV)
 //		xScopedStackFrame frame(false, true);
         armBeginStackFrame();
 
+#ifdef __NINTENDO_SWITCH__
+	// Nintendo Switch builds rely on the packed register views for VU stores.
+	// Ensure RSTATE_MVU and RSTATE_CPU always point at their packs before any PTR_MVU/PTR_CPU writes.
+	armMoveAddressToReg(RSTATE_MVU, &g_vuRegistersPack);
+	armMoveAddressToReg(RSTATE_CPU, &g_cpuRegistersPack);
+#endif
         // From memory to registry
         armMoveAddressToReg(RSTATE_MVU, &g_vuRegistersPack);
         armMoveAddressToReg(RSTATE_CPU, &g_cpuRegistersPack);
@@ -139,6 +145,13 @@ void mVUdispatcherCD(mV)
 //		xScopedStackFrame frame(false, true);
         armBeginStackFrame();
 
+#ifdef __NINTENDO_SWITCH__
+	// Nintendo Switch builds rely on the packed register views for VU stores.
+	// Ensure RSTATE_MVU and RSTATE_CPU always point at their packs before any PTR_MVU/PTR_CPU writes.
+	armMoveAddressToReg(RSTATE_MVU, &g_vuRegistersPack);
+	armMoveAddressToReg(RSTATE_CPU, &g_cpuRegistersPack);
+#endif
+
         // Load VU's MXCSR state
         if (mvuNeedsFPCRUpdate(mVU)) {
 //            xLDMXCSR(ptr32[isVU0 ? &EmuConfig.Cpu.VU0FPCR.bitmask : &EmuConfig.Cpu.VU1FPCR.bitmask]);
@@ -192,6 +205,13 @@ void mVUdispatcherCD(mV)
 static void mVUGenerateWaitMTVU(mV)
 {
     mVU.waitMTVU = armStartBlock();
+
+#ifdef __NINTENDO_SWITCH__
+	// Nintendo Switch builds rely on the packed register views for VU stores.
+	// Ensure state registers are properly initialized before any PTR_* accesses.
+	armMoveAddressToReg(RSTATE_MVU, &g_vuRegistersPack);
+	armMoveAddressToReg(RSTATE_CPU, &g_cpuRegistersPack);
+#endif
 
 //    int i;
 //    for (i = 0; i < static_cast<int>(iREGCNT_GPR); ++i)
@@ -255,6 +275,10 @@ static void mVUGenerateCopyPipelineState(mV)
 {
     mVU.copyPLState = armStartBlock();
     {
+#ifdef __NINTENDO_SWITCH__
+	// Nintendo Switch builds ensure state registers are initialized before PTR_MVU access.
+	armMoveAddressToReg(RSTATE_MVU, &g_vuRegistersPack);
+#endif
         auto mop_rax = a64::MemOperand(RAX);
         auto mop_lpState = PTR_MVU(microVU[mVU.index].prog.lpState);
 
