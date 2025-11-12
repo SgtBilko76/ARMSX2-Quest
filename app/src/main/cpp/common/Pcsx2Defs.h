@@ -28,6 +28,11 @@ static constexpr bool IsDebugBuild = false;
 	static constexpr unsigned int __pagesize = OVERRIDE_HOST_PAGE_SIZE;
 	static constexpr unsigned int __pagemask = __pagesize - 1;
 	static constexpr unsigned int __pageshift = std::bit_width(__pagemask);
+#elif defined(__ANDROID__)
+	// Target modern Android arm64 devices which ship with 16KB system pages.
+	static constexpr unsigned int __pagesize = 0x4000;
+	static constexpr unsigned int __pageshift = 14;
+	static constexpr unsigned int __pagemask = __pagesize - 1;
 #elif defined(_M_ARM64) && !defined(ANDROID)
 	// Apple Silicon uses 16KB pages and 128 byte cache lines.
 	static constexpr unsigned int __pagesize = 0x4000;
