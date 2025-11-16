@@ -43,7 +43,7 @@ public final class DeviceProfiles {
         UiModeManager uiModeManager = (UiModeManager) context.getSystemService(Context.UI_MODE_SERVICE);
         if (uiModeManager == null) return false;
         int mode = uiModeManager.getCurrentModeType();
-        return mode == Configuration.UI_MODE_TYPE_TELEVISION || uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_APPLIANCE;
+        return mode == Configuration.UI_MODE_TYPE_TELEVISION || mode == Configuration.UI_MODE_TYPE_APPLIANCE;
     }
 
     public static boolean isSamsungDex(Context context) {
