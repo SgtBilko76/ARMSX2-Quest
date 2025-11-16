@@ -37,10 +37,8 @@ public final class ControllerMappingManager {
             sPadCodeToAction.put(action.getPadCode(), action);
             int defaultKey = action.getDefaultKeyCode();
             int stored = sPrefs.getInt(KEY_PREFIX + action.name(), defaultKey);
-            if (stored == NO_MAPPING) {
-                sActionToKey.put(action, NO_MAPPING);
-            } else {
-                sActionToKey.put(action, stored);
+            sActionToKey.put(action, stored);
+            if (stored != NO_MAPPING) {
                 sKeyToPad.put(stored, action.getPadCode());
             }
         }
