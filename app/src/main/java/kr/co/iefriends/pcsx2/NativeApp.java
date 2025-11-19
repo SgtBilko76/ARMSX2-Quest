@@ -155,4 +155,8 @@ public class NativeApp {
     
     // Native tools for ISO to CHD conversion (and eventually more soon)
     public static native int convertIsoToChd(String inputIsoPath);
+    
+    public static native void setCustomDriverPath(String path);
+    public static native String getCustomDriverPath();
+    public static native void setNativeLibraryDir(String path);
 }

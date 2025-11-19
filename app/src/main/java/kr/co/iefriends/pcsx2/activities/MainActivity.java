@@ -3600,6 +3600,10 @@ public class MainActivity extends AppCompatActivity {
             NativeApp.setDataRootOverride(dataDir.getAbsolutePath());
         }
         NativeApp.initializeOnce(getApplicationContext());
+        
+        // Restore custom GPU driver if one was previously selected
+        restoreGpuDriver();
+        
         LogcatRecorder.initialize(getApplicationContext());
         boolean recordLogs = false;
         try {
@@ -3615,6 +3619,18 @@ public class MainActivity extends AppCompatActivity {
         SDLControllerManager.initialize();
 
         mHIDDeviceManager = HIDDeviceManager.acquire(this);
+    }
+    
+    private void restoreGpuDriver() {
+        try {
+            // Set native library directory for libadrenotools
+            String nativeLibDir = getApplicationInfo().nativeLibraryDir;
+            if (!TextUtils.isEmpty(nativeLibDir)) {
+                NativeApp.setNativeLibraryDir(nativeLibDir);
+            }
+        } catch (Exception e) {
+            // If there's any error, just continue with defaults
+        }
     }
 
     private boolean isOnboardingComplete() {

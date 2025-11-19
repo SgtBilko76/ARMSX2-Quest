@@ -1123,7 +1123,7 @@ if(ANDROID)
 	target_sources(PCSX2 PRIVATE
 		${pcsx2LinuxSources}
 		${pcsx2LinuxHeaders}
-		../native-lib.cpp
+		../main.cpp
 	)
 elseif(LINUX)
 	target_sources(PCSX2 PRIVATE
@@ -1181,6 +1181,11 @@ target_link_libraries(PCSX2_FLAGS INTERFACE
 #	plutosvg::plutosvg
 	${LIBC_LIBRARIES}
 )
+
+if(ANDROID AND USE_VULKAN AND TARGET adrenotools)
+	target_link_libraries(PCSX2_FLAGS INTERFACE adrenotools)
+	target_compile_definitions(PCSX2_FLAGS INTERFACE USE_ADRENOTOOLS)
+endif()
 
 # Discord linking: only link when the option is enabled and the corresponding target exists
 if(USE_DISCORD_SDK)

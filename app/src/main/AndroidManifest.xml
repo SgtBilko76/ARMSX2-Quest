@@ -85,6 +85,12 @@
             android:screenOrientation="unspecified"
             android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize"
             android:exported="false" />
+        <activity
+            android:name=".activities.GpuDriverManagerActivity"
+            android:screenOrientation="unspecified"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize"
+            android:exported="false"
+            android:parentActivityName=".activities.SettingsActivity" />
 
         <activity
             android:name="com.discord.socialsdk.AuthenticationActivity"

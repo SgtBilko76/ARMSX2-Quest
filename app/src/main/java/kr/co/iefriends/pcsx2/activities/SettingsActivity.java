@@ -836,6 +836,14 @@ public class SettingsActivity extends AppCompatActivity {
     private void initializeGraphicsSettings() {
         final boolean[] ignoreInit = new boolean[]{true};
 
+		com.google.android.material.button.MaterialButton btnGpuDriverManager = findViewById(R.id.btn_gpu_driver_manager);
+		if (btnGpuDriverManager != null) {
+			btnGpuDriverManager.setOnClickListener(v -> {
+				Intent intent = new Intent(this, GpuDriverManagerActivity.class);
+				startActivity(intent);
+			});
+		}
+
 		// Renderer
 		Spinner spRenderer = findViewById(R.id.sp_renderer);
 		ArrayAdapter<CharSequence> rendererAdapter = ArrayAdapter.createFromResource(this, R.array.renderers, android.R.layout.simple_spinner_item);
