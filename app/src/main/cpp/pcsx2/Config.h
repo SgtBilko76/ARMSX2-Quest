@@ -854,6 +854,7 @@ struct Pcsx2Config
 		int AudioCaptureBitrate = DEFAULT_AUDIO_CAPTURE_BITRATE;
 
 		std::string Adapter;
+		std::string CustomDriverPath;
 		std::string HWDumpDirectory;
 		std::string SWDumpDirectory;
 

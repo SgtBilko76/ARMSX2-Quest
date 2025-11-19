@@ -203,4 +203,25 @@ Open it later from Settings -> Open ARMSX2 directory.</string>
     <string name="per_game_settings_button">Per-game settings</string>
     <string name="per_game_settings_saved_toast">Per-game settings saved.</string>
     <string name="per_game_settings_cleared_toast">Per-game settings cleared.</string>
+    <string name="gpu_driver_manager_title">GPU Driver Manager</string>
+    <string name="gpu_driver_manager_description">Manage custom GPU drivers for improved compatibility and performance. Custom drivers (like Turnip for Adreno GPUs) can be installed here. Drivers must be in ZIP format with a meta.json file.</string>
+    <string name="gpu_driver_install_button">Install Driver</string>
+    <string name="gpu_driver_install_title">Install GPU Driver</string>
+    <string name="gpu_driver_install_message">Select a driver ZIP file to install. Custom drivers can improve performance and compatibility on some devices.</string>
+    <string name="gpu_driver_invalid_zip">Invalid driver ZIP file. Missing or invalid meta.json.</string>
+    <string name="gpu_driver_api_too_high">Driver requires Android API %1$d or higher. Your device is API %2$d.</string>
+    <string name="gpu_driver_install_from_file">Select File</string>
+    <string name="gpu_driver_installed">Driver installed: %1$s</string>
+    <string name="gpu_driver_install_failed">Failed to install driver</string>
+    <string name="gpu_driver_system_description">Default system driver</string>
+    <string name="gpu_driver_system_selected">System driver selected</string>
+    <string name="gpu_driver_selected">Driver selected: %1$s</string>
+    <string name="gpu_driver_selected_format">Selected - %1$s</string>
+    <string name="settings_gpu_driver_manager">GPU Driver Manager</string>
+    <string name="gpu_driver_system_name">System GPU driver</string>
+    <string name="gpu_driver_delete">Delete driver</string>
+    <string name="gpu_driver_delete_title">Delete Driver</string>
+    <string name="gpu_driver_delete_message">Are you sure you want to delete \"%1$s\"?</string>
+    <string name="gpu_driver_deleted">Driver deleted</string>
+    <string name="gpu_driver_delete_failed">Failed to delete driver</string>
 </resources>

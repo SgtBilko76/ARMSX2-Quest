@@ -1,29 +1,37 @@
+# Build system and IDE files
 build/
 .gradle
-app/.cxx/
-.DS_Store
-app/.DS_Store
-armsx2_release.jks
-armsx2_keystore.properties
-local.properties
-EEJitA64.cpp
-EEJitA64.h
-macos
-app/src/main/cpp/bin
-log.txt
-node_modules/
-bun.lockb
 .vscode/
-app/src/main/jniLibs/
-app/libs/discord_partner_sdk.aar
-app/src/main/assets/discord_creds.env
+.idea/
 .project
 .settings/
-.idea/
-app/src/main/cpp/3rdparty/rcheevos/.build
-app/src/main/cpp/3rdparty/discord_social_sdk/cdiscord.h
-app/src/main/cpp/3rdparty/discord_social_sdk/discordpp.h
+local.properties
+node_modules/
+bun.lockb
+
+# OS junk & editor/files
 .DS_Store
 app/.DS_Store
 app/src/.DS_Store
 app/src/main/.DS_Store
+
+# Android/NDK/intermediate output
+app/.cxx/
+app/src/main/jniLibs/
+app/src/main/cpp/bin
+
+# Sensitive or key material
+armsx2_release.jks
+armsx2_keystore.properties
+app/src/main/assets/discord_creds.env
+
+# Temporary/log/output files
+log.txt
+
+# Third-party (vendored) native or generated sources
+app/src/main/cpp/3rdparty/rcheevos/.build
+app/src/main/cpp/3rdparty/discord_social_sdk/cdiscord.h
+app/src/main/cpp/3rdparty/discord_social_sdk/discordpp.h
+
+# External libs
+app/libs/discord_partner_sdk.aar
