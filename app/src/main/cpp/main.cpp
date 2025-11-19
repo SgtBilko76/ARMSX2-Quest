@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <android/native_window_jni.h>
 #include <unistd.h>
+#include <cstdlib>
 #include "PrecompiledHeader.h"
 #include "common/StringUtil.h"
 #include "common/FileSystem.h"
@@ -31,8 +32,6 @@
 #include <fstream>
 #include <algorithm>
 #include <mutex>
-
-
 
 namespace
 {
@@ -330,6 +329,7 @@ Java_kr_co_iefriends_pcsx2_NativeApp_initialize(JNIEnv *env, jclass clazz,
         s_settings_interface->SetBoolValue("EmuCore/GS", "OsdShowFPS", false);
     VMManager::ApplySettings();
     GSConfig.OsdPerformancePos = EmuConfig.GS.OsdPerformancePos;
+    GSConfig.CustomDriverPath = EmuConfig.GS.CustomDriverPath;
     if (MTGS::IsOpen()) MTGS::ApplySettings();
     VMManager::ReloadInputSources();
     VMManager::ReloadInputBindings(true);
@@ -406,6 +406,7 @@ Java_kr_co_iefriends_pcsx2_NativeApp_reloadDataRoot(JNIEnv* env, jclass, jstring
         s_settings_interface->SetBoolValue("EmuCore/GS", "OsdShowFPS", false);
     VMManager::ApplySettings();
     GSConfig.OsdPerformancePos = EmuConfig.GS.OsdPerformancePos;
+    GSConfig.CustomDriverPath = EmuConfig.GS.CustomDriverPath;
     if (MTGS::IsOpen())
         MTGS::ApplySettings();
     VMManager::ReloadInputSources();
@@ -766,6 +767,72 @@ Java_kr_co_iefriends_pcsx2_NativeApp_renderGpu(JNIEnv *env, jclass clazz,
     {
         s_settings_interface->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(p_value));
         s_settings_interface->Save();
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_setCustomDriverPath(JNIEnv *env, jclass clazz,
+                                                          jstring p_path) {
+    std::string driver_path = GetJavaString(env, p_path);
+    
+    // Store old config to check if restart is needed
+    Pcsx2Config::GSOptions old_gs_config = GSConfig;
+    std::string old_emu_config_path = EmuConfig.GS.CustomDriverPath;
+
+    EmuConfig.GS.CustomDriverPath = driver_path;
+    GSConfig.CustomDriverPath = driver_path;
+
+    if (s_settings_interface)
+    {
+        if (driver_path.empty())
+            s_settings_interface->DeleteValue("EmuCore/GS", "CustomDriverPath");
+        else
+            s_settings_interface->SetStringValue("EmuCore/GS", "CustomDriverPath", driver_path.c_str());
+        s_settings_interface->Save();
+    }
+    
+    // If graphics device is already initialized and driver path changed, trigger restart
+    if (old_gs_config.CustomDriverPath != driver_path || old_emu_config_path != driver_path)
+    {
+        // Ensure GSConfig matches EmuConfig (they should already match, but be explicit)
+        GSConfig.CustomDriverPath = EmuConfig.GS.CustomDriverPath;
+        
+        // Trigger graphics restart if device is already open
+        if (MTGS::IsOpen())
+        {
+            MTGS::ApplySettings();
+        }
+    }
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_getCustomDriverPath(JNIEnv *env, jclass clazz) {
+    std::string driver_path;
+    if (s_settings_interface)
+    {
+        s_settings_interface->GetStringValue("EmuCore/GS", "CustomDriverPath", &driver_path);
+        EmuConfig.GS.CustomDriverPath = driver_path;
+        GSConfig.CustomDriverPath = driver_path;
+    }
+    else
+    {
+        driver_path = GSConfig.CustomDriverPath;
+    }
+    
+    return env->NewStringUTF(driver_path.c_str());
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_setNativeLibraryDir(JNIEnv *env, jclass clazz,
+                                                         jstring p_path) {
+    std::string native_lib_dir = GetJavaString(env, p_path);
+    if (!native_lib_dir.empty())
+    {
+        // Set env variable for libadrenotools to use
+        setenv("ANDROID_NATIVE_LIB_DIR", native_lib_dir.c_str(), 1);
     }
 }
 

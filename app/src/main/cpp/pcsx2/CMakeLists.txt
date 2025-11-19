@@ -1123,7 +1123,7 @@ if(ANDROID)
 	target_sources(PCSX2 PRIVATE
 		${pcsx2LinuxSources}
 		${pcsx2LinuxHeaders}
-		../native-lib.cpp
+		../main.cpp
 	)
 elseif(LINUX)
 	target_sources(PCSX2 PRIVATE
