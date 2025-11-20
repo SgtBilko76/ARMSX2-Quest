@@ -520,12 +520,6 @@ public:
 			if (clearState)
 				clearGPR(i);
 		}
-
-        // Wait flush
-        std::thread t([]() {
-            std::this_thread::sleep_for(std::chrono::microseconds(2));
-        });
-        t.detach();
 	}
 
 	void flushCallerSavedRegisters(bool clearNeeded = false)

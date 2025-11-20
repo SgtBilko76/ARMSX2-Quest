@@ -47,12 +47,15 @@ void mVUreset(microVU& mVU, bool resetReserve)
 
 //	xSetPtr(mVU.cache);
     armSetAsmPtr(mVU.cache, mVU.index ? HostMemoryMap::mVU1recSize : HostMemoryMap::mVU0recSize, nullptr);
-
+    armStartBlock();
+    ////
 	mVUdispatcherAB(mVU);
 	mVUdispatcherCD(mVU);
 	mVUGenerateWaitMTVU(mVU);
 	mVUGenerateCopyPipelineState(mVU);
 	mVUGenerateCompareState(mVU);
+    ////
+    mVU.prog.x86start = armEndBlock();
 
 	mVU.regs().nextBlockCycles = 0;
 	memset(&mVU.prog.lpState, 0, sizeof(mVU.prog.lpState));
@@ -67,7 +70,6 @@ void mVUreset(microVU& mVU, bool resetReserve)
 
 	// Setup Dynarec Cache Limits for Each Program
 //	mVU.prog.x86start = xGetAlignedCallTarget();
-    armAlignAsmPtr();
 	mVU.prog.x86ptr   = mVU.prog.x86start;
 
     u32 i, e = (mVU.progSize >> 1); // mVU.progSize / 2

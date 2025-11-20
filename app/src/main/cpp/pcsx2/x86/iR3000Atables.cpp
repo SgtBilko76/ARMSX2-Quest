@@ -1812,7 +1812,7 @@ static void rpsxJALR()
 		}
 		else
 		{
-			_psxMoveGPRtoM((uptr)&psxRegs.pc, _Rs_);
+			_psxMoveGPRtoM(PTR_CPU(psxRegs.pc), _Rs_);
 		}
 	}
 

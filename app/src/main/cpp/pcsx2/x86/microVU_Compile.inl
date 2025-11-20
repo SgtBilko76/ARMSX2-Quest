@@ -748,7 +748,15 @@ static void mvuPreloadRegisters(microVU& mVU, u32 endCount)
 void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 {
 	microFlagCycles mFC{};
-	u8* thisPtr = armGetCurrentCodePointer();
+
+    u8* thisPtr;
+    if(armHasBlock()) {
+        thisPtr = armGetCurrentCodePointer();
+    } else {
+        armSetAsmPtr(mVU.prog.x86ptr, mVU.prog.x86end - mVU.prog.x86ptr, nullptr);
+        thisPtr = armStartBlock();
+    }
+
 	const u32 endCount = (((microRegInfo*)pState)->blockType) ? 1 : (mVU.microMemSize >> 3); // mVU.microMemSize / 8
 
 	// First Pass
@@ -1075,13 +1083,17 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 
 perf_and_return:
 
-	if (mVU.regs().start_pc == startPC)
-	{
-		if (mVU.index)
-			Perf::vu1.RegisterPC(thisPtr, static_cast<u32>(armGetCurrentCodePointer() - thisPtr), startPC);
-		else
-			Perf::vu0.RegisterPC(thisPtr, static_cast<u32>(armGetCurrentCodePointer() - thisPtr), startPC);
-	}
+    if(armHasBlock())
+    {
+        if (mVU.regs().start_pc == startPC)
+        {
+            if (mVU.index)
+                Perf::vu1.RegisterPC(thisPtr, static_cast<u32>(armGetCurrentCodePointer() - thisPtr), startPC);
+            else
+                Perf::vu0.RegisterPC(thisPtr, static_cast<u32>(armGetCurrentCodePointer() - thisPtr), startPC);
+        }
+        mVU.prog.x86ptr = armEndBlock();
+    }
 
 	return thisPtr;
 }

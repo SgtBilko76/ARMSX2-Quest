@@ -439,7 +439,7 @@ __fi void _cpuEventTest_Shared()
 
     // ---- Schedule Next Event Test --------------
 #if defined(ANDROID)
-    const s32 nextIopEventDeta = (psxRegs.iopNextEventCycle - psxRegs.cycle);
+    const s32 nextIopEventDeta = (psxRegs.iopNextEventCycle - psxRegs.cycle) << 3;
 #else
     const float mutiplier = static_cast<float>(PS2CLK) / static_cast<float>(PSXCLK);
     const s32 nextIopEventDeta = ((psxRegs.iopNextEventCycle - psxRegs.cycle) * mutiplier);

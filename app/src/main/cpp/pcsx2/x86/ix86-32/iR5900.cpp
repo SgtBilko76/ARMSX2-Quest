@@ -621,7 +621,7 @@ static void recReserve()
 	recReserveRAM();
 
 	pxAssertRel(!s_pInstCache, "InstCache not allocated");
-	s_nInstCacheSize = 1024;
+	s_nInstCacheSize = 128;
 	s_pInstCache = (EEINST*)malloc(sizeof(EEINST) * s_nInstCacheSize);
 	if (!s_pInstCache)
 		pxFailRel("Failed to allocate R5900 InstCache array");
@@ -644,7 +644,7 @@ static void recResetRaw()
 	EE::Profiler.Reset();
 
 //	xSetPtr(SysMemory::GetEERec());
-    armSetAsmPtr(recPtr, recPtrEnd - recPtr, nullptr);
+    armSetAsmPtr(SysMemory::GetEERec(), _4kb, nullptr);
     armStartBlock();
 
 	_DynGen_Dispatchers();
@@ -661,7 +661,7 @@ static void recResetRaw()
 	maxrecmem = 0;
 
 	if (s_pInstCache)
-		std::fill(s_pInstCache, s_pInstCache + s_nInstCacheSize, EEINST{});
+		memset(s_pInstCache, 0, sizeof(EEINST) * s_nInstCacheSize);
 
 	recBlocks.Reset();
 	vtlb_ClearLoadStoreInfo();
@@ -901,15 +901,17 @@ void SetBranchReg(u32 reg)
 		if (!swap)
 		{
 			const int wbreg = _allocX86reg(X86TYPE_PCWRITEBACK, 0, MODE_WRITE | MODE_CALLEESAVED);
-			_eeMoveGPRtoR(a64::WRegister(wbreg), reg);
+            auto reg32 = a64::WRegister(wbreg);
+
+			_eeMoveGPRtoR(reg32, reg);
 
 			if (EmuConfig.Gamefixes.GoemonTlbHack)
 			{
 //				xMOV(ecx, xRegister32(wbreg));
-                armAsm->Mov(ECX, a64::WRegister(wbreg));
+                armAsm->Mov(ECX, reg32);
 				vtlb_DynV2P();
 //				xMOV(xRegister32(wbreg), eax);
-                armAsm->Mov(a64::WRegister(wbreg), EAX);
+                armAsm->Mov(reg32, EAX);
 			}
 
 			recompileNextInstruction(true, false);
@@ -918,7 +920,7 @@ void SetBranchReg(u32 reg)
 			if (x86regs[wbreg].inuse && x86regs[wbreg].type == X86TYPE_PCWRITEBACK)
 			{
 //				xMOV(ptr[&cpuRegs.pc], xRegister32(wbreg));
-                armStore(PTR_CPU(cpuRegs.pc), a64::WRegister(wbreg));
+                armStore(PTR_CPU(cpuRegs.pc), reg32);
 				x86regs[wbreg].inuse = 0;
 			}
 			else
@@ -974,7 +976,7 @@ u8* recBeginThunk()
 		eeRecNeedsReset = true;
 
 //	xSetPtr(recPtr);
-    armSetAsmPtr(recPtr, recPtrEnd - recPtr, nullptr);
+    armSetAsmPtr(recPtr, _4kb, nullptr);
 //	recPtr = xGetAlignedCallTarget();
     recPtr = armStartBlock();
 
@@ -1686,7 +1688,7 @@ void recMemcheck(u32 op, u32 bits, bool store)
 //	xMOV(edx, eax);
     armAsm->Mov(EDX, EAX);
 //	xADD(edx, bits / 8);
-    armAsm->Add(EDX, EDX, bits / 8);
+    armAsm->Add(EDX, EDX, bits >> 3); // bits / 8
 
 	// ecx = access address
 	// edx = access address+size
@@ -1828,34 +1830,35 @@ void recompileNextInstruction(bool delayslot, bool swapped_delay_slot)
 
 	g_pCurInstInfo++;
 
-	// pc might be past s_nEndBlock if the last instruction in the block is a DI.
-	if (pc <= s_nEndBlock && (g_pCurInstInfo + (s_nEndBlock - pc) / 4 + 1) <= s_pInstCache + s_nInstCacheSize)
-	{
-		int count;
-		for (u32 i = 0; i < iREGCNT_GPR; ++i)
-		{
-			if (x86regs[i].inuse)
-			{
-				count = _recIsRegReadOrWritten(g_pCurInstInfo, (s_nEndBlock - pc) / 4 + 1, x86regs[i].type, x86regs[i].reg);
-				if (count > 0)
-					x86regs[i].counter = 1000 - count;
-				else
-					x86regs[i].counter = 0;
-			}
-		}
+    // pc might be past s_nEndBlock if the last instruction in the block is a DI.
+    u32 s_nEndBlock_pc = (s_nEndBlock - pc) / 4 + 1;
+    if (pc <= s_nEndBlock && (g_pCurInstInfo + s_nEndBlock_pc) <= s_pInstCache + s_nInstCacheSize)
+    {
+        int i, count;
+        for (i = 0; i < iREGCNT_GPR; ++i)
+        {
+            if (x86regs[i].inuse)
+            {
+                count = _recIsRegReadOrWritten(g_pCurInstInfo, s_nEndBlock_pc, x86regs[i].type, x86regs[i].reg);
+                if (count > 0)
+                    x86regs[i].counter = 1000 - count;
+                else
+                    x86regs[i].counter = 0;
+            }
+        }
 
-		for (u32 i = 0; i < iREGCNT_XMM; ++i)
-		{
-			if (xmmregs[i].inuse)
-			{
-				count = _recIsRegReadOrWritten(g_pCurInstInfo, (s_nEndBlock - pc) / 4 + 1, xmmregs[i].type, xmmregs[i].reg);
-				if (count > 0)
-					xmmregs[i].counter = 1000 - count;
-				else
-					xmmregs[i].counter = 0;
-			}
-		}
-	}
+        for (i = 0; i < iREGCNT_XMM; ++i)
+        {
+            if (xmmregs[i].inuse)
+            {
+                count = _recIsRegReadOrWritten(g_pCurInstInfo, s_nEndBlock_pc, xmmregs[i].type, xmmregs[i].reg);
+                if (count > 0)
+                    xmmregs[i].counter = 1000 - count;
+                else
+                    xmmregs[i].counter = 0;
+            }
+        }
+    }
 
 	if (g_pCurInstInfo->info & EEINST_COP2_FLUSH_VU0_REGISTERS)
 	{
@@ -2365,7 +2368,7 @@ static void recRecompile(const u32 startpc)
 	}
 
 //	xSetPtr(recPtr);
-    armSetAsmPtr(recPtr, recPtrEnd - recPtr, nullptr);
+    armSetAsmPtr(recPtr, _256kb, nullptr);
 //	recPtr = xGetAlignedCallTarget();
     recPtr = armStartBlock();
 
