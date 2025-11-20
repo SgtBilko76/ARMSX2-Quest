@@ -152,6 +152,7 @@ add_subdirectory(3rdparty/ccc EXCLUDE_FROM_ALL)
 if(_M_X86)
 	add_subdirectory(3rdparty/zydis EXCLUDE_FROM_ALL)
 elseif(_M_ARM64)
+	add_subdirectory(3rdparty/glslang EXCLUDE_FROM_ALL)
 	add_subdirectory(3rdparty/vixl EXCLUDE_FROM_ALL)
 endif()
 

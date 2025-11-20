@@ -660,7 +660,7 @@ if(USE_VULKAN)
 		GS/Renderers/Vulkan/VKStreamBuffer.h
 		GS/Renderers/Vulkan/VKSwapChain.h
 	)
-	target_link_libraries(PCSX2_FLAGS INTERFACE vulkan-headers)
+	target_link_libraries(PCSX2_FLAGS INTERFACE vulkan-headers glslang)
 	target_include_directories(PCSX2_FLAGS INTERFACE ${SHADERC_INCLUDE_DIR})
 endif()
 
@@ -1225,7 +1225,6 @@ elseif(ANDROID)
 	find_library(log-lib log)
 	target_link_directories(PCSX2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ../3rdparty/libs)
 	target_link_libraries(PCSX2_FLAGS INTERFACE
-		shaderc
 		oboe
 		android
 		${log-lib}
