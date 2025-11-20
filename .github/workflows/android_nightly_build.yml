@@ -35,7 +35,7 @@ jobs:
 
       # --- Build Phase ---
       - name: 🏗️ Running the Debug Build (only Nightly)
-        run: /gradlew assembleUnrestrictedDebug
+        run: ./gradlew assembleUnrestrictedDebug
 
       - name: 🔎 Get Package Name and Version
         id: package_info
