@@ -59,6 +59,9 @@ import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
 
 import kr.co.iefriends.pcsx2.input.ControllerMappingDialog;
 import kr.co.iefriends.pcsx2.BuildConfig;
@@ -73,6 +76,8 @@ import kr.co.iefriends.pcsx2.utils.RetroAchievementsBridge;
 import kr.co.iefriends.pcsx2.input.ControllerMappingManager;
 import kr.co.iefriends.pcsx2.utils.DeviceProfiles;
 import kr.co.iefriends.pcsx2.utils.AvatarLoader;
+
+import java.net.NetworkInterface;
 
 public class SettingsActivity extends AppCompatActivity {
 
@@ -1885,6 +1890,96 @@ public class SettingsActivity extends AppCompatActivity {
 			swDev9Network.setChecked(networkEnabled);
 			swDev9Network.setOnCheckedChangeListener((buttonView, isChecked) ->
 					NativeApp.setSetting("DEV9/Eth", "EthEnable", "bool", isChecked ? "true" : "false"));
+		}
+		
+		Spinner spDev9networkEthApi = findViewById(R.id.sp_dev9_network_ethapi);
+
+		if (spDev9networkEthApi != null) {
+			ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
+					this,
+					R.array.network_ethapi,
+					android.R.layout.simple_spinner_item
+			);
+			adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+			spDev9networkEthApi.setAdapter(adapter);
+
+			// Load saved value from native settings
+			try {
+				String savedValue = NativeApp.getSetting("DEV9/Eth", "EthApi", "string");
+				if (savedValue != null) {
+					int pos = adapter.getPosition(savedValue);
+					if (pos >= 0) {
+						spDev9networkEthApi.setSelection(pos);
+					}
+				}
+			} catch (Exception ignored) {}
+
+			// Save when user selects
+			spDev9networkEthApi.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+				@Override
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					String selected = parent.getItemAtPosition(position).toString();
+					NativeApp.setSetting("DEV9/Eth", "EthApi", "string", selected);
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) { }
+			});
+		}
+
+		Spinner spDev9networkEthDevice = findViewById(R.id.sp_dev9_network_ethdevice);
+
+		if (spDev9networkEthApi != null) {
+			List<String> adapterNames = new ArrayList<>();
+
+			try {
+				Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+
+				if (interfaces != null) {
+					for (NetworkInterface ni : Collections.list(interfaces)) {
+						if(ni.isUp())
+							adapterNames.add(ni.getName());  // ONLY getName()
+					}
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+
+			// Create adapter for spinner
+			ArrayAdapter<String> adapter = new ArrayAdapter<>(
+					this,
+					android.R.layout.simple_spinner_item,
+					adapterNames
+			);
+
+			adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+			spDev9networkEthDevice.setAdapter(adapter);
+
+			// Load saved value from native settings
+			try {
+				String savedValue = NativeApp.getSetting("DEV9/Eth", "EthDevice", "string");
+				if (savedValue != null) {
+					int pos = adapter.getPosition(savedValue);
+					if (pos >= 0) {
+						spDev9networkEthDevice.setSelection(pos);
+					}
+				}
+			} catch (Exception ignored) {}
+
+			// Handle selection events
+			spDev9networkEthDevice.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+				@Override
+				public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					String selectedAdapter = adapterNames.get(position);
+					// Call your NativeApp function with the selected network adapter
+					NativeApp.setSetting("DEV9/Eth", "EthDevice", "string", selectedAdapter);
+				}
+
+				@Override
+				public void onNothingSelected(AdapterView<?> parent) {
+					// Optional: do nothing
+				}
+			});
 		}
 	}
 

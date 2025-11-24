@@ -104,4 +104,11 @@
         <item>Translator (default)</item>
         <item>Interpreter</item>
     </string-array>
+
+    <string-array name="network_ethapi">
+        <item>Unset</item>
+        <item>PCAP Bridged</item>
+        <item>PCAP Switched</item>
+        <item>Sockets</item>
+    </string-array>
 </resources>

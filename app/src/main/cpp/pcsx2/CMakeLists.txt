@@ -1124,6 +1124,7 @@ if(ANDROID)
 		${pcsx2LinuxSources}
 		${pcsx2LinuxHeaders}
 		../main.cpp
+        ../common/Android/JNI.cpp
 	)
 elseif(LINUX)
 	target_sources(PCSX2 PRIVATE

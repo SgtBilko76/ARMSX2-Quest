@@ -82,6 +82,36 @@
             android:textColor="?attr/colorOnSurface" />
 
         <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"
+            android:text="@string/settings_dev9_network_ethapi"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textStyle="bold" />
+
+        <Spinner
+            android:id="@+id/sp_dev9_network_ethapi"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/network_ethapi" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"
+            android:text="@string/settings_dev9_network_ethdevice"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textStyle="bold" />
+
+        <Spinner
+            android:id="@+id/sp_dev9_network_ethdevice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            />
+
+        <TextView
             android:id="@+id/tv_dev9_network_summary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

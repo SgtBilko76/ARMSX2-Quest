@@ -82,6 +82,8 @@ Open it later from Settings -> Open ARMSX2 directory.</string>
     <string name="settings_dev9_hdd_use_default">Use default image</string>
     <string name="settings_dev9_network_label">Network</string>
     <string name="settings_dev9_network_switch">Enable DEV9 Ethernet</string>
+    <string name="settings_dev9_network_ethapi">Ethernet api</string>
+    <string name="settings_dev9_network_ethdevice">Ethernet device</string>
     <string name="settings_dev9_network_summary">Requires BIOS network setup and may need a restart to take effect.</string>
     <string name="settings_dev9_hdd_reset_toast">Using default DEV9hdd.raw image</string>
     <string name="settings_storage_google_play_disabled">Unavailable in Google Play builds</string>

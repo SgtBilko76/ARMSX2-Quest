@@ -24,6 +24,7 @@ package kr.co.iefriends.pcsx2;
 import android.app.Activity;
 import android.app.Application;
 import android.os.Bundle;
+import android.content.Context;
 
 import androidx.annotation.NonNull;
 
@@ -32,9 +33,19 @@ import com.google.android.material.color.DynamicColors;
 import kr.co.iefriends.pcsx2.utils.DiscordBridge;
 
 public class App extends Application {
+    private static Context appContext;
+
+    public static Context getContext() {
+        return appContext;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
+
+        // Save global application context
+        appContext = getApplicationContext();
+
         // Apply Material You !
         DynamicColors.applyToActivitiesIfAvailable(this);
         DiscordBridge.initialize(this);
