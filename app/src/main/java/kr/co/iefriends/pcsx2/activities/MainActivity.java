@@ -158,6 +158,7 @@ import kr.co.iefriends.pcsx2.utils.LogcatRecorder;
 import kr.co.iefriends.pcsx2.utils.RetroAchievementsBridge;
 import kr.co.iefriends.pcsx2.utils.SDLControllerManager;
 import kr.co.iefriends.pcsx2.utils.SDLSurface;
+import kr.co.iefriends.pcsx2.utils.NetworkAdapterCollector;
 
 public class MainActivity extends AppCompatActivity {
     private String m_szGamefile = "";
@@ -322,6 +323,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        NetworkAdapterCollector.collectAdapters();
         DiscordBridge.updateEngineActivity(this);
         sInstanceRef = new WeakReference<>(this);
         setContentView(R.layout.activity_main);
