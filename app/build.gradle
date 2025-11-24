@@ -48,14 +48,14 @@ def isDiscordSdkAvailable = file("${project.projectDir}/libs/discord_partner_sdk
 android {
     namespace 'kr.co.iefriends.pcsx2'
     compileSdk 36
-    ndkVersion '29.0.14206865'
+    ndkVersion '27.0.12077973'
 
     flavorDimensions "distribution"
 
     defaultConfig {
     applicationId "come.nanodata.armsx2"
-        minSdk 26
-        targetSdk 36
+        minSdk 34
+        targetSdk 34
         versionCode 14
         versionName "1.0.5"
 

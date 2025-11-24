@@ -26,12 +26,12 @@ plugins {
 def enableRN = gradle.ext.has('enableRN') ? gradle.ext.enableRN : false
 
 ext {
-	enableRN = enableRN
-	minSdkVersion = 26
-	targetSdkVersion = 34
-	compileSdkVersion = 34
-	ndkVersion = '27.0.12077973'
-	kotlinVersion = '1.9.24'
+    enableRN = enableRN
+    minSdkVersion = 34
+    targetSdkVersion = 34
+    compileSdkVersion = 36
+    ndkVersion = '27.0.12077973'
+    kotlinVersion = '1.9.24'
 }
 
 

@@ -20,6 +20,7 @@ pluginManagement {
     }
 
     def reactPluginDir = new File(settingsDir, "node_modules/@react-native/gradle-plugin")
+	def rnPluginJar = new File(reactPluginDir, "build/libs/react-native-gradle-plugin.jar")
     def enableRNLocal = enableRNRequested && reactPluginDir.isDirectory()
     settings.ext.enableRN = enableRNLocal
     gradle.ext.enableRN = enableRNLocal
@@ -29,8 +30,14 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
+	
+    // PATCH: only include the plugin project if the JAR is missing
     if (enableRNLocal) {
-        includeBuild("node_modules/@react-native/gradle-plugin")
+        if (!rnPluginJar.isFile()) {
+            includeBuild("node_modules/@react-native/gradle-plugin")
+        } else {
+            logger.lifecycle("[settings.gradle] Using prebuilt RN gradle-plugin jar at: ${rnPluginJar}")
+        }
     }
 }
 
