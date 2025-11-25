@@ -1,5 +1,8 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Pressable, FlatList, BackHandler, TextInput } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BackHandler, FlatList, SafeAreaView, StyleSheet, View } from 'react-native';
+import { Appbar, Button, Card, FAB, Portal, Searchbar, Text } from 'react-native-paper';
+import { BottomSheetModal, BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import SideDrawer from '../components/SideDrawer.jsx';
 import ThemedButton from '../components/ThemedButton.jsx';
@@ -11,135 +14,224 @@ const hapticOptions = {
 };
 
 function GameItem({ item, colors, onPress }) {
+  const cardStyle = useMemo(
+    () => ({
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+    }),
+    [colors]
+  );
+
   return (
-    <Pressable 
+    <Card
+      mode="elevated"
+      style={cardStyle}
       onPress={() => {
         ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
         onPress?.(item);
-      }} 
-      android_ripple={{ color: colors.surfaceContainerHigh }} 
-      style={styles.itemRow}
+      }}
     >
-      <View style={[styles.cover, { backgroundColor: colors.surfaceContainerHigh }]} />
-      <Text numberOfLines={2} style={[styles.itemTitle, { color: colors.onSurface }]}>{item.title}</Text>
-    </Pressable>
+      <Card.Content style={styles.cardContent}>
+        <View style={[styles.cover, { backgroundColor: colors.surfaceContainerHigh }]} />
+        <View style={styles.cardText}>
+          <Text variant="titleMedium" style={[styles.itemTitle, { color: colors.onSurface }]}>
+            {item.title}
+          </Text>
+          {item.subtitle ? (
+            <Text variant="bodySmall" style={{ color: colors.onSurfaceVariant }}>
+              {item.subtitle}
+            </Text>
+          ) : null}
+        </View>
+      </Card.Content>
+    </Card>
   );
 }
 
-export default function GameSelector({ navigation }) {
+export default function GameSelector() {
   const { colors } = useTheme();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [games, setGames] = useState([]);
+  const [games] = useState([]);
   const [searchVisible, setSearchVisible] = useState(false);
-  const [searchText, setSearchText] = useState(''); 
+  const [searchText, setSearchText] = useState('');
+  const [layout, setLayout] = useState('grid');
+  const [fabOpen, setFabOpen] = useState(false);
+  const [coverUrl, setCoverUrl] = useState('');
 
-  const drawerItems = useMemo(() => ([
-    { type: 'section', label: 'Emulation' },
-    { label: 'Boot BIOS', onPress: () => navigation?.navigate('/') },
-    { label: 'BIOS', onPress: () => navigation?.navigate('Settings') },
-    { type: 'section', label: 'Library' },
-    { label: 'Choose games folder', onPress: () => {} },
-    { label: 'Refresh games', onPress: () => {} },
-    { label: 'Covers', onPress: () => {} },
-    { label: 'Remove cover URL', onPress: () => {} },
-    { type: 'section', label: 'Background' },
-    { label: 'Choose landscape background', onPress: () => {} },
-    { label: 'Choose portrait background', onPress: () => {} },
-    { label: 'Clear background', onPress: () => {} },
-    { type: 'section', label: 'Settings' },
-    { label: 'Settings', onPress: () => navigation?.navigate('Settings') },
-  ]), [navigation]); 
-  if (!colors || !colors.surface) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: '#1A1F24' }]}>
-        <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyText, { color: '#C4C7C5' }]}>Loading...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const bottomSheetRef = useRef(null);
+  const snapPoints = useMemo(() => ['40%'], []);
+
+  const drawerItems = useMemo(
+    () => [
+      { type: 'section', label: 'Emulation' },
+      { label: 'Boot BIOS', onPress: () => {} },
+      { label: 'BIOS', onPress: () => {} },
+      { type: 'section', label: 'Library' },
+      { label: 'Choose games folder', onPress: () => {} },
+      { label: 'Refresh games', onPress: () => {} },
+      { label: 'Covers', onPress: () => {} },
+      { label: 'Remove cover URL', onPress: () => {} },
+      { type: 'section', label: 'Background' },
+      { label: 'Choose landscape background', onPress: () => {} },
+      { label: 'Choose portrait background', onPress: () => {} },
+      { label: 'Clear background', onPress: () => {} },
+    ],
+    []
+  );
+
+  const filteredGames = useMemo(() => {
+    const query = searchText.trim().toLowerCase();
+    if (!query) return games;
+    return games.filter((g) => (g.title ?? '').toLowerCase().includes(query));
+  }, [games, searchText]);
+
+  const handleToggleLayout = useCallback(() => {
+    ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
+    setLayout((prev) => (prev === 'grid' ? 'list' : 'grid'));
+  }, []);
+
+  const handleOpenCoverSheet = useCallback(() => {
+    ReactNativeHapticFeedback.trigger('impactMedium', hapticOptions);
+    bottomSheetRef.current?.present();
+    setFabOpen(false);
+  }, []);
+
+  const handleSaveCoverUrl = useCallback(() => {
+    ReactNativeHapticFeedback.trigger('notificationSuccess', hapticOptions);
+    // Wire up to native module in next step.
+    bottomSheetRef.current?.dismiss();
+  }, []);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.surface }] }>
-      <AndroidBackCloser open={drawerOpen} onClose={() => setDrawerOpen(false)} />
-      
-      <View style={styles.header}>
-        {!drawerOpen && (
-          <Pressable 
-            onPress={() => {
-              ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
-              setDrawerOpen(true);
-            }} 
-            style={styles.headerIcon}
-            android_ripple={{ color: colors.primary + '33', borderless: true }}
-          >
-            <View style={[styles.hamburgerBar, { backgroundColor: colors.onSurface }]} />
-            <View style={[styles.hamburgerBar, { backgroundColor: colors.onSurface, marginVertical: 3 }]} />
-            <View style={[styles.hamburgerBar, { backgroundColor: colors.onSurface }]} />
-          </Pressable>
-        )}
-        
-        {drawerOpen && <View style={styles.headerIcon} />}
-        
-        <Pressable 
-          onPress={() => {
-            ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
-            setSearchVisible(!searchVisible);
-          }} 
-          style={[styles.headerIcon, styles.searchIcon]}
-          android_ripple={{ color: colors.primary + '33', borderless: true }}
-        >
-          <View style={[styles.searchIconShape, { borderColor: colors.onSurface }]} />
-          <View style={[styles.searchHandle, { backgroundColor: colors.onSurface }]} />
-        </Pressable>
-      </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <BottomSheetModalProvider>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+          <AndroidBackCloser open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
-      {/* Search bar */}
-      {searchVisible && (
-        <TextInput
-          style={[styles.searchBar, { 
-            backgroundColor: colors.surfaceContainer,
-            color: colors.onSurface,
-            borderColor: colors.outline,
-          }]}
-          placeholder="Search games…"
-          placeholderTextColor={colors.onSurfaceVariant}
-          value={searchText}
-          onChangeText={setSearchText}
-          returnKeyType="done"
-          onSubmitEditing={() => setSearchVisible(false)}
-        />
-      )}
+          <Appbar.Header mode="small" elevated style={{ backgroundColor: colors.surface }}>
+            <Appbar.Action
+              icon="menu"
+              onPress={() => {
+                ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
+                setDrawerOpen(true);
+              }}
+            />
+            <Appbar.Content title="Games" subtitle={layout === 'grid' ? 'Grid view' : 'List view'} />
+            <Appbar.Action
+              icon={layout === 'grid' ? 'view-list' : 'view-grid-outline'}
+              onPress={handleToggleLayout}
+            />
+            <Appbar.Action
+              icon={searchVisible ? 'close' : 'magnify'}
+              onPress={() => {
+                ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
+                setSearchVisible((v) => !v);
+                if (searchVisible) setSearchText('');
+              }}
+            />
+          </Appbar.Header>
 
-      {games.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyText, { color: colors.onSurfaceVariant }]}>Please select a game folder</Text>
-          <ThemedButton title="Choose games folder" onPress={() => {}} colors={colors} variant="outlined" />
-        </View>
-      ) : (
-        <FlatList
-          contentContainerStyle={{ padding: 12 }}
-          data={games}
-          keyExtractor={(g, i) => g.id ?? String(i)}
-          renderItem={({ item }) => (
-            <GameItem item={item} colors={colors} onPress={() => {}} />
+          {searchVisible && (
+            <View style={styles.searchWrap}>
+              <Searchbar
+                placeholder="Search games"
+                value={searchText}
+                onChangeText={setSearchText}
+                onIconPress={() => setSearchText('')}
+                style={{ backgroundColor: colors.surfaceContainer }}
+                inputStyle={{ color: colors.onSurface }}
+                iconColor={colors.onSurfaceVariant}
+                placeholderTextColor={colors.onSurfaceVariant}
+              />
+            </View>
           )}
-        />
-      )}
 
+          {filteredGames.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text variant="titleMedium" style={[styles.emptyText, { color: colors.onSurface }]}>
+                No games yet
+              </Text>
+              <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant, marginBottom: 16 }}>
+                Point ARMSX2 to your library to see everything here.
+              </Text>
+              <ThemedButton title="Choose games folder" onPress={() => {}} colors={colors} variant="outlined" />
+            </View>
+          ) : (
+            <FlatList
+              contentContainerStyle={{ padding: 16 }}
+              data={filteredGames}
+              keyExtractor={(g, i) => g.id ?? String(i)}
+              renderItem={({ item }) => <GameItem item={item} colors={colors} onPress={() => {}} />}
+              numColumns={layout === 'grid' ? 2 : 1}
+              columnWrapperStyle={layout === 'grid' ? styles.gridWrapper : undefined}
+              ItemSeparatorComponent={() => <View style={{ height: layout === 'list' ? 12 : 0 }} />}
+            />
+          )}
 
-      <Pressable 
-        onPress={() => {
-          ReactNativeHapticFeedback.trigger('impactMedium', hapticOptions);
-        }} 
-        android_ripple={{ color: colors.onPrimary + '22' }} 
-        style={[styles.fab, { backgroundColor: colors.primary }] }
-      >
-        <View style={[styles.fabDot, { backgroundColor: colors.onPrimary }]} />
-      </Pressable>
+          <Portal>
+            <FAB.Group
+              open={fabOpen}
+              visible
+              icon={fabOpen ? 'close' : 'plus'}
+              onStateChange={({ open }) => setFabOpen(open)}
+              fabStyle={{ backgroundColor: colors.primary }}
+              color={colors.onPrimary}
+              actions={[
+                { icon: 'folder', label: 'Choose folder', onPress: () => {}, small: false },
+                { icon: 'refresh', label: 'Refresh games', onPress: () => {}, small: false },
+                { icon: 'image-plus', label: 'Add cover URL', onPress: handleOpenCoverSheet, small: false },
+              ]}
+            />
+          </Portal>
 
-      <SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} colors={colors} items={drawerItems} />
-    </SafeAreaView>
+          <SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} colors={colors} items={drawerItems} />
+
+          <BottomSheetModal
+            ref={bottomSheetRef}
+            snapPoints={snapPoints}
+            backgroundStyle={{ backgroundColor: colors.surface }}
+            handleIndicatorStyle={{ backgroundColor: colors.onSurfaceVariant }}
+          >
+            <View style={styles.sheetContent}>
+              <Text variant="titleMedium" style={{ color: colors.onSurface, marginBottom: 12 }}>
+                Add cover image URL
+              </Text>
+              <Text variant="bodySmall" style={{ color: colors.onSurfaceVariant, marginBottom: 12 }}>
+                Paste a cover URL and we will apply it to the selected game. Native wiring comes next.
+              </Text>
+              <Button
+                mode="outlined"
+                style={{ marginBottom: 12 }}
+                textColor={colors.onSurface}
+                onPress={() => {
+                  ReactNativeHapticFeedback.trigger('impactLight', hapticOptions);
+                }}
+              >
+                Paste from clipboard
+              </Button>
+              <Searchbar
+                placeholder="https://example.com/cover.jpg"
+                value={coverUrl}
+                onChangeText={setCoverUrl}
+                style={{ backgroundColor: colors.surfaceContainer }}
+                inputStyle={{ color: colors.onSurface }}
+                iconColor={colors.onSurfaceVariant}
+                placeholderTextColor={colors.onSurfaceVariant}
+              />
+              <Button
+                mode="contained"
+                style={{ marginTop: 16 }}
+                onPress={handleSaveCoverUrl}
+                buttonColor={colors.primary}
+                textColor={colors.onPrimary}
+              >
+                Save cover URL
+              </Button>
+            </View>
+          </BottomSheetModal>
+        </SafeAreaView>
+      </BottomSheetModalProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -157,73 +249,13 @@ function AndroidBackCloser({ open, onClose }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-    zIndex: 100,
-  },
-  headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  searchIcon: {
-    position: 'relative',
-  },
-  hamburgerBar: { 
-    height: 2, 
-    width: 18, 
-    borderRadius: 1 
-  },
-  searchIconShape: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 2,
-  },
-  searchHandle: {
-    width: 2,
-    height: 6,
-    borderRadius: 1,
-    position: 'absolute',
-    right: 14,
-    bottom: 14,
-    transform: [{ rotate: '45deg' }],
-  },
-  searchBar: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    fontSize: 16,
-  },
-  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { fontSize: 18, marginBottom: 16 },
-  itemRow: { flexDirection: 'row', alignItems: 'center', padding: 12, minHeight: 72 },
-  cover: { width: 80, aspectRatio: 2/3, borderRadius: 6, marginRight: 12 },
-  itemTitle: { flex: 1, fontSize: 16, lineHeight: 20 },
-  fab: { 
-    position: 'absolute', 
-    right: 16, 
-    bottom: 16, 
-    width: 56, 
-    height: 56, 
-    borderRadius: 28, 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    elevation: 6, 
-    shadowColor: '#000', 
-    shadowOpacity: 0.3, 
-    shadowRadius: 8, 
-    shadowOffset: { width: 0, height: 4 } 
-  },
-  fabDot: { width: 20, height: 20, borderRadius: 10 },
+  searchWrap: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+  emptyText: { marginBottom: 4 },
+  cardContent: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
+  cover: { width: 72, aspectRatio: 2 / 3, borderRadius: 10, marginRight: 4 },
+  cardText: { flex: 1 },
+  itemTitle: { marginBottom: 2 },
+  gridWrapper: { gap: 12 },
+  sheetContent: { paddingHorizontal: 20, paddingVertical: 12, gap: 8 },
 });

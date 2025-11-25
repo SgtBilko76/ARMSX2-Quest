@@ -1,90 +1,62 @@
-import React, { useState, useEffect } from 'react';
-import { SafeAreaView, View, Text, Pressable, StyleSheet, StatusBar, BackHandler } from 'react-native';
-import HomeScreen from './screens/HomeScreen.jsx';
+import React, { useEffect, useMemo, useState } from 'react';
+import { BackHandler, SafeAreaView, StatusBar, StyleSheet } from 'react-native';
+import { BottomNavigation } from 'react-native-paper';
 import GameSelector from './screens/GameSelector.jsx';
 import SettingsScreen from './screens/SettingsScreen.jsx';
-import AboutScreen from './screens/AboutScreen.jsx';
 import { useTheme } from './theme.jsx';
 
 export default function Router() {
   const { scheme, colors } = useTheme();
-  const [currentScreen, setCurrentScreen] = useState('GameSelector');
-  const [navigationStack, setNavigationStack] = useState(['GameSelector']);
-  
-  if (!colors || !colors.background) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0F1419' }}>
-        <StatusBar barStyle="light-content" backgroundColor="#0F1419" />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: '#C4C7C5', fontSize: 16 }}>Loading...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-  
-  // Navigation functions
-  const navigate = (screenName) => {
-    setNavigationStack(prev => [...prev, screenName]);
-    setCurrentScreen(screenName);
-  };
-  
-  const goBack = () => {
-    setNavigationStack(prev => {
-      const newStack = prev.slice(0, -1);
-      if (newStack.length === 0) {
-        return ['GameSelector'];
-      }
-      setCurrentScreen(newStack[newStack.length - 1]);
-      return newStack;
-    });
-  };
-  
-  // Handle Android back button
+  const [index, setIndex] = useState(0);
+
+  const routes = useMemo(
+    () => [
+      { key: 'games', title: 'Games', focusedIcon: 'controller-classic', unfocusedIcon: 'controller-classic-outline' },
+      { key: 'settings', title: 'Settings', focusedIcon: 'cog', unfocusedIcon: 'cog-outline' },
+    ],
+    []
+  );
+
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (navigationStack.length > 1) {
-        goBack();
+      if (index !== 0) {
+        setIndex(0);
         return true;
       }
       return false;
     });
-    
     return () => backHandler.remove();
-  }, [navigationStack]);
-  
-  const renderScreen = () => {
-    switch (currentScreen) {
-      case 'Settings':
-        return (
-          <View style={styles.screenContainer}>
-            <SettingsScreen navigation={{ goBack, navigate }} />
-          </View>
-        );
-      case 'About':
-        return (
-          <View style={styles.screenContainer}>
-            <AboutScreen navigation={{ goBack, navigate }} />
-          </View>
-        );
-      case 'GameSelector':
+  }, [index]);
+
+  const renderScene = ({ route }) => {
+    switch (route.key) {
+      case 'settings':
+        return <SettingsScreen />;
+      case 'games':
       default:
-        return (
-          <View style={styles.screenContainer}>
-            <GameSelector navigation={{ goBack, navigate }} />
-          </View>
-        );
+        return <GameSelector />;
     }
   };
-  
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-      {renderScreen()}
+      <StatusBar
+        barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.background}
+      />
+      <BottomNavigation
+        navigationState={{ index, routes }}
+        onIndexChange={setIndex}
+        renderScene={renderScene}
+        sceneAnimationEnabled
+        barStyle={{ backgroundColor: colors.surface }}
+        activeColor={colors.primary}
+        inactiveColor={colors.onSurfaceVariant}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  screenContainer: { flex: 1 },
 });

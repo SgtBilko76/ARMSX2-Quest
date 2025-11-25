@@ -227,7 +227,7 @@ function AboutScreen({ navigation }) {
             Platform: {systemInfo.platform} {systemInfo.version}{'\n'}
             Architecture: {systemInfo.architecture}{'\n'}
             Screen: {systemInfo.screenWidth}x{systemInfo.screenHeight} (@{systemInfo.scale}x){'\n'}
-            Framework: React Native 0.74
+            Framework: React Native 0.79
           </Text>
         </View>
 

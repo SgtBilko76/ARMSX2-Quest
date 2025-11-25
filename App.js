@@ -1,11 +1,11 @@
 import React from 'react';
 import Router from './app_ui/Router.jsx';
-import { MaterialYouService } from '@assembless/react-native-material-you';
+import { ThemeProvider } from './app_ui/theme.jsx';
 
 export default function App() {
   return (
-    <MaterialYouService>
+    <ThemeProvider>
       <Router />
-    </MaterialYouService>
+    </ThemeProvider>
   );
 }

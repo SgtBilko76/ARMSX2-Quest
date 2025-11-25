@@ -46,6 +46,9 @@ if(ANDROID)
 	endif()
 	# Link all native binaries with 16KB page support for newer devices.
 	add_link_options(-Wl,-z,max-page-size=16384)
+	# Belt-and-suspenders: ensure every shared/module target inherits the flag.
+	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+	set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
 endif()
 
 # Must be done after SearchForStuff
