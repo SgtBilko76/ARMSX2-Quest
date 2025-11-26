@@ -40,10 +40,10 @@ def enableRN = gradle.ext.has('enableRN') ? gradle.ext.enableRN : false
 
 ext {
     enableRN = enableRN
-    minSdkVersion = 30
+    minSdkVersion = 26
     targetSdkVersion = 35
     compileSdkVersion = 36
-    ndkVersion = '27.0.12077973'
+    ndkVersion = '29.0.14206865'
     kotlinVersion = '1.9.24'
 }
 

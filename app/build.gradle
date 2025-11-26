@@ -48,16 +48,16 @@ def isDiscordSdkAvailable = file("${project.projectDir}/libs/discord_partner_sdk
 android {
     namespace 'kr.co.iefriends.pcsx2'
     compileSdk 36
-    ndkVersion '27.0.12077973'
+    ndkVersion '29.0.14206865'
 
     flavorDimensions "distribution"
 
     defaultConfig {
     applicationId "come.nanodata.armsx2"
-        minSdk 30
+        minSdk 26
         targetSdk 35
-        versionCode 19
-        versionName "1.0.6"
+        versionCode 21
+        versionName "1.0.7"
 
         // APK
         def baseName = 'ARMSX2'
