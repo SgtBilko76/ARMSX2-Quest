@@ -29,9 +29,6 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
-    if (enableRNLocal) {
-        includeBuild("node_modules/@react-native/gradle-plugin")
-    }
 }
 
 def enableRN = settings.ext.has("enableRN") ? settings.ext.enableRN : false

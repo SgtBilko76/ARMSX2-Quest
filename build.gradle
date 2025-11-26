@@ -9,9 +9,22 @@ buildscript {
 		classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24"
 		def rnEnabled = gradle.ext.has('enableRN') ? gradle.ext.enableRN : false
 		if (rnEnabled) {
+			def rnPluginDir = file("$rootDir/node_modules/@react-native/gradle-plugin")
 			def rnPluginJar = file("$rootDir/node_modules/@react-native/gradle-plugin/build/libs/react-native-gradle-plugin.jar")
 			if (!rnPluginJar.isFile()) {
-				throw new GradleException("React Native Gradle plugin JAR not found at ${rnPluginJar}. Did you run yarn install?")
+				if (!rnPluginDir.isDirectory()) {
+					throw new GradleException("React Native Gradle plugin not installed at ${rnPluginDir}. Did you run yarn install?")
+				}
+				logger.lifecycle("[build.gradle] React Native Gradle plugin JAR missing; running './gradlew build' in ${rnPluginDir} to generate it.")
+				def process = new ProcessBuilder()
+						.directory(rnPluginDir)
+						.command("./gradlew", "build")
+						.inheritIO()
+						.start()
+				def exitCode = process.waitFor()
+				if (exitCode != 0 || !rnPluginJar.isFile()) {
+					throw new GradleException("Failed to build React Native Gradle plugin (exit code ${exitCode}); see logs above.")
+				}
 			}
 			classpath files(rnPluginJar)
 		}
@@ -27,8 +40,8 @@ def enableRN = gradle.ext.has('enableRN') ? gradle.ext.enableRN : false
 
 ext {
     enableRN = enableRN
-    minSdkVersion = 34
-    targetSdkVersion = 34
+    minSdkVersion = 30
+    targetSdkVersion = 35
     compileSdkVersion = 36
     ndkVersion = '27.0.12077973'
     kotlinVersion = '1.9.24'
