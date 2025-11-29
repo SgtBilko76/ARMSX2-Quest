@@ -4,8 +4,8 @@
     <string name="app_name_desktop">ARMSX2 桌面版</string>
     <string name="controller_mapping_button">编辑控制器映射</string>
     <string name="controller_mapping_title">控制器映射</string>
-    <string name="controller_mapping_instruction">选择一种行为以重新绑定。当出现提示时，按下新的控制器按钮。</string>
-    <string name="controller_mapping_rebind">重新绑定</string>
+    <string name="controller_mapping_instruction">选择一种操作以重绑定。当出现提示时，按下新的控制器按钮。</string>
+    <string name="controller_mapping_rebind">重绑定</string>
     <string name="controller_mapping_clear">清除</string>
     <string name="controller_mapping_waiting">按下按钮…</string>
     <string name="controller_mapping_unbound">未绑定</string>
@@ -33,11 +33,11 @@
     <string name="settings_section_performance">性能</string>
     <string name="settings_section_stats">状态</string>
     <string name="settings_section_controller">控制器</string>
-    <string name="settings_section_customization">自定义</string>
+    <string name="settings_section_customization">个性化定制</string>
     <string name="settings_section_storage">存储与数据</string>
     <string name="settings_section_achievements">连接</string>
-    <string name="settings_on_screen_ui_style">显示界面风格</string>
-    <string name="dialog_on_screen_ui_style_title">显示界面风格</string>
+    <string name="settings_on_screen_ui_style">屏幕 UI 风格</string>
+    <string name="dialog_on_screen_ui_style_title">屏幕 UI 风格</string>
     <string name="on_screen_ui_style_default">默认</string>
     <string name="on_screen_ui_style_nether">Nether</string>
     <string name="onboarding_title">欢迎</string>
@@ -47,7 +47,7 @@
     <string name="onboarding_welcome_title">欢迎来到 ARMSX2</string>
     <string name="onboarding_welcome_message">让我们来为游玩做好准备。我们将会引导您完成 BIOS 和存储设置——您可以稍后在设置中更改这些。</string>
     <string name="onboarding_bios_title">PlayStation 2 BIOS</string>
-    <string name="onboarding_bios_message">ARMSX2 需要一份合法的、提取自您的游戏主机的 PS2 BIOS 硬盘备份。选择一个已转储的 .bin 文件。</string>
+    <string name="onboarding_bios_message">ARMSX2 需要一份合法的、提取自您的游戏主机的 PS2 BIOS 映像文件。选择一个已转储的 .bin 文件。</string>
     <string name="onboarding_bios_select">选择 BIOS</string>
     <string name="onboarding_bios_status_missing">尚未检测到 BIOS。</string>
     <string name="onboarding_bios_status_ready">BIOS 可供使用。</string>
@@ -63,7 +63,7 @@
     <string name="onboarding_storage_status_missing">尚未选择存储文件夹。</string>
     <string name="onboarding_storage_google_play_unavailable">Google Play 构建版本使用默认的 ARMSX2 数据文件夹。
 位置：%1$s
-稍后从设置中打开它 -&gt; 打开 ARMSX2 目录。</string>
+稍后可从 “设置 → 打开 ARMSX2 目录” 打开它。</string>
     <string name="onboarding_storage_default_set">正在使用默认的存储位置</string>
     <string name="onboarding_storage_picker_error">无法打开文件夹选择器</string>
     <string name="onboarding_storage_unusable">无法使用所选文件夹</string>
@@ -77,15 +77,15 @@
     <string name="onboarding_storage_access_error">Android 拒绝直接访问：%1$s。在系统设置中授予所有文件访问权限，或者选择一个在 ARMSX2 存储空间中的文件夹。</string>
     <string name="onboarding_storage_access_settings">打开设置</string>
     <string name="settings_dev9_title">PS2 硬盘与网络</string>
-    <string name="settings_dev9_hdd_summary">启用虚拟硬盘以支持已启用 DEV9 的游戏。硬盘备份保存在您的数据目录下。</string>
+    <string name="settings_dev9_hdd_summary">启用虚拟硬盘以支持已启用 DEV9 的游戏。映像文件保存在您的数据目录下。</string>
     <string name="settings_dev9_hdd_label">启用 DEV9 虚拟硬盘</string>
-    <string name="settings_dev9_hdd_use_default">使用默认硬盘备份</string>
+    <string name="settings_dev9_hdd_use_default">使用默认映像文件</string>
     <string name="settings_dev9_network_label">网络</string>
     <string name="settings_dev9_network_switch">启用 DEV9 以太网</string>
     <string name="settings_dev9_network_ethapi">以太网 API</string>
     <string name="settings_dev9_network_ethdevice">以太网设备</string>
     <string name="settings_dev9_network_summary">需要 BIOS 网络设置并且可能需要重启一次以生效。</string>
-    <string name="settings_dev9_hdd_reset_toast">正在使用默认的 DEV9hdd.raw 硬盘备份</string>
+    <string name="settings_dev9_hdd_reset_toast">正在使用默认的 DEV9hdd.raw 映像文件</string>
     <string name="settings_storage_google_play_disabled">在 Google Play 构建版本中不可用</string>
     <string name="settings_open_data_directory">打开 ARMSX2 目录</string>
     <string name="settings_open_data_directory_error">未找到受支持的文件管理器以打开目录。</string>
@@ -119,7 +119,7 @@
     <string name="drawer_action_import_textures">导入纹理</string>
     <string name="drawer_import_cheats_picker_title">选择金手指文件</string>
     <string name="drawer_import_textures_picker_title">选择纹理压缩包（.zip）</string>
-    <string name="drawer_ui_scale_label">显示界面比例</string>
+    <string name="drawer_ui_scale_label">屏幕 UI 比例</string>
     <string name="drawer_ui_scale_value">%1$.1f倍</string>
     <string name="drawer_toast_cheats_import_success">金手指已导入到 %1$s</string>
     <string name="drawer_toast_cheats_import_failed">无法导入金手指</string>
@@ -141,7 +141,7 @@
     <string name="settings_show_overscan">显示过扫描区域</string>
     <string name="settings_antiblur">抗模糊</string>
     <string name="settings_achievements_title">Retro Achievements</string>
-    <string name="settings_achievements_description">链接您的 RetroAchievements 账号以同步解锁的成就、查看排行榜，以及在您游玩时追踪进展。</string>
+    <string name="settings_achievements_description">链接您的 RetroAchievements 账号以同步解锁的成就、查看排行榜，以及在您游玩时记录进展。</string>
     <string name="settings_achievements_button">登录到 RetroAchievements</string>
     <string name="settings_achievements_button_change">切换账号</string>
     <string name="settings_achievements_logout">退出登录</string>
@@ -154,12 +154,12 @@
     <string name="settings_achievements_profile_signed_out">登录以同步用户资料和解锁的成就。</string>
     <string name="settings_achievements_profile_fmt">得分：%1$d PTS • 软核：%2$d PTS • 未读消息：%3$d</string>
     <string name="settings_achievements_no_game">当前未加载游戏。</string>
-    <string name="settings_achievements_game_fmt">%1$s — %2$d/%3$d 成就 • %4$d/%5$d PTS</string>
+    <string name="settings_achievements_game_fmt">%1$s - %2$d/%3$d 成就 • %4$d/%5$d PTS</string>
     <string name="drawer_ra_section_label">RetroAchievements</string>
     <string name="drawer_ra_icon_content_description">RetroAchievements 游戏图标</string>
     <string name="drawer_ra_toast_connected">已以 %1$s 的身份连接到 RetroAchievements。</string>
-    <string name="drawer_ra_toast_tracking">正在在 RetroAchievements 上追踪 %1$s。</string>
-    <string name="drawer_ra_toast_tracking_generic">RetroAchievements 追踪运行中。</string>
+    <string name="drawer_ra_toast_tracking">正在在 RetroAchievements 上记录 %1$s 的进展。</string>
+    <string name="drawer_ra_toast_tracking_generic">RetroAchievements 进展记录正在运行中。</string>
     <string name="drawer_ra_dialog_title">RetroAchievements</string>
     <string name="drawer_ra_dialog_progress">成就：%1$d/%2$d</string>
     <string name="drawer_ra_dialog_points">分数：%1$d/%2$d</string>
