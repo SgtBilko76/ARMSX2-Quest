@@ -71,6 +71,9 @@ jobs:
 
       - name: 🚀 Create the Release on GitHub
         uses: softprops/action-gh-release@v2
+        if: >
+          github.repository == 'ARMSX2/ARMSX2' &&
+          github.ref == 'refs/heads/master'
         with:
           tag_name: ${{ steps.release_vars.outputs.RELEASE_TAG }}
           name: ${{ steps.release_vars.outputs.RELEASE_TITLE }}
