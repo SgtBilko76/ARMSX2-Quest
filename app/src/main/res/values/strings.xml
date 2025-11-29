@@ -63,7 +63,7 @@
     <string name="onboarding_storage_status_missing">No storage folder selected yet.</string>
     <string name="onboarding_storage_google_play_unavailable">Google Play builds use the default ARMSX2 data folder.
 Location: %1$s
-Open it later from Settings -> Open ARMSX2 directory.</string>
+Open it later from Settings → Open ARMSX2 directory.</string>
     <string name="onboarding_storage_default_set">Using default storage location</string>
     <string name="onboarding_storage_picker_error">Unable to open the folder picker</string>
     <string name="onboarding_storage_unusable">Unable to use the selected folder</string>
@@ -154,7 +154,7 @@ Open it later from Settings -> Open ARMSX2 directory.</string>
     <string name="settings_achievements_profile_signed_out">Sign in to sync your profile and unlocks.</string>
     <string name="settings_achievements_profile_fmt">Score: %1$d pts • Softcore: %2$d pts • Unread messages: %3$d</string>
     <string name="settings_achievements_no_game">No game currently loaded.</string>
-    <string name="settings_achievements_game_fmt">%1$s — %2$d/%3$d achievements • %4$d/%5$d pts</string>
+    <string name="settings_achievements_game_fmt">%1$s - %2$d/%3$d achievements • %4$d/%5$d pts</string>
     <string name="drawer_ra_section_label">RetroAchievements</string>
     <string name="drawer_ra_icon_content_description">RetroAchievements game icon</string>
     <string name="drawer_ra_toast_connected">Connected to RetroAchievements as %1$s.</string>
