@@ -22,10 +22,10 @@ clamp_list = ['eeClampMode', 'vuClampMode', 'vu0ClampMode', 'vu1ClampMode']
 round_list = ['eeDivRoundMode', 'eeRoundMode', 'vuRoundMode', 'vu0RoundMode', 'vu1RoundMode']
 gmfix_list = ['BlitInternalFPSHack', 'DMABusyHack', 'EETimingHack', 'FpuMulHack', 'GIFFIFOHack', 'GoemonTlbHack', 'IbitHack', 'OPHFlagHack', 'SkipMPEGHack', 'SoftwareRendererFMVHack', 'VIF1StallHack', 'VIFFIFOHack', 'VuAddSubHack', 'VUOverflowHack', 'FullVU0SyncHack', 'VUSyncHack', 'XGKickHack']
 speed_list = ['mvuFlag', 'instantVU1', 'mtvu', 'eeCycleRate']
-hwfix_list = ['autoFlush', 'cpuFramebufferConversion', 'readTCOnClose', 'disableDepthSupport', 'preloadFrameData', 'disablePartialInvalidation', 'partialTargetInvalidation', 'textureInsideRT', 'alignSprite', 'mergeSprite', 'forceEvenSpritePosition', 'bilinearUpscale', 'nativePaletteDraw', 'estimateTextureRegion', 'PCRTCOffsets', 'PCRTCOverscan', 'mipmap', 'trilinearFiltering', 'skipDrawStart', 'skipDrawEnd', 'halfBottomOverride', 'halfPixelOffset', 'nativeScaling ', 'roundSprite', 'texturePreloading', 'deinterlace', 'cpuSpriteRenderBW', 'cpuSpriteRenderLevel', 'cpuCLUTRender', 'gpuTargetCLUT', 'gpuPaletteConversion', 'minimumBlendingLevel', 'maximumBlendingLevel', 'getSkipCount', 'beforeDraw', 'moveHandler']
+hwfix_list = ['autoFlush', 'cpuFramebufferConversion', 'readTCOnClose', 'disableDepthSupport', 'preloadFrameData', 'disablePartialInvalidation', 'partialTargetInvalidation', 'textureInsideRT', 'alignSprite', 'mergeSprite', 'forceEvenSpritePosition', 'bilinearUpscale', 'nativePaletteDraw', 'estimateTextureRegion', 'PCRTCOffsets', 'PCRTCOverscan', 'mipmap', 'trilinearFiltering', 'skipDrawStart', 'skipDrawEnd', 'halfBottomOverride', 'halfPixelOffset', 'nativeScaling', 'roundSprite', 'texturePreloading', 'deinterlace', 'cpuSpriteRenderBW', 'cpuSpriteRenderLevel', 'cpuCLUTRender', 'gpuTargetCLUT', 'gpuPaletteConversion', 'minimumBlendingLevel', 'maximumBlendingLevel', 'getSkipCount', 'beforeDraw', 'moveHandler']
 ignore_keys = []
 ignore_list = ['GSC_IRem', 'GSC_SandGrainGames', 'GSC_Turok', 'recommendedBlendingLevel']
-gamefix_dict = {'SLES-53764': ['SoftwareRendererFMVHack'], 'SLES-54822': ['SoftwareRendererFMVHack'], 'SLUS-21327': ['SoftwareRendererFMVHack'], 'SLUS-21564': ['SoftwareRendererFMVHack'], 'SLES-51252': ['SoftwareRendererFMVHack'], 'SLPM-65212': ['SoftwareRendererFMVHack'], 'SLPM-67005': ['SoftwareRendererFMVHack'], 'SLPM-67546': ['SoftwareRendererFMVHack'], 'SLPS-29003': ['SoftwareRendererFMVHack'], 'SLPS-29004': ['SoftwareRendererFMVHack'], 'SLUS-20578': ['SoftwareRendererFMVHack']}
+gamefix_dict = {'SLES-54822': ['SoftwareRendererFMVHack'], 'SLUS-21327': ['SoftwareRendererFMVHack'], 'SLUS-21564': ['SoftwareRendererFMVHack'], 'SLES-51252': ['SoftwareRendererFMVHack'], 'SLPM-65212': ['SoftwareRendererFMVHack'], 'SLPM-67005': ['SoftwareRendererFMVHack'], 'SLPM-67546': ['SoftwareRendererFMVHack'], 'SLPS-29003': ['SoftwareRendererFMVHack'], 'SLPS-29004': ['SoftwareRendererFMVHack'], 'SLUS-20578': ['SoftwareRendererFMVHack']}
 hwfkey_dict = {'SCAJ-20095': ['disableDepthSupport', 1], 'SCAJ-20120': ['disableDepthSupport', 1], 'SLES-53458': ['disableDepthSupport', 1], 'SLES-54555': ['disableDepthSupport', 1], 'SLKA-25300': ['disableDepthSupport', 1], 'SLKA-25301': ['disableDepthSupport', 1], 'SLPM-65597': ['disableDepthSupport', 1], 'SLPM-65795': ['disableDepthSupport', 1], 'SLPM-66372': ['disableDepthSupport', 1], 'SLPM-66373': ['disableDepthSupport', 1], 'SLUS-20974': ['disableDepthSupport', 1], 'SLUS-21152': ['disableDepthSupport', 1], 'SLUS-28049': ['disableDepthSupport', 1], 'SLUS-28052': ['disableDepthSupport', 1]}
 replace_dict = {'PlayStation2': 'PlayStation 2'}
 speedfix_dict = {'SLPM-60149': ['mvuFlag', 0], 'SLPS-25052': ['mvuFlag', 0], 'SLPS-73205': ['mvuFlag', 0], 'SLPS-73410': ['mvuFlag', 0], 'SLUS-20152': ['mvuFlag', 0]}
@@ -72,6 +72,8 @@ def process_dict(my_dict, new_dict):
                 except KeyError:
                     if not req_sort: req_sort = True
                     my_dict[key][nested_key] = new_dict[key][nested_key]
+        for nested_key in ['name-sort', 'name-en', 'compat']:
+            if nested_key in value and key in my_dict: my_dict[key][nested_key] = new_dict[key][nested_key]
         if 'clampModes' in value and key in my_dict:
             for nested_key in ['vu0ClampMode', 'vu1ClampMode']:
                 if nested_key in value['clampModes']:
@@ -112,17 +114,11 @@ def process_dict(my_dict, new_dict):
         if 'speedHacks' in value and key in my_dict:
             for nested_key in speed_list:
                 if nested_key in value['speedHacks']:
-                    try:
-                        if my_dict[key]['speedHacks'][nested_key]: continue
-                    except KeyError:
-                        my_dict[key]['speedHacks'][nested_key] = new_dict[key]['speedHacks'][nested_key]
+                    my_dict[key]['speedHacks'][nested_key] = new_dict[key]['speedHacks'][nested_key]
         if 'gsHWFixes' in value and key in my_dict:
             for nested_key in hwfix_list:
                 if nested_key in value['gsHWFixes']:
-                    try:
-                        if my_dict[key]['gsHWFixes'][nested_key]: continue
-                    except KeyError:
-                        my_dict[key]['gsHWFixes'][nested_key] = new_dict[key]['gsHWFixes'][nested_key]
+                    my_dict[key]['gsHWFixes'][nested_key] = new_dict[key]['gsHWFixes'][nested_key]
         if key in gamefix_dict and key in my_dict:
             for i in range(len(gamefix_dict[key])):
                 if 'gameFixes' in my_dict[key]: 
@@ -133,9 +129,6 @@ def process_dict(my_dict, new_dict):
             if 'speedHacks' not in my_dict[key]: my_dict[key]['speedHacks'] = {}
             for i in range(0, len(speedfix_dict[key]), 2): 
                 my_dict[key]['speedHacks'][speedfix_dict[key][i]] = speedfix_dict[key][i + 1]
-            if 'Ace Combat 04' in my_dict[key]['name']:
-                if 'gpuTargetCLUT' in my_dict[key]['gsHWFixes']: del my_dict[key]['gsHWFixes']['gpuTargetCLUT']
-                my_dict[key]['gsHWFixes']['cpuCLUTRender'] = 1
         if key in hwfkey_dict and key in my_dict:
             if 'gsHWFixes' not in my_dict[key]: my_dict[key]['gsHWFixes'] = {}
             for i in range(0, len(hwfkey_dict[key]), 2): 
