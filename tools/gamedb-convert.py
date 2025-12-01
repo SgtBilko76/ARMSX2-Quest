@@ -2,7 +2,7 @@
 # Just drag and drop the GameIndex.yaml file from PCSX2 on to it to process it
 # Requires the ruamel.yaml library to be installed to work
 # Type pip install ruamel.yaml in the terminal to install it
-import re, sys, os
+import sys, os
 from ruamel.yaml import YAML
 
 def my_represent_none(self, data):
@@ -27,7 +27,7 @@ ignore_keys = []
 ignore_list = ['GSC_IRem', 'GSC_SandGrainGames', 'GSC_Turok', 'recommendedBlendingLevel']
 gamefix_dict = {'SLES-54822': ['SoftwareRendererFMVHack'], 'SLUS-21327': ['SoftwareRendererFMVHack'], 'SLUS-21564': ['SoftwareRendererFMVHack'], 'SLES-51252': ['SoftwareRendererFMVHack'], 'SLPM-65212': ['SoftwareRendererFMVHack'], 'SLPM-67005': ['SoftwareRendererFMVHack'], 'SLPM-67546': ['SoftwareRendererFMVHack'], 'SLPS-29003': ['SoftwareRendererFMVHack'], 'SLPS-29004': ['SoftwareRendererFMVHack'], 'SLUS-20578': ['SoftwareRendererFMVHack']}
 hwfkey_dict = {'SCAJ-20095': ['disableDepthSupport', 1], 'SCAJ-20120': ['disableDepthSupport', 1], 'SLES-53458': ['disableDepthSupport', 1], 'SLES-54555': ['disableDepthSupport', 1], 'SLKA-25300': ['disableDepthSupport', 1], 'SLKA-25301': ['disableDepthSupport', 1], 'SLPM-65597': ['disableDepthSupport', 1], 'SLPM-65795': ['disableDepthSupport', 1], 'SLPM-66372': ['disableDepthSupport', 1], 'SLPM-66373': ['disableDepthSupport', 1], 'SLUS-20974': ['disableDepthSupport', 1], 'SLUS-21152': ['disableDepthSupport', 1], 'SLUS-28049': ['disableDepthSupport', 1], 'SLUS-28052': ['disableDepthSupport', 1]}
-replace_dict = {'PlayStation2': 'PlayStation 2'}
+replace_dict = {'nativeScaling: 3': 'nativeScaling: 1', 'nativeScaling: 4': 'nativeScaling: 2', 'PlayStation2': 'PlayStation 2'}
 speedfix_dict = {'SLPM-60149': ['mvuFlag', 0], 'SLPS-25052': ['mvuFlag', 0], 'SLPS-73205': ['mvuFlag', 0], 'SLPS-73410': ['mvuFlag', 0], 'SLUS-20152': ['mvuFlag', 0]}
 
 def sort_keys(my_dict):
@@ -46,11 +46,9 @@ def process_db(file_name, clean_name):
     if os.path.isfile('GameIndex[temp].yaml'): os.remove('GameIndex[temp].yaml')
     if os.path.isfile(clean_name) and clean_name == 'GameIndex[converted].yaml': os.remove('GameIndex[converted].yaml')
     with open(file_name, encoding='utf8') as newfile, open('GameIndex[temp].yaml', 'w', encoding='utf8') as tempfile:
-        prev_line = ''
         for line in newfile:
             if any(k := key for key in replace_dict if key in line): line = line.replace(k, replace_dict[k])
             if not any(ignore_word in line for ignore_word in ignore_list): tempfile.write(line)
-            prev_line = line
     os.rename('GameIndex[temp].yaml', clean_name)
 
 def process_dict(my_dict, new_dict):
