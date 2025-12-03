@@ -26,6 +26,7 @@
     <string name="controller_action_r3">R3</string>
     <string name="controller_action_select">Select</string>
     <string name="controller_action_start">Start</string>
+    <string name="settings_aspect_ratio">Aspect Ratio</string>
     <string name="settings_record_logs">Record Logs</string>
     <string name="settings_record_logs_summary">Capture full Android logcat (emulator output, crashes, ADB) to ANDROID_LOG.txt in your data directory. May reduce performance.</string>
     <string name="settings_section_general">General</string>
@@ -194,7 +195,6 @@ Open it later from Settings → Open ARMSX2 directory.</string>
     <string name="cover_prefetch_no_connection">Connect to the internet to download covers.</string>
     <string name="action_save">Save</string>
     <string name="per_game_settings_enable_custom">Enable per-game settings</string>
-    <string name="per_game_settings_aspect_ratio">Aspect ratio</string>
     <string name="per_game_settings_widescreen">Apply widescreen patch</string>
     <string name="per_game_settings_enable_cheats">Enable cheats</string>
     <string name="per_game_settings_no_interlacing">Disable interlacing</string>
