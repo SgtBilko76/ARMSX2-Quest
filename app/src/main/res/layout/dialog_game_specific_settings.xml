@@ -47,7 +47,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:layout_marginBottom="8dp"
-                android:text="@string/per_game_settings_aspect_ratio"
+                android:text="@string/settings_aspect_ratio"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textStyle="bold" />
 

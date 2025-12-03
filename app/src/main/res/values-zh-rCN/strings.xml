@@ -27,6 +27,7 @@
     <string name="controller_action_select">Select</string>
     <string name="controller_action_start">Start</string>
     <string name="settings_record_logs">记录日志</string>
+    <string name="settings_aspect_ratio">长宽比</string>
     <string name="settings_record_logs_summary">录制完整的 Android logcat（模拟器输出、崩溃、ADB）到您数据目录下的 ANDROID_LOG.txt 中。可能会降低性能。</string>
     <string name="settings_section_general">通用</string>
     <string name="settings_section_graphics">图形</string>
@@ -36,8 +37,8 @@
     <string name="settings_section_customization">个性化定制</string>
     <string name="settings_section_storage">存储与数据</string>
     <string name="settings_section_achievements">连接</string>
-    <string name="settings_on_screen_ui_style">屏幕 UI 风格</string>
-    <string name="dialog_on_screen_ui_style_title">屏幕 UI 风格</string>
+    <string name="settings_on_screen_ui_style">虚拟按键风格</string>
+    <string name="dialog_on_screen_ui_style_title">虚拟按键风格</string>
     <string name="on_screen_ui_style_default">默认</string>
     <string name="on_screen_ui_style_nether">Nether</string>
     <string name="onboarding_title">欢迎</string>
@@ -119,7 +120,7 @@
     <string name="drawer_action_import_textures">导入纹理</string>
     <string name="drawer_import_cheats_picker_title">选择金手指文件</string>
     <string name="drawer_import_textures_picker_title">选择纹理压缩包（.zip）</string>
-    <string name="drawer_ui_scale_label">屏幕 UI 比例</string>
+    <string name="drawer_ui_scale_label">虚拟按键比例</string>
     <string name="drawer_ui_scale_value">%1$.1f倍</string>
     <string name="drawer_toast_cheats_import_success">金手指已导入到 %1$s</string>
     <string name="drawer_toast_cheats_import_failed">无法导入金手指</string>
@@ -194,7 +195,6 @@
     <string name="cover_prefetch_no_connection">连接到互联网以下载封面。</string>
     <string name="action_save">保存</string>
     <string name="per_game_settings_enable_custom">启用单游戏设置</string>
-    <string name="per_game_settings_aspect_ratio">长宽比</string>
     <string name="per_game_settings_widescreen">应用宽屏补丁</string>
     <string name="per_game_settings_enable_cheats">启用金手指</string>
     <string name="per_game_settings_no_interlacing">禁用隔行扫描</string>
