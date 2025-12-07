@@ -36,9 +36,6 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: ⚙️ Setup of Gradle Wrapper
-        uses: gradle/actions/setup-gradle@v5
-
       # --- Build Phase ---
       - name: 🏗️ Running the Debug Build (only Nightly)
         run: ./gradlew assembleUnrestrictedDebug
@@ -78,7 +75,7 @@ jobs:
       - name: ⬆️ Upload artifact
         uses: actions/upload-artifact@v5
         with:
-          name: ${{ steps.rename_apk.outputs.APK_FILE_NIGHTLY }}
+          name: ${{ steps.package_info.outputs.PACKAGE_NAME }}
           path: ${{ steps.rename_apk.outputs.APK_FILE_NIGHTLY }}
 
       - name: 🚀 Create the Release on GitHub
