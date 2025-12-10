@@ -2231,11 +2231,7 @@ public class SettingsActivity extends AppCompatActivity {
 			return;
 		}
 		File dir = DataDirectoryManager.getDataRoot(getApplicationContext());
-		if (dir != null) {
-			tvDataDirPath.setText("Current location: " + dir.getAbsolutePath());
-		} else {
-			tvDataDirPath.setText("Current location: unavailable");
-		}
+        tvDataDirPath.setText(getString(R.string.onboarding_storage_status_default, dir.getAbsolutePath()));
 	}
 
 		private void openDataDirectoryInFilesApp() {

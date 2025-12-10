@@ -319,7 +319,7 @@
 				<TextView
 					android:layout_width="match_parent"
 					android:layout_height="wrap_content"
-					android:text="Aspect Ratio"
+					android:text="@string/settings_aspect_ratio"
 					android:paddingTop="12dp"/>
 				<Spinner
 					android:id="@+id/sp_aspect_ratio"
