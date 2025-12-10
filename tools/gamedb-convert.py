@@ -26,7 +26,7 @@ hwfix_list = ['autoFlush', 'cpuFramebufferConversion', 'readTCOnClose', 'disable
 ignore_keys = []
 ignore_list = ['GSC_IRem', 'GSC_SandGrainGames', 'GSC_Turok', 'recommendedBlendingLevel']
 gamefix_dict = {'SLES-54822': ['SoftwareRendererFMVHack'], 'SLUS-21327': ['SoftwareRendererFMVHack'], 'SLUS-21564': ['SoftwareRendererFMVHack'], 'SLES-51252': ['SoftwareRendererFMVHack'], 'SLPM-65212': ['SoftwareRendererFMVHack'], 'SLPM-67005': ['SoftwareRendererFMVHack'], 'SLPM-67546': ['SoftwareRendererFMVHack'], 'SLPS-29003': ['SoftwareRendererFMVHack'], 'SLPS-29004': ['SoftwareRendererFMVHack'], 'SLUS-20578': ['SoftwareRendererFMVHack']}
-hwfkey_dict = {'SCAJ-20095': ['disableDepthSupport', 1], 'SCAJ-20120': ['disableDepthSupport', 1], 'SLES-53458': ['disableDepthSupport', 1], 'SLES-54555': ['disableDepthSupport', 1], 'SLKA-25300': ['disableDepthSupport', 1], 'SLKA-25301': ['disableDepthSupport', 1], 'SLPM-65597': ['disableDepthSupport', 1], 'SLPM-65795': ['disableDepthSupport', 1], 'SLPM-66372': ['disableDepthSupport', 1], 'SLPM-66373': ['disableDepthSupport', 1], 'SLUS-20974': ['disableDepthSupport', 1], 'SLUS-21152': ['disableDepthSupport', 1], 'SLUS-28049': ['disableDepthSupport', 1], 'SLUS-28052': ['disableDepthSupport', 1]}
+hwfkey_dict = {}
 replace_dict = {'nativeScaling: 3': 'nativeScaling: 1', 'nativeScaling: 4': 'nativeScaling: 2', 'PlayStation2': 'PlayStation 2'}
 speedfix_dict = {'SLPM-60149': ['mvuFlag', 0], 'SLPS-25052': ['mvuFlag', 0], 'SLPS-73205': ['mvuFlag', 0], 'SLPS-73410': ['mvuFlag', 0], 'SLUS-20152': ['mvuFlag', 0]}
 

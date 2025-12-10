@@ -1579,9 +1579,11 @@ SCAJ-20052:
     - "SCAJ-20001"
 SCAJ-20055:
   name: "Battle Gear 3"
-  region: "NTSC-Unk"
+  region: "NTSC-J"
   clampModes:
     vuClampMode: 3 # Stops car from falling through track.
+  gsHWFixes:
+    textureInsideRT: 1 # Fixes broken splitscreen mode.
 SCAJ-20056:
   name: "Bujingai"
   region: "NTSC-Unk"
@@ -1823,7 +1825,6 @@ SCAJ-20095:
     - EETimingHack
   gsHWFixes:
     halfPixelOffset: 4 # Aligns shadows to prevent artefacts.
-    disableDepthSupport: 1
 SCAJ-20096:
   name: "Guilty Gear Isuka"
   region: "NTSC-Unk"
@@ -1987,8 +1988,6 @@ SCAJ-20120:
   region: "NTSC-Unk"
   gameFixes:
     - EETimingHack
-  gsHWFixes:
-    disableDepthSupport: 1
   memcardFilters:
     - "SCAJ-20120"
     - "SLPM-65795"
@@ -23136,7 +23135,6 @@ SLES-53458:
   compat: 5
   gsHWFixes:
     halfPixelOffset: 4 # Aligns shadows to prevent artefacts.
-    disableDepthSupport: 1
 SLES-53459:
   name: "Marc Ecko's Getting Up - Contents Under Pressure"
   region: "PAL-M5"
@@ -26772,8 +26770,6 @@ SLES-54554:
 SLES-54555:
   name: "Shin Megami Tensei - Digital Devil Saga 2"
   region: "PAL-E"
-  gsHWFixes:
-    disableDepthSupport: 1
   memcardFilters: # Reads data from DDS1.
     - "SLES-54555"
     - "SLES-53458"
@@ -28885,7 +28881,7 @@ SLES-55191:
     nativeScaling: 1 # Fixes post-processing smoothness and position.
     getSkipCount: "GSC_GuitarHero"
 SLES-55192:
-  name: "Steam Express"
+  name: "Nitrobike"
   region: "PAL-M5"
 SLES-55193:
   name: "Disney/Pixar WALL-E"
@@ -32190,7 +32186,6 @@ SLKA-25300:
     - EETimingHack
   gsHWFixes:
     halfPixelOffset: 4 # Aligns shadows to prevent artefacts.
-    disableDepthSupport: 1
 SLKA-25301:
   name: "디지털 데빌 사가: 아바탈 튜너 2"
   name-en: "Digital Devil Saga - Avatar Tuner 2"
@@ -32198,8 +32193,6 @@ SLKA-25301:
   compat: 5
   gameFixes:
     - EETimingHack
-  gsHWFixes:
-    disableDepthSupport: 1
   memcardFilters:
     - "SLKA-25301"
     - "SLKA-25300"
@@ -43132,6 +43125,8 @@ SLPM-65434:
   region: "NTSC-J"
   clampModes:
     vuClampMode: 3 # Stops car from falling through track.
+  gsHWFixes:
+    textureInsideRT: 1 # Fixes broken splitscreen mode.
 SLPM-65435:
   name: "北へ。～Diamond Dust～"
   name-sort: "きたへ Diamond Dust"
@@ -44045,7 +44040,6 @@ SLPM-65597:
     - EETimingHack
   gsHWFixes:
     halfPixelOffset: 4 # Aligns shadows to prevent artefacts.
-    disableDepthSupport: 1
 SLPM-65598:
   name: "転生學園 幻蒼録"
   name-sort: "てんしょうがくえん げんそうろく"
@@ -45210,8 +45204,6 @@ SLPM-65795:
   region: "NTSC-J"
   gameFixes:
     - EETimingHack
-  gsHWFixes:
-    disableDepthSupport: 1
   memcardFilters:
     - "SCAJ-20120"
     - "SLPM-65795"
@@ -48780,7 +48772,6 @@ SLPM-66372:
     - EETimingHack
   gsHWFixes:
     halfPixelOffset: 4 # Aligns shadows to prevent artefacts.
-    disableDepthSupport: 1
 SLPM-66373:
   name: "DIGITAL DEVIL SAGA ～アバタール・チューナー2～ [ATLUS BEST COLLECTION]"
   name-sort: "でじたるでびるさーが あばたーるちゅーなー2 [ATLUS BEST COLLECTION]"
@@ -48788,8 +48779,6 @@ SLPM-66373:
   region: "NTSC-J"
   gameFixes:
     - EETimingHack
-  gsHWFixes:
-    disableDepthSupport: 1
   memcardFilters:
     - "SCAJ-20120"
     - "SLPM-65795"
@@ -68424,7 +68413,6 @@ SLUS-20974:
   compat: 5
   gsHWFixes:
     halfPixelOffset: 4 # Aligns shadows to prevent artefacts.
-    disableDepthSupport: 1
 SLUS-20975:
   name: "One Piece - Grand Battle"
   region: "NTSC-U"
@@ -69499,8 +69487,6 @@ SLUS-21152:
   name: "Shin Megami Tensei - Digital Devil Saga 2"
   region: "NTSC-U"
   compat: 5
-  gsHWFixes:
-    disableDepthSupport: 1
   memcardFilters:
     - "SLUS-21152"
     - "SLUS-20974"
@@ -74378,7 +74364,6 @@ SLUS-28049:
   region: "NTSC-U"
   gsHWFixes:
     halfPixelOffset: 4 # Aligns shadows to prevent artefacts.
-    disableDepthSupport: 1
 SLUS-28050:
   name: "Stella Deus - The Gate of Eternity [Trade Demo]"
   region: "NTSC-U"
@@ -74388,8 +74373,6 @@ SLUS-28051:
 SLUS-28052:
   name: "Shin Megami Tensei - Digital Devil Saga 2 [Trade Demo]"
   region: "NTSC-U"
-  gsHWFixes:
-    disableDepthSupport: 1
 SLUS-28053:
   name: "Magna Carta [Trade Demo]"
   region: "NTSC-U"
