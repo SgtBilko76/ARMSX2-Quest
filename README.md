@@ -1,10 +1,11 @@
-![ARMSX2](app_icons/icon.png)
-
 <div align="center">
 
+![ARMSX2](app_icons/icon.png)
+
 # ARMSX2
+
 [![License](https://img.shields.io/github/license/ARMSX2/ARMSX2)](https://www.gnu.org/licenses/gpl-3.0.html)
-[![Discord](https://img.shields.io/discord/309643527816609793?logo=discord&logoColor=white&label=ARMSX2%20Discord&color=5865F2)](https://discord.gg/KwAChKDctz)
+[![Discord](https://img.shields.io/discord/914421153827794975?logo=discord&logoColor=white&label=ARMSX2%20Discord&color=5865F2)](https://discord.gg/KwAChKDctz)
 [![Patreon](https://img.shields.io/endpoint?url=https%3A%2F%2Fshieldsio-patreon.vercel.app%2Fapi%3Fusername%3DARMSX2&label=Patreon)](https://patreon.com/ARMSX2)
 [![Nightly Build](https://github.com/ARMSX2/ARMSX2/actions/workflows/android_nightly_build.yml/badge.svg)](https://github.com/ARMSX2/ARMSX2/actions/workflows/android_nightly_build.yml)
 
@@ -18,22 +19,28 @@ ARMSX2 began after years of there being no open source PS2 emulator for ARM syst
 
 ## System Requirements
 
-ARMSX2 supports any ARM capable device, including Android, iOS, Linux, and Windows platforms (eventually), should work as well). Please note that performance will also depend on your devices hardware capabilities, we have done our best to optimize for low end devices and will continue to do so.
+ARMSX2 supports any ARM capable device, including Android, iOS, Linux, and Windows platforms (eventually, should work as well). Please note that performance will also depend on your devices hardware capabilities, we have done our best to optimize for low end devices and will continue to do so.
 
 Please note that a BIOS dump from a legitimately-owned PS2 console is required to use the emulator.
 
-## Website 
-https://armsx2.net/
+## Website
+
+→ <https://armsx2.net/>
 
 Any other website is not affiliated with ARMSX2. 
 
-## Google Play Store
+## Download
+
 ARMSX2 is available on the Google Play Store once released. 
 
-## Affiliation 
+[<img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" height="80"/>](https://play.google.com/store/apps/details?id=come.nanodata.armsx2)
+
+## Affiliation
+
 We are NOT affiliated with ARM Holding LTD in any way shape or form. We chose the name ARMSX2 since it runs on ARM devices, and seek no commercial incentive from the emulator. The most we accept is voluntary donations. Thank you. 
 
-## Additional Credits 
+## Additional Credits
+
 [PCSX2](https://github.com/PCSX2/pcsx2) - ARMSX2 would not be possible without the legendary work from the PCSX2 team and their patience and understanding regarding this project!
 
 [PCSX2_ARM64](https://github.com/pontos2024/PCSX2_ARM64) - ARMSX2 originally started off as a fork of developer Pontos work. 
@@ -43,6 +50,7 @@ Thank you to [@fffathur](https://github.com/fffathur) and [@Vivimagic](https://g
 Thank you to developers [@tanosshi](https://github.com/tanosshi) [@jpolo1224](https://github.com/jpolo1224) [@MoonPower](https://github.com/momo-AUX1) for working on the ARMSX2 website!
 
 ## Roadmap
+
 Here's a roadmap of the things you can expect from ARMSX2 in the future:
 
 | Task | Priority |
@@ -56,6 +64,7 @@ Here's a roadmap of the things you can expect from ARMSX2 in the future:
 
 
 ## Why are there .js and .jsx files?
+
 Originally as a curious idea the react native screens were just an experiment i decided to keep they are extremely barebones and will either be finalized in a seperate branch (armsx2-rn) or removed altogether They do not affect performance as they are hidden by default and not executed. Any PR to them is welcome!
 
 ### To start developing with ARMSX2 RN do the following:
