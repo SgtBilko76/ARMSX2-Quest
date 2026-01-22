@@ -67,6 +67,8 @@ android {
             cmake {
                 def stlLib = enableRN ? "c++_shared" : "c++_static"
                 arguments "-DANDROID=true", "-DCMAKE_BUILD_TYPE=Release", "-DANDROID_STL=${stlLib}", "-DENABLE_RAINTEGRATION=ON"
+                // Toggle native Discord SDK wiring based on whether the partner SDK AAR is present.
+                arguments "-DUSE_DISCORD_SDK=${isDiscordSdkAvailable ? 'ON' : 'OFF'}"
                 if (isSwitchBuild) {
                     arguments "-DSWITCHBUILD=ON"
                     cFlags "-D__NINTENDO_SWITCH__"
