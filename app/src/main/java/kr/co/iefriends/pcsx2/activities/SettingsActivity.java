@@ -2036,6 +2036,7 @@ public class SettingsActivity extends AppCompatActivity {
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_general));
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_graphics));
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_performance));
+                sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_stats));
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_controller));
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_customization));
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_storage));
