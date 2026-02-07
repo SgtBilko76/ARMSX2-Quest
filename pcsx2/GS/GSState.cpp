@@ -3787,10 +3787,10 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 	struct SavedTristrip {
 		bool saved = false;
 		u32 skip;
-		GSVector4i bbox;
+		BoundingOct bbox;
 	} saved_tristrip;
 
-	GSVector4i all(INT_MAX, INT_MAX, -INT_MAX, -INT_MAX);
+	BoundingOct all;
 
 	while (i < count)
 	{
@@ -3798,7 +3798,7 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 
 		skip = 0;
 
-		GSVector4i bbox(INT_MAX, INT_MAX, -INT_MAX, -INT_MAX);
+		BoundingOct bbox;
 
 		while (j < count)
 		{
@@ -3826,7 +3826,7 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 
 			// Helper to detect triangles strips/fans (template 0 for strips, 1 for fans).
 			const auto CheckTriangleQuads = [v, index, count, TrianglesOverlap, GetPoint]
-				<int type>(u32 i, u32& skip, GSVector4i& bbox) -> bool {
+				<int type>(u32 i, u32& skip, BoundingOct& bbox) -> bool {
 
 				// Assuming that indices 0-5 represent two triangles:
 				// Triangle strips: indices 1, 2 are identical to indices 3, 4. Indices 0, 5 are different.
@@ -3855,9 +3855,9 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 				u32 j = i;
 
 				// Get the initial triangle bbox.
-				bbox = GetPoint(j + 0).xyxy();
-				bbox = bbox.runion(GetPoint(j + 1).xyxy());
-				bbox = bbox.runion(GetPoint(j + 2).xyxy());
+				bbox = BoundingOct::FromPoint(GetPoint(j + 0));
+				bbox = bbox.Union(GetPoint(j + 1));
+				bbox = bbox.Union(GetPoint(j + 2));
 
 				while (true)
 				{
@@ -3870,7 +3870,7 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 
 					// Corners are on opposite sides so we can assume a non-axis-aligned quad.
 					// Take union with the single unshared point.
-					bbox = bbox.runion(GetPoint(j + tri1[2]).xyxy());
+					bbox = bbox.Union(GetPoint(j + tri1[2]));
 					j += 3;
 
 					if (!(j + 6 <= count &&
@@ -3937,7 +3937,7 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 			// Helper function to detect triangles strips and merge them together into
 			// a grid of triangles strips.
 			const auto CheckTriangleStrips = [index, v, count, CheckTriangleQuads, MatchTriangles, GetPoint]
-				(u32 i, u32& skip, GSVector4i& bbox_all, SavedTristrip& saved_tristrip) -> bool {
+				(u32 i, u32& skip, BoundingOct& bbox_all, SavedTristrip& saved_tristrip) -> bool {
 
 				if (!(primclass == GS_TRIANGLE_CLASS && i + 6 <= count))
 				{
@@ -3951,7 +3951,7 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 				
 				bool all_small; // Whether all strips so far have 2 triangles only.
 				
-				u32 n_tristrips = 0; // Number of tristrips merged so far (not axis-aligned).
+				u32 n_tristrips = 0; // Number of tristrips merged so far.
 
 				// Used to make sure the tristrips are adjacent in the same direction so there's not overlap.
 				bool expected_sign;
@@ -3961,10 +3961,10 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 				GSVector4i start_pt;
 				GSVector4i max_delta(0, 0);
 
-				// Where the current tristrip is oriented in the same direction as the first.
+				// Whether the current tristrip is oriented in the same direction as the first.
 				bool orientation = true;
 
-				GSVector4i bbox; // BBox of current strip.
+				BoundingOct bbox; // BBox of current strip.
 
 				// Check for the first tristrip in the chain.
 				if (saved_tristrip.saved)
@@ -4070,7 +4070,7 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 
 					prev_tri0 = tri0;
 					prev_tri1 = tri1;
-					bbox_all = bbox_all.runion(bbox);
+					bbox_all = bbox_all.Union(bbox);
 					j += skip;
 					saved_tristrip.saved = false; // We consumed the new tristrip.
 					n_tristrips++;
@@ -4083,7 +4083,7 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 
 			// Helper functions to detect when two triangles form an axis-aligned quad.
 			const auto GetBBoxAxisAlignedTriangles = [v, index, count, GetPoint]
-				(u32 i, u32& skip, GSVector4i& bbox) -> bool {
+				(u32 i, u32& skip, BoundingOct& bbox) -> bool {
 
 				if (!(primclass == GS_TRIANGLE_CLASS && i + 6 <= count))
 				{
@@ -4101,19 +4101,27 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 				}
 
 				// tri.b is right angle corner
-				bbox = GetPoint(off0 + tri0.b).xyxy();
-				bbox = bbox.runion(GetPoint(off1 + tri1.b).xyxy());
+				const GSVector4i pt0 = GetPoint(off0 + tri0.b);
+				const GSVector4i pt1 = GetPoint(off1 + tri1.b);
+				bbox = BoundingOct::FromSprite(pt0, pt1);
 				skip = 6;
 
 				return true;
 			};
 
 			// Helper functions to just get the individual prim bbox.
-			const auto GetBBox = [v, count, GetPoint](u32 i, u32& skip, GSVector4i& bbox) -> bool {
-				bbox = GetPoint(i + 0).xyxy();
-				for (u32 j = 1; j < n; j++) // Unroll
+			const auto GetBBox = [v, count, GetPoint](u32 i, u32& skip, BoundingOct& bbox) -> bool {
+				if constexpr (primclass == GS_SPRITE_CLASS)
 				{
-					bbox = bbox.runion(GetPoint(i + j).xyxy());
+					bbox = BoundingOct::FromSprite(GetPoint(i + 0), GetPoint(i + 1));
+				}
+				else
+				{
+					bbox = BoundingOct::FromPoint(GetPoint(i + 0));
+					for (u32 j = 1; j < n; j++) // Unroll
+					{
+						bbox = bbox.Union(GetPoint(i + j));
+					}
 				}
 				skip = n;
 				return true;
@@ -4148,15 +4156,15 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 			}
 
 			// Avoid degenerate bbox.
-			bbox = bbox.blend(bbox + GSVector4i(0, 0, 1, 1), bbox.xyxy() == bbox.zwzw());
+			bbox = bbox.FixDegenerate();
 
-			if (all.rintersects(bbox))
+			if (all.Intersects(bbox))
 			{
 				overlap = PRIM_OVERLAP_YES;
 				break;
 			}
 
-			all = all.runion(bbox);
+			all = all.Union(bbox);
 			j += skip;
 			skip = 0;
 		}
@@ -4172,13 +4180,12 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 
 		if (save_bbox)
 		{
-			m_drawlist_bbox.push_back(ProcessBBox(all));
+			m_drawlist_bbox.push_back(ProcessBBox(all.ToBBox()));
 		}
 
 		all = bbox;
 		i = j;
 	}
-	Console.Warning("DRAWLIST %d: %d\n", s_n, (int)m_drawlist.size());
 	return overlap;
 }
 
