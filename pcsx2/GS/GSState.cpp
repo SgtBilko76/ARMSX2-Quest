@@ -6362,27 +6362,29 @@ void GSState::GSPCRTCRegs::CalculateFramebufferOffset(bool scanmask, GSRegDISPFB
 
 	if (GSConfig.PCRTCAntiBlur && PCRTCSameSrc && !scanmask && abs(fb1.y - fb0.y) <= 1)
 	{
-		if (framebuffer0Reg.DBY != PCRTCDisplays[0].prevFramebufferReg.DBY)
-		{
-			if (framebuffer1Reg.DBY == PCRTCDisplays[1].prevFramebufferReg.DBY)
-			{
-				const int offset = PCRTCDisplays[1].framebufferRect.y - PCRTCDisplays[0].framebufferRect.y;
+		const bool alternating_0 = framebuffer0Reg.DBY != PCRTCDisplays[0].prevFramebufferReg.DBY;
+		const bool alternating_1 = framebuffer1Reg.DBY != PCRTCDisplays[1].prevFramebufferReg.DBY;
 
-				if (std::abs(offset) <= 4)
-				{
-					PCRTCDisplays[0].framebufferRect.y += offset;
-					PCRTCDisplays[0].framebufferRect.w += offset;
-				}
-			}
-		}
-		else
+		if (alternating_0 && alternating_1)
 		{
-			const int offset = PCRTCDisplays[0].framebufferRect.y - PCRTCDisplays[1].framebufferRect.y;
+			const int index = (static_cast<u32>(PCRTCDisplays[1].framebufferRect.y) < static_cast<u32>(PCRTCDisplays[0].framebufferRect.y)) ? 0 : 1;
+			const int offset = PCRTCDisplays[1 - index].framebufferRect.y - PCRTCDisplays[index].framebufferRect.y;
 
 			if (std::abs(offset) <= 4)
 			{
-				PCRTCDisplays[1].framebufferRect.y += offset;
-				PCRTCDisplays[1].framebufferRect.w += offset;
+				PCRTCDisplays[index].framebufferRect.y += offset;
+				PCRTCDisplays[index].framebufferRect.w += offset;
+			}
+		}
+		else // Only one rect is alternating
+		{
+			const int index = alternating_1 ? 1 : 0;
+			const int offset = PCRTCDisplays[1 - index].framebufferRect.y - PCRTCDisplays[index].framebufferRect.y;
+
+			if (std::abs(offset) <= 4)
+			{
+				PCRTCDisplays[index].framebufferRect.y += offset;
+				PCRTCDisplays[index].framebufferRect.w += offset;
 			}
 		}
 	}
