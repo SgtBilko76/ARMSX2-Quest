@@ -45,6 +45,20 @@ jobs:
           git submodule sync -- "${SUBMODULE_PATHS[@]}"
           git -c protocol.version=2 submodule update --init --force --depth=1 --recursive -- "${SUBMODULE_PATHS[@]}"
 
+          # libadrenotools has its own nested submodule (lib/linkernsbypass).
+          # Initialize it explicitly because some Gitea runners skip nested updates.
+          if [ -f "app/src/main/cpp/3rdparty/libadrenotools/.gitmodules" ]; then
+            git -C app/src/main/cpp/3rdparty/libadrenotools submodule sync --recursive
+            git -C app/src/main/cpp/3rdparty/libadrenotools -c protocol.version=2 submodule update --init --force --depth=1 --recursive
+          fi
+
+          # Fallback for environments where nested submodule checkout is incomplete.
+          if [ ! -f "app/src/main/cpp/3rdparty/libadrenotools/lib/linkernsbypass/CMakeLists.txt" ]; then
+            echo "Nested submodule missing CMakeLists.txt, cloning fallback copy of liblinkernsbypass."
+            rm -rf app/src/main/cpp/3rdparty/libadrenotools/lib/linkernsbypass
+            git clone --depth=1 https://github.com/bylaws/liblinkernsbypass.git app/src/main/cpp/3rdparty/libadrenotools/lib/linkernsbypass
+          fi
+
       - name: Java and Android SDK Setup
         uses: actions/setup-java@v5
         with:
@@ -125,7 +139,7 @@ jobs:
           echo "APK renamed and saved in: $NEW_FILE_PATH"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ steps.package_info.outputs.PACKAGE_NAME }}
           path: ${{ steps.rename_apk.outputs.APK_FILE_NIGHTLY }}
@@ -148,7 +162,7 @@ jobs:
 
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v3
         with:
           name: ${{ needs.build.outputs.package_name }}
           path: artifact
