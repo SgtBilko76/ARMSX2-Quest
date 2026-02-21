@@ -132,6 +132,8 @@ Open it later from Settings → Open ARMSX2 directory.</string>
     <string name="settings_fxaa">FXAA</string>
     <string name="settings_graphics_advanced_heading">Advanced Rendering</string>
     <string name="settings_graphics_renderer">Renderer</string>
+    <string name="settings_gpu_profile_override">GPU Profile Override</string>
+    <string name="settings_gpu_profile_override_summary">Used only if automatic GPU/CPU detection is wrong. Applies after renderer reinitialization.</string>
     <string name="settings_texture_preloading">Texture Preloading</string>
     <string name="settings_acc_blending">Blending Accuracy</string>
     <string name="settings_anisotropic_filtering">Anisotropic Filtering</string>

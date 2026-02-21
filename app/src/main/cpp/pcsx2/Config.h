@@ -321,7 +321,7 @@ enum class BiFiltering : u8
 
 enum class TriFiltering : s8
 {
-	Automatic = -1,
+	Automatic,
 	Off,
 	PS2,
 	Forced,
@@ -855,6 +855,7 @@ struct Pcsx2Config
 
 		std::string Adapter;
 		std::string CustomDriverPath;
+		std::string AndroidGpuProfileOverride = "auto";
 		std::string HWDumpDirectory;
 		std::string SWDumpDirectory;
 

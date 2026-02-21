@@ -35,6 +35,7 @@ public:
 
 	struct OptionalExtensions
 	{
+		bool vk_khr_push_descriptor : 1;
 		bool vk_ext_provoking_vertex : 1;
 		bool vk_ext_memory_budget : 1;
 		bool vk_ext_calibrated_timestamps : 1;

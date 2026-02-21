@@ -43,6 +43,34 @@
                 android:layout_height="wrap_content" />
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="@string/settings_gpu_profile_override"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="16sp" />
+
+            <Spinner
+                android:id="@+id/sp_gpu_profile_override"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_gpu_profile_override_summary"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="12sp" />
+        </LinearLayout>
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_gpu_driver_manager"
             android:layout_width="match_parent"

@@ -638,33 +638,51 @@ bool GSDeviceOGL::CheckFeatures(bool& buggy_pbo)
 
 	const char* vendor = (const char*)glGetString(GL_VENDOR);
 	const char* renderer = (const char*)glGetString(GL_RENDERER);
+	const char* vendor_str = vendor ? vendor : "";
+	const char* renderer_str = renderer ? renderer : "";
 	
-	if (std::strstr(vendor, "Advanced Micro Devices") || std::strstr(vendor, "ATI Technologies Inc.") ||
-		std::strstr(vendor, "ATI"))
+	if (std::strstr(vendor_str, "Advanced Micro Devices") || std::strstr(vendor_str, "ATI Technologies Inc.") ||
+		std::strstr(vendor_str, "ATI"))
 	{
 		Console.WriteLn(Color_StrongRed, "GL: AMD GPU detected.");
 		//vendor_id_amd = true;
 	}
-	else if (std::strstr(vendor, "NVIDIA Corporation"))
+	else if (std::strstr(vendor_str, "NVIDIA Corporation"))
 	{
 		Console.WriteLn(Color_StrongGreen, "GL: NVIDIA GPU detected.");
 		vendor_id_nvidia = true;
 	}
-	else if (std::strstr(vendor, "Intel"))
+	else if (std::strstr(vendor_str, "Intel"))
 	{
 		Console.WriteLn(Color_StrongBlue, "GL: Intel GPU detected.");
 		//vendor_id_intel = true;
 	}
-	else if (std::strstr(vendor, "ARM") || std::strstr(renderer, "Mali"))
+	else if (std::strstr(vendor_str, "ARM") || std::strstr(renderer_str, "Mali"))
 	{
 		Console.WriteLn(Color_Yellow, "GL: ARM Mali GPU detected.");
 		vendor_id_mali = true;
 	}
-	else if (std::strstr(vendor, "Qualcomm") || std::strstr(renderer, "Adreno"))
+	else if (std::strstr(vendor_str, "Qualcomm") || std::strstr(renderer_str, "Adreno"))
 	{
 		Console.WriteLn(Color_Cyan, "GL: Qualcomm Adreno GPU detected.");
 		vendor_id_adreno = true;
 	}
+
+#if defined(__ANDROID__)
+	const GpuProfileSelection profile_selection =
+		GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride, vendor_str, renderer_str);
+	SetRuntimeGPUProfile(profile_selection.runtime_profile);
+	Console.WriteLn("GL: GPU profile override='%s' resolved='%s'.",
+		GpuProfileDetector::OverrideToConfigString(profile_selection.override_mode),
+		GpuProfileDetector::RuntimeProfileToString(profile_selection.runtime_profile));
+	DevCon.WriteLn("GL: GPU profile hints: %s", profile_selection.hints.c_str());
+	const bool use_mali_profile = IsMaliGPUProfile();
+	const bool use_adreno_profile = IsAdrenoGPUProfile();
+#else
+	SetRuntimeGPUProfile(vendor_id_mali ? RuntimeGpuProfile::Mali : RuntimeGpuProfile::Adreno);
+	const bool use_mali_profile = vendor_id_mali;
+	const bool use_adreno_profile = vendor_id_adreno;
+#endif
 
 	GLint major_gl = 0;
 	GLint minor_gl = 0;
@@ -759,7 +777,7 @@ bool GSDeviceOGL::CheckFeatures(bool& buggy_pbo)
 	m_features.broken_point_sampler = false;
 	m_features.primitive_id = true;
 
-	m_features.framebuffer_fetch = GLAD_GL_EXT_shader_framebuffer_fetch;
+	m_features.framebuffer_fetch = (GLAD_GL_ARM_shader_framebuffer_fetch || GLAD_GL_EXT_shader_framebuffer_fetch);
 	if (m_features.framebuffer_fetch && GSConfig.DisableFramebufferFetch)
 	{
 		Host::AddOSDMessage(
@@ -795,11 +813,13 @@ bool GSDeviceOGL::CheckFeatures(bool& buggy_pbo)
 		Console.Warning("GL: Disabling vertex shader expand due to broken NVIDIA driver.");
 
 	// Mali GPU optimizations for tile-based rendering architecture
-	if (vendor_id_mali)
+	if (use_mali_profile)
 	{
 		Console.WriteLn(Color_Yellow, "GL: Applying Mali-specific optimizations for tile-based rendering.");
 		// Enable early-Z and avoid unnecessary discard operations
 		m_features.prefer_new_textures = true;
+		m_features.framebuffer_fetch =
+			(m_features.framebuffer_fetch || GLAD_GL_EXT_shader_pixel_local_storage);
 		// Mali benefits from reduced texture barrier usage due to tile memory
 		if (GSConfig.OverrideTextureBarriers == -1) // If not explicitly set
 		{
@@ -809,7 +829,7 @@ bool GSDeviceOGL::CheckFeatures(bool& buggy_pbo)
 	}
 
 	// Adreno GPU optimizations for Qualcomm's architecture
-	if (vendor_id_adreno)
+	if (use_adreno_profile)
 	{
 		Console.WriteLn(Color_Cyan, "GL: Applying Adreno-specific optimizations for Qualcomm GPU.");
 		// Adreno benefits from reduced bandwidth and optimized memory patterns
@@ -1368,13 +1388,15 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
         if (GLAD_GL_ARB_blend_func_extended)
             header += "#extension GL_ARB_blend_func_extended : require\n";
 
-        if (m_features.framebuffer_fetch)
-        {
-            if (GLAD_GL_ARM_shader_framebuffer_fetch)
-                header += "#extension GL_ARM_shader_framebuffer_fetch : require\n";
-            else if (GLAD_GL_EXT_shader_framebuffer_fetch)
-                header += "#extension GL_EXT_shader_framebuffer_fetch : require\n";
-        }
+		if (m_features.framebuffer_fetch)
+		{
+			if (GLAD_GL_ARM_shader_framebuffer_fetch)
+				header += "#extension GL_ARM_shader_framebuffer_fetch : require\n";
+			else if (GLAD_GL_EXT_shader_framebuffer_fetch)
+				header += "#extension GL_EXT_shader_framebuffer_fetch : require\n";
+			else if (GLAD_GL_EXT_shader_pixel_local_storage)
+				header += "#extension GL_EXT_shader_pixel_local_storage : require\n";
+		}
 
         header += "precision highp float;\n";
         header += "precision highp int;\n";
@@ -1415,6 +1437,11 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 		header += "#define HAS_FRAMEBUFFER_FETCH 1\n";
 	else
 		header += "#define HAS_FRAMEBUFFER_FETCH 0\n";
+	header += fmt::format("#define HAS_EXT_SHADER_FRAMEBUFFER_FETCH {}\n", GLAD_GL_EXT_shader_framebuffer_fetch ? 1 : 0);
+	header += fmt::format("#define HAS_ARM_SHADER_FRAMEBUFFER_FETCH {}\n", GLAD_GL_ARM_shader_framebuffer_fetch ? 1 : 0);
+	header += fmt::format("#define HAS_EXT_SHADER_PIXEL_LOCAL_STORAGE {}\n", GLAD_GL_EXT_shader_pixel_local_storage ? 1 : 0);
+	header += fmt::format("#define GPU_PROFILE_MALI {}\n", IsMaliGPUProfile() ? 1 : 0);
+	header += fmt::format("#define GPU_PROFILE_ADRENO {}\n", IsAdrenoGPUProfile() ? 1 : 0);
 
     if (GLAD_GL_ARB_clip_control)
         header += "#define HAS_CLIP_CONTROL 1\n";

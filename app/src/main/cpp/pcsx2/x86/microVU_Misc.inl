@@ -721,7 +721,12 @@ void ADD_SS_TriAceHack(microVU& mVU, const xmm& to, const xmm& from)
 	do { \
 		mVUclamp3(mVU, to, t1, (isPS) ? 0xf : 0x8); \
 		mVUclamp3(mVU, from, t1, (isPS) ? 0xf : 0x8); \
-		opX(to.V4S(), to.V4S(), from.V4S()); \
+		if (isPS) { \
+			opX(to.V4S(), to.V4S(), from.V4S()); \
+		} else { \
+			opX(RQSCRATCH.S(), to.S(), from.S()); \
+			armAsm->Ins(to.V4S(), 0, RQSCRATCH.V4S(), 0); \
+		} \
 		mVUclamp4(mVU, to, t1, (isPS) ? 0xf : 0x8); \
 	} while (0)
 

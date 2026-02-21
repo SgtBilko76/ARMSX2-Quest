@@ -415,12 +415,15 @@ mVUop(mVU_EEXP)
 // sumXYZ(): PQ.x = x ^ 2 + y ^ 2 + z ^ 2
 static __fi void mVU_sumXYZ(mV, const xmm& PQ, const xmm& Fs)
 {
-//	xDP.PS(Fs, Fs, 0x71);
-//	xMOVSS(PQ, Fs);
+	// [x^2, y^2, z^2, w^2]
+	armAsm->Fmul(PQ.V4S(), Fs.V4S(), Fs.V4S());
 
-    armAsm->Fmul(PQ.V4S(), Fs.V4S(), Fs.V4S());
-    armAsm->Faddp(PQ.V4S(), PQ.V4S(), PQ.V4S());
-    armAsm->Faddp(PQ.S(), PQ.V2S());
+	// PQ.S[0] = x^2 + y^2
+	armAsm->Faddp(PQ.V2S(), PQ.V2S(), PQ.V2S());
+
+	// Add z^2 from lane 2.
+	armAsm->Dup(RQSCRATCH.V4S(), PQ.V4S(), 2);
+	armAsm->Fadd(PQ.S(), PQ.S(), RQSCRATCH.S());
 }
 
 mVUop(mVU_ELENG)

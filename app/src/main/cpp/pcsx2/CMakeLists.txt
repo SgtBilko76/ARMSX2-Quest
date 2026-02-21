@@ -510,6 +510,7 @@ set(pcsx2GSSources
 	GS/Renderers/Common/GSDevice.cpp
 	GS/Renderers/Common/GSDirtyRect.cpp
 	GS/Renderers/Common/GSFunctionMap.cpp
+	GS/Renderers/Common/GSGPUProfile.cpp
 	GS/Renderers/Common/GSRenderer.cpp
 	GS/Renderers/Common/GSTexture.cpp
 	GS/Renderers/Common/GSVertexTrace.cpp
@@ -551,6 +552,7 @@ set(pcsx2GSHeaders
 	GS/Renderers/Common/GSDirtyRect.h
 	GS/Renderers/Common/GSFastList.h
 	GS/Renderers/Common/GSFunctionMap.h
+	GS/Renderers/Common/GSGPUProfile.h
 	GS/Renderers/Common/GSRenderer.h
 	GS/Renderers/Common/GSTexture.h
 	GS/Renderers/Common/GSVertex.h

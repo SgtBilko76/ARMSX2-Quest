@@ -7,6 +7,7 @@
 #include "common/WindowInfo.h"
 #include "GS/GS.h"
 #include "GS/Renderers/Common/GSFastList.h"
+#include "GS/Renderers/Common/GSGPUProfile.h"
 #include "GS/Renderers/Common/GSTexture.h"
 #include "GS/Renderers/Vulkan/GSTextureVK.h"
 #include "GS/Renderers/Common/GSVertex.h"
@@ -832,6 +833,7 @@ public:
 protected:
 	std::string m_name = "Unknown";
 	FeatureSupport m_features;
+	RuntimeGpuProfile m_runtime_gpu_profile = RuntimeGpuProfile::Adreno;
 	u32 m_max_texture_size = 0;
 
 	struct
@@ -878,6 +880,7 @@ protected:
 	GSTexture* m_colclip_rt = nullptr; ///< Temp hw colclip texture
 
 	bool AcquireWindow(bool recreate_window);
+	__fi void SetRuntimeGPUProfile(RuntimeGpuProfile profile) { m_runtime_gpu_profile = profile; }
 
 	virtual GSTexture* CreateSurface(GSTexture::Type type, int width, int height, int levels, GSTexture::Format format) = 0;
 	GSTexture* FetchSurface(GSTexture::Type type, int width, int height, int levels, GSTexture::Format format, bool clear, bool prefer_unused_texture);
@@ -926,6 +929,9 @@ public:
 
 	__fi FeatureSupport Features() const { return m_features; }
 	__fi u32 GetMaxTextureSize() const { return m_max_texture_size; }
+	__fi RuntimeGpuProfile GetRuntimeGPUProfile() const { return m_runtime_gpu_profile; }
+	__fi bool IsMaliGPUProfile() const { return (m_runtime_gpu_profile == RuntimeGpuProfile::Mali); }
+	__fi bool IsAdrenoGPUProfile() const { return (m_runtime_gpu_profile == RuntimeGpuProfile::Adreno); }
 
 	__fi const WindowInfo& GetWindowInfo() const { return m_window_info; }
 	__fi s32 GetWindowWidth() const { return static_cast<s32>(m_window_info.surface_width); }

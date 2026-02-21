@@ -731,7 +731,7 @@ Pcsx2Config::GSOptions::GSOptions()
 	OsdShowFPS = true;
 	OsdShowVPS = true;
 	OsdShowCPU = true;
-	OsdShowGPU = true;
+	OsdShowGPU = false;
 	OsdShowResolution = true;
 	OsdShowGSStats = false;
 	OsdShowIndicators = true;
@@ -879,6 +879,7 @@ bool Pcsx2Config::GSOptions::OptionsAreEqual(const GSOptions& right) const
 
 		OpEqu(Adapter) &&
 		OpEqu(CustomDriverPath) &&
+		OpEqu(AndroidGpuProfileOverride) &&
 
 		OpEqu(HWDumpDirectory) &&
 		OpEqu(SWDumpDirectory));
@@ -1041,6 +1042,12 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitfieldEx(UserHacks_CPUCLUTRender, "UserHacks_CPUCLUTRender");
 	SettingsWrapIntEnumEx(UserHacks_GPUTargetCLUTMode, "UserHacks_GPUTargetCLUTMode");
 	SettingsWrapIntEnumEx(TriFilter, "TriFilter");
+	// Legacy configs can contain -1 for Automatic from older enum ordering.
+	if (static_cast<s8>(TriFilter) < static_cast<s8>(TriFiltering::Automatic) ||
+		static_cast<s8>(TriFilter) > static_cast<s8>(TriFiltering::Forced))
+	{
+		TriFilter = TriFiltering::Automatic;
+	}
 	SettingsWrapBitfieldEx(OverrideTextureBarriers, "OverrideTextureBarriers");
 
 	SettingsWrapBitfield(ShadeBoost_Brightness);
@@ -1068,6 +1075,13 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 
 	SettingsWrapEntry(Adapter);
 	SettingsWrapEntry(CustomDriverPath);
+	SettingsWrapEntry(AndroidGpuProfileOverride);
+	if (StringUtil::Strcasecmp(AndroidGpuProfileOverride.c_str(), "mali") == 0)
+		AndroidGpuProfileOverride = "mali";
+	else if (StringUtil::Strcasecmp(AndroidGpuProfileOverride.c_str(), "adreno") == 0)
+		AndroidGpuProfileOverride = "adreno";
+	else
+		AndroidGpuProfileOverride = "auto";
 	SettingsWrapEntry(HWDumpDirectory);
 	if (!HWDumpDirectory.empty() && !Path::IsAbsolute(HWDumpDirectory))
 		HWDumpDirectory = Path::Combine(EmuFolders::DataRoot, HWDumpDirectory);

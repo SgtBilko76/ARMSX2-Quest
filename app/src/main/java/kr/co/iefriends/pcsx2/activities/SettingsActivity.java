@@ -871,6 +871,48 @@ public class SettingsActivity extends AppCompatActivity {
 			@Override public void onNothingSelected(AdapterView<?> parent) {}
 		});
 
+		Spinner spGpuProfileOverride = findViewById(R.id.sp_gpu_profile_override);
+		if (spGpuProfileOverride != null) {
+			final boolean[] ignoreGpuProfileInit = new boolean[]{true};
+			ArrayAdapter<CharSequence> gpuProfileAdapter = ArrayAdapter.createFromResource(
+					this, R.array.gpu_profile_override, android.R.layout.simple_spinner_item);
+			gpuProfileAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+			spGpuProfileOverride.setAdapter(gpuProfileAdapter);
+			try {
+				String profile = NativeApp.getSetting("EmuCore/GS", "AndroidGpuProfileOverride", "string");
+				int selection = 0;
+				if ("mali".equalsIgnoreCase(profile)) {
+					selection = 1;
+				} else if ("adreno".equalsIgnoreCase(profile)) {
+					selection = 2;
+				}
+				spGpuProfileOverride.setSelection(selection, false);
+			} catch (Exception ignored) {}
+			spGpuProfileOverride.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+				@Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+					if (ignoreGpuProfileInit[0]) {
+						ignoreGpuProfileInit[0] = false;
+						return;
+					}
+
+					final String value;
+					switch (position) {
+						case 1:
+							value = "mali";
+							break;
+						case 2:
+							value = "adreno";
+							break;
+						default:
+							value = "auto";
+							break;
+					}
+					NativeApp.setSetting("EmuCore/GS", "AndroidGpuProfileOverride", "string", value);
+				}
+				@Override public void onNothingSelected(AdapterView<?> parent) {}
+			});
+		}
+
 		Slider sbUpscale = findViewById(R.id.sb_upscale);
 		TextView tvUpscale = findViewById(R.id.tv_upscale_value);
 		if (sbUpscale != null && tvUpscale != null) {
