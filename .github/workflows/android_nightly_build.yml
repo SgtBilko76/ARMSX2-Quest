@@ -29,7 +29,21 @@ jobs:
       - name: Checkout of code
         uses: actions/checkout@v5
         with:
-          submodules: recursive
+          submodules: false
+
+      - name: Init mapped submodules only (Gitea-safe)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t SUBMODULE_PATHS < <(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
+          if [ "${#SUBMODULE_PATHS[@]}" -eq 0 ]; then
+            echo "No mapped submodules found in .gitmodules"
+            exit 0
+          fi
+
+          git submodule sync -- "${SUBMODULE_PATHS[@]}"
+          git -c protocol.version=2 submodule update --init --force --depth=1 -- "${SUBMODULE_PATHS[@]}"
 
       - name: Java and Android SDK Setup
         uses: actions/setup-java@v5
