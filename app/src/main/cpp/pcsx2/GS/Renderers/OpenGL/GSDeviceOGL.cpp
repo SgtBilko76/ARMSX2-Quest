@@ -747,8 +747,11 @@ bool GSDeviceOGL::CheckFeatures(bool& buggy_pbo)
 	if (!GLAD_GL_ARB_texture_barrier)
 	{
 		glTextureBarrier = ReplaceGL::TextureBarrier;
-		Host::AddOSDMessage(
-			"GL_ARB_texture_barrier is not supported, blending will not be accurate.", Host::OSD_ERROR_DURATION);
+		if (!use_mali_profile)
+		{
+			Host::AddOSDMessage(
+				"GL_ARB_texture_barrier is not supported, blending will not be accurate.", Host::OSD_ERROR_DURATION);
+		}
 	}
 
 	if (!GLAD_GL_ARB_direct_state_access)
@@ -818,13 +821,16 @@ bool GSDeviceOGL::CheckFeatures(bool& buggy_pbo)
 		Console.WriteLn(Color_Yellow, "GL: Applying Mali-specific optimizations for tile-based rendering.");
 		// Enable early-Z and avoid unnecessary discard operations
 		m_features.prefer_new_textures = true;
-		m_features.framebuffer_fetch =
-			(m_features.framebuffer_fetch || GLAD_GL_EXT_shader_pixel_local_storage);
+		// Mali path is ARM-only; EXT/PLS fetch paths are intentionally disabled.
+		m_features.framebuffer_fetch = GLAD_GL_ARM_shader_framebuffer_fetch;
 		// Mali benefits from reduced texture barrier usage due to tile memory
 		if (GSConfig.OverrideTextureBarriers == -1) // If not explicitly set
 		{
 			m_features.texture_barrier = m_features.framebuffer_fetch;
-			Console.WriteLn("GL: Mali optimization - using framebuffer fetch over texture barriers when available.");
+			if (m_features.framebuffer_fetch)
+			{
+				Console.WriteLn("GL: Mali optimization - using ARM framebuffer fetch over texture barriers.");
+			}
 		}
 	}
 
@@ -841,6 +847,34 @@ bool GSDeviceOGL::CheckFeatures(bool& buggy_pbo)
 		}
 		// Reduce unnecessary state changes for Adreno's command processor
 		Console.WriteLn("GL: Adreno optimization - minimizing state changes for improved performance.");
+	}
+
+	const bool has_arm_fetch = GLAD_GL_ARM_shader_framebuffer_fetch;
+	const bool has_ext_fetch = GLAD_GL_EXT_shader_framebuffer_fetch;
+	const bool has_pls_fetch = GLAD_GL_EXT_shader_pixel_local_storage;
+	Console.WriteLn("GL: Framebuffer fetch extension caps: arm=%d ext=%d pls=%d.",
+		has_arm_fetch ? 1 : 0, has_ext_fetch ? 1 : 0, has_pls_fetch ? 1 : 0);
+
+	const char* active_profile_name = use_mali_profile ? "Mali" : (use_adreno_profile ? "Adreno" : "Generic");
+	const char* active_fetch_backend = "None";
+	if (m_features.framebuffer_fetch)
+	{
+		if (use_mali_profile)
+			active_fetch_backend = "ARM";
+		else if (has_ext_fetch || has_pls_fetch)
+			active_fetch_backend = "EXT/PLS";
+		else if (has_arm_fetch)
+			active_fetch_backend = "ARM";
+	}
+	Console.WriteLn("GL: Active framebuffer fetch backend (%s profile): %s.", active_profile_name, active_fetch_backend);
+
+	if (use_mali_profile && !has_arm_fetch)
+	{
+		Console.Warning("GL: Mali profile selected but ARM framebuffer fetch is unavailable; using non-fetch fallback.");
+	}
+	if (use_mali_profile && !GLAD_GL_ARB_texture_barrier && m_features.framebuffer_fetch)
+	{
+		Console.WriteLn("GL: Mali path active without GL_ARB_texture_barrier; using no-op texture barrier.");
 	}
 
 	if (GLAD_GL_ARB_shader_storage_buffer_object)
