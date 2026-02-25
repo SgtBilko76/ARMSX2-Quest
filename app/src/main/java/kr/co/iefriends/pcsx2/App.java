@@ -25,6 +25,7 @@ import android.app.Activity;
 import android.app.Application;
 import android.os.Bundle;
 import android.content.Context;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.NonNull;
 
@@ -34,9 +35,14 @@ import kr.co.iefriends.pcsx2.utils.DiscordBridge;
 
 public class App extends Application {
     private static Context appContext;
+    private static final AtomicBoolean sBootSplashPlayed = new AtomicBoolean(false);
 
     public static Context getContext() {
         return appContext;
+    }
+
+    public static boolean consumeBootSplashPlayToken() {
+        return sBootSplashPlayed.compareAndSet(false, true);
     }
 
     @Override

@@ -213,9 +213,14 @@ public class MainActivity extends AppCompatActivity {
     private boolean storagePromptShown = false;
     private String pendingChdCachePath;
     private String pendingChdDisplayName;
+    private Uri pendingChdSourceUri;
+    private String pendingChdSourceSerial;
+    private String pendingChdSourceTitle;
     private AlertDialog dataDirProgressDialog;
     private static final String PREFS = "armsx2";
     private static final String PREF_GAMES_URI = "games_folder_uri";
+    private static final String PREF_CHD_SERIAL_PREFIX = "chd_serial:";
+    private static final String PREF_CHD_TITLE_PREFIX = "chd_title:";
     private static final String PREF_ONBOARDING_COMPLETE = "onboarding_complete";
     private static final String PREF_ONSCREEN_UI_STYLE = "on_screen_ui_style";
     private static final String PREF_UI_SCALE_MULTIPLIER = "onscreen_ui_scale_multiplier";
@@ -252,6 +257,10 @@ public class MainActivity extends AppCompatActivity {
     private final SparseIntArray analogStates = new SparseIntArray();
     private boolean hatUp, hatDown, hatLeft, hatRight;
     private boolean disableTouchControls;
+
+    public static final String EXTRA_SETTINGS_LAYOUT_CHANGED = "SET_LAYOUT_CHANGED";
+    public static final String EXTRA_SETTINGS_GPU_PROFILE_OVERRIDE = "SET_GPU_PROFILE_OVERRIDE";
+    public static final String EXTRA_SETTINGS_GPU_PROFILE_PERSISTED = "SET_GPU_PROFILE_PERSISTED";
     
     private int currentControllerMode = 0; // 0=2 Sticks, 1=1 Stick+Face, 2=D-Pad Only
 
@@ -318,6 +327,72 @@ public class MainActivity extends AppCompatActivity {
             return null;
         }
         return dir;
+    }
+
+    @Nullable
+    private static String stripFileExtension(@Nullable String name) {
+        if (TextUtils.isEmpty(name)) {
+            return name;
+        }
+        int dot = name.lastIndexOf('.');
+        return dot > 0 ? name.substring(0, dot) : name;
+    }
+
+    private static String makeChdMetadataKey(@NonNull String prefix, @NonNull Uri uri) {
+        return prefix + uri.toString();
+    }
+
+    private void persistChdMetadata(@Nullable Uri uri, @Nullable String serial, @Nullable String title) {
+        if (uri == null) {
+            return;
+        }
+        android.content.SharedPreferences.Editor editor = getSharedPreferences(PREFS, MODE_PRIVATE).edit();
+        String serialValue = TextUtils.isEmpty(serial) ? null : serial.trim();
+        String titleValue = TextUtils.isEmpty(title) ? null : title.trim();
+        String serialKey = makeChdMetadataKey(PREF_CHD_SERIAL_PREFIX, uri);
+        String titleKey = makeChdMetadataKey(PREF_CHD_TITLE_PREFIX, uri);
+        if (TextUtils.isEmpty(serialValue)) {
+            editor.remove(serialKey);
+        } else {
+            editor.putString(serialKey, serialValue);
+        }
+        if (TextUtils.isEmpty(titleValue)) {
+            editor.remove(titleKey);
+        } else {
+            editor.putString(titleKey, titleValue);
+        }
+        editor.apply();
+    }
+
+    @Nullable
+    private static Pair<String, String> getPersistedChdMetadata(@Nullable Context ctx, @Nullable Uri uri) {
+        if (ctx == null || uri == null) {
+            return null;
+        }
+        Context appCtx = ctx.getApplicationContext() != null ? ctx.getApplicationContext() : ctx;
+        android.content.SharedPreferences prefs = appCtx.getSharedPreferences(PREFS, MODE_PRIVATE);
+        String serial = prefs.getString(makeChdMetadataKey(PREF_CHD_SERIAL_PREFIX, uri), null);
+        String title = prefs.getString(makeChdMetadataKey(PREF_CHD_TITLE_PREFIX, uri), null);
+        if (TextUtils.isEmpty(serial) && TextUtils.isEmpty(title)) {
+            return null;
+        }
+        return new Pair<>(serial, title);
+    }
+
+    private static boolean isChdEntry(@Nullable Uri uri, @Nullable String title) {
+        String lowerTitle = title != null ? title.toLowerCase(Locale.US) : "";
+        if (lowerTitle.endsWith(".chd")) {
+            return true;
+        }
+        if (uri == null) {
+            return false;
+        }
+        String last = uri.getLastPathSegment();
+        if (last != null && last.toLowerCase(Locale.US).endsWith(".chd")) {
+            return true;
+        }
+        String uriString = uri.toString().toLowerCase(Locale.US);
+        return uriString.endsWith(".chd") || uriString.contains(".chd?");
     }
 
     @Override
@@ -830,6 +905,18 @@ public class MainActivity extends AppCompatActivity {
                 continue;
             }
             try {
+                if (isChdEntry(ge.uri, ge.title)) {
+                    Pair<String, String> cached = getPersistedChdMetadata(this, ge.uri);
+                    if (cached != null) {
+                        if (TextUtils.isEmpty(ge.serial) && !TextUtils.isEmpty(cached.first)) {
+                            ge.serial = cached.first;
+                        }
+                        if (TextUtils.isEmpty(ge.gameTitle) && !TextUtils.isEmpty(cached.second)) {
+                            ge.gameTitle = cached.second;
+                        }
+                    }
+                    continue;
+                }
                 boolean needsSerial = TextUtils.isEmpty(ge.serial);
                 boolean needsTitle = TextUtils.isEmpty(ge.gameTitle);
                 if (!needsSerial && !needsTitle) {
@@ -925,12 +1012,21 @@ public class MainActivity extends AppCompatActivity {
         String b0 = base.trim();
         if (!b0.isEmpty()) set.add(b0);
         String b1 = b0.replace('_', ' ').trim(); if (!b1.isEmpty()) set.add(b1);
+        String b1Sanitized = b1
+                .replaceAll("\\[[^\\]]*\\]", " ")
+                .replaceAll("\\([^\\)]*\\)", " ")
+                .replaceAll("\\{[^\\}]*\\}", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        if (!b1Sanitized.isEmpty()) set.add(b1Sanitized);
         String b2 = b1.replace(":", " - ").replaceAll("\\s+", " ").trim(); if (!b2.isEmpty()) set.add(b2);
         try {
             String b3 = b1.replaceAll("(?i)(?<=\\w) \\–|\\u2014| - (?=\\w)", ": ");
             b3 = b3.replace(" - ", ": ");
             b3 = b3.replaceAll("\\s+", " ").trim();
             if (!b3.isEmpty()) set.add(b3);
+            String b4 = b1Sanitized.replace(" - ", ": ").replaceAll("\\s+", " ").trim();
+            if (!b4.isEmpty()) set.add(b4);
         } catch (Throwable ignored) {}
         return new ArrayList<>(set);
     }
@@ -1188,6 +1284,12 @@ public class MainActivity extends AppCompatActivity {
                 pendingChdCachePath = null;
                 String displayName = pendingChdDisplayName;
                 pendingChdDisplayName = null;
+                Uri sourceUri = pendingChdSourceUri;
+                pendingChdSourceUri = null;
+                String sourceSerial = pendingChdSourceSerial;
+                pendingChdSourceSerial = null;
+                String sourceTitle = pendingChdSourceTitle;
+                pendingChdSourceTitle = null;
 
                 if (!chdFile.exists()) {
                     android.util.Log.e("ARMSX2_CHD", "Pending CHD file missing from cache: " + cachePath);
@@ -1200,6 +1302,11 @@ public class MainActivity extends AppCompatActivity {
                     android.util.Log.d("ARMSX2_CHD", "User selected destination URI: " + destinationUri);
                     boolean saved = saveChdToUri(chdFile, destinationUri);
                     if (saved) {
+                        String destinationDisplayName = queryOpenableDisplayName(destinationUri);
+                        String persistedTitle = !TextUtils.isEmpty(sourceTitle) ? sourceTitle : stripFileExtension(destinationDisplayName);
+                        persistChdMetadata(destinationUri, sourceSerial, persistedTitle);
+                        carryCoverAssociationAfterChdSave(
+                                sourceUri, destinationUri, displayName, destinationDisplayName, sourceSerial, persistedTitle);
                         if (!chdFile.delete()) {
                             android.util.Log.w("ARMSX2_CHD", "Failed to delete cached CHD after saving: " + cachePath);
                         } else {
@@ -1214,6 +1321,77 @@ public class MainActivity extends AppCompatActivity {
                     showConversionResult(false, "Save cancelled. The converted CHD remains in the app cache:\n" + cachePath);
                 }
             });
+
+    private void carryCoverAssociationAfterChdSave(@Nullable Uri sourceUri,
+                                                   @Nullable Uri destinationUri,
+                                                   @Nullable String sourceDisplayName,
+                                                   @Nullable String destinationDisplayName,
+                                                   @Nullable String sourceSerial,
+                                                   @Nullable String sourceTitle) {
+        if (sourceUri == null || destinationUri == null) {
+            return;
+        }
+
+        String srcName = !TextUtils.isEmpty(sourceDisplayName) ? sourceDisplayName : sourceUri.getLastPathSegment();
+        String dstName = !TextUtils.isEmpty(destinationDisplayName) ? destinationDisplayName : destinationUri.getLastPathSegment();
+        if (TextUtils.isEmpty(srcName)) srcName = "source.iso";
+        if (TextUtils.isEmpty(dstName)) dstName = "destination.chd";
+
+        GameEntry sourceEntry = new GameEntry(srcName, sourceUri);
+        sourceEntry.serial = sourceSerial;
+        sourceEntry.gameTitle = sourceTitle;
+
+        GameEntry destinationEntry = new GameEntry(dstName, destinationUri);
+        destinationEntry.serial = sourceSerial;
+        destinationEntry.gameTitle = sourceTitle;
+
+        String sourceGameKey = gameKeyFromEntry(sourceEntry);
+        String destinationGameKey = gameKeyFromEntry(destinationEntry);
+        if (!TextUtils.isEmpty(sourceGameKey) && !TextUtils.isEmpty(destinationGameKey)
+                && !sourceGameKey.equals(destinationGameKey)) {
+            String manualCoverUri = getManualCoverUri(sourceGameKey);
+            if (!TextUtils.isEmpty(manualCoverUri)) {
+                setManualCoverUri(destinationGameKey, manualCoverUri);
+            }
+        }
+
+        copyCachedCoverBetweenEntries(sourceEntry, destinationEntry);
+    }
+
+    private void copyCachedCoverBetweenEntries(@NonNull GameEntry sourceEntry, @NonNull GameEntry destinationEntry) {
+        File coversDir = getCoversCacheDir();
+        if (coversDir == null) {
+            return;
+        }
+        String sourceBase = computeCoverBaseName(sourceEntry);
+        String destinationBase = computeCoverBaseName(destinationEntry);
+        if (TextUtils.isEmpty(sourceBase) || TextUtils.isEmpty(destinationBase) || sourceBase.equals(destinationBase)) {
+            return;
+        }
+
+        File sourceCover = findExistingCoverFile(coversDir, sourceBase);
+        if (sourceCover == null || !sourceCover.isFile() || sourceCover.length() <= 0L) {
+            return;
+        }
+        if (findExistingCoverFile(coversDir, destinationBase) != null) {
+            return;
+        }
+
+        String sourceName = sourceCover.getName();
+        int extIndex = sourceName.lastIndexOf('.');
+        String ext = extIndex >= 0 ? sourceName.substring(extIndex) : ".jpg";
+        File destinationCover = new File(coversDir, destinationBase + ext);
+        try (FileInputStream in = new FileInputStream(sourceCover);
+             FileOutputStream out = new FileOutputStream(destinationCover)) {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                out.write(buffer, 0, read);
+            }
+            out.flush();
+            GamesAdapter.registerCachedCover(destinationEntry, destinationCover);
+        } catch (IOException ignored) {}
+    }
 
     private void showGameOptionsDialog(GameEntry e) {
         if (e == null) return;
@@ -1706,12 +1884,21 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void applyFullscreen() {
-        boolean fullscreen = !isHomeVisible();
+        boolean emulationVisible = !isHomeVisible();
+        boolean fullscreen = emulationVisible || isFullscreenUiModeEnabled();
+        applyDisplayCutoutMode(emulationVisible);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), !fullscreen);
         View decorView = getWindow().getDecorView();
+        applyLegacyImmersiveFlags(decorView, fullscreen);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setNavigationBarContrastEnforced(false);
+            getWindow().setStatusBarContrastEnforced(false);
+        }
+
         WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(getWindow(), decorView);
         if (fullscreen) {
-            controller.hide(WindowInsetsCompat.Type.statusBars() | WindowInsetsCompat.Type.navigationBars());
+            controller.hide(WindowInsetsCompat.Type.systemBars());
             controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
             decorView.setOnTouchListener((v, e) -> {
                 if (disableTouchControls) return false;
@@ -1727,10 +1914,67 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             });
         } else {
-            controller.show(WindowInsetsCompat.Type.statusBars() | WindowInsetsCompat.Type.navigationBars());
+            controller.show(WindowInsetsCompat.Type.systemBars());
             controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_DEFAULT);
             decorView.setOnTouchListener(null);
         }
+    }
+
+    private boolean isFullscreenUiModeEnabled() {
+        try {
+            String value = NativeApp.getSetting("UI", "EnableFullscreenUI", "bool");
+            if (!TextUtils.isEmpty(value)) {
+                return "true".equalsIgnoreCase(value);
+            }
+        } catch (Exception ignored) {}
+        try {
+            return NativeApp.isFullscreenUIEnabled();
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private void applyDisplayCutoutMode(boolean emulationVisible) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            return;
+        }
+
+        final WindowManager.LayoutParams attrs = getWindow().getAttributes();
+        final int targetMode;
+        if (!emulationVisible) {
+            targetMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;
+        } else if (isDisplayCutoutExpansionEnabled()) {
+            targetMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        } else {
+            targetMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER;
+        }
+
+        if (attrs.layoutInDisplayCutoutMode != targetMode) {
+            attrs.layoutInDisplayCutoutMode = targetMode;
+            getWindow().setAttributes(attrs);
+        }
+    }
+
+    private boolean isDisplayCutoutExpansionEnabled() {
+        try {
+            String value = NativeApp.getSetting("UI", "ExpandIntoDisplayCutout", "bool");
+            return "true".equalsIgnoreCase(value);
+        } catch (Exception ignored) {
+            return true;
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private static void applyLegacyImmersiveFlags(View decorView, boolean fullscreen) {
+        int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
+        if (fullscreen) {
+            flags |= View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+        }
+        decorView.setSystemUiVisibility(flags);
     }
 
     public void onSurfaceReady() {
@@ -2011,7 +2255,7 @@ public class MainActivity extends AppCompatActivity {
         if (btnSettingsDrawer != null) {
             btnSettingsDrawer.setOnClickListener(v -> {
                 closeInGameDrawer();
-                startActivity(new Intent(this, SettingsActivity.class));
+                startActivityForResult(new Intent(this, SettingsActivity.class), 7722);
             });
         }
 
@@ -3498,6 +3742,27 @@ public class MainActivity extends AppCompatActivity {
                     applyRendererSelection(r);
                 }
             }
+            if (data.getBooleanExtra(EXTRA_SETTINGS_LAYOUT_CHANGED, false)) {
+                applyFullscreen();
+            }
+            if (data.hasExtra(EXTRA_SETTINGS_GPU_PROFILE_OVERRIDE)) {
+                String selected = data.getStringExtra(EXTRA_SETTINGS_GPU_PROFILE_OVERRIDE);
+                boolean persisted = data.getBooleanExtra(EXTRA_SETTINGS_GPU_PROFILE_PERSISTED, true);
+                if (!TextUtils.isEmpty(selected) && !persisted) {
+                    boolean recovered = false;
+                    try {
+                        NativeApp.setSetting("EmuCore/GS", "AndroidGpuProfileOverride", "string", selected);
+                        String verify = NativeApp.getSetting("EmuCore/GS", "AndroidGpuProfileOverride", "string");
+                        recovered = selected.equalsIgnoreCase(verify);
+                    } catch (Throwable ignored) {}
+                    int msg = recovered
+                            ? R.string.settings_gpu_profile_persist_recovered
+                            : R.string.settings_gpu_profile_persist_failed;
+                    try { Toast.makeText(this, msg, Toast.LENGTH_LONG).show(); } catch (Throwable ignored) {}
+                } else if (!TextUtils.isEmpty(selected)) {
+                    try { Toast.makeText(this, R.string.settings_gpu_profile_saved_hint, Toast.LENGTH_SHORT).show(); } catch (Throwable ignored) {}
+                }
+            }
         }
         if (requestCode == 9911 && resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
             Uri uri = data.getData();
@@ -4273,8 +4538,19 @@ public class MainActivity extends AppCompatActivity {
             String outputPath = null;
             String resultMessage = null;
             boolean success = false;
+            String sourceTitle = stripFileExtension(isoDisplayName);
+            if (TextUtils.isEmpty(sourceTitle) && isoUri != null) {
+                sourceTitle = stripFileExtension(isoUri.getLastPathSegment());
+            }
+            String sourceSerial = GameScanner.parseSerialFromString(sourceTitle);
 
             try {
+                if (TextUtils.isEmpty(sourceSerial)) {
+                    try {
+                        sourceSerial = GameScanner.tryExtractIsoSerial(getContentResolver(), isoUri);
+                    } catch (Throwable ignored) {}
+                }
+
                 // Get real file path from URI
                 android.util.Log.i("ARMSX2_CHD", "Starting ISO to CHD conversion for: " + isoDisplayName);
                 android.util.Log.i("ARMSX2_CHD", "Input URI: " + isoUri.toString());
@@ -4308,8 +4584,11 @@ public class MainActivity extends AppCompatActivity {
                 if (success) {
                     final String chdCachePath = outputPath;
                     final String chdDisplayName = isoDisplayName;
+                    final String finalSourceSerial = sourceSerial;
+                    final String finalSourceTitle = sourceTitle;
                     android.util.Log.i("ARMSX2_CHD", "Conversion succeeded. Prompting user to choose CHD save location.");
-                    runOnUiThread(() -> promptForChdSave(chdCachePath, chdDisplayName));
+                    runOnUiThread(() -> promptForChdSave(
+                            chdCachePath, chdDisplayName, isoUri, finalSourceSerial, finalSourceTitle));
                     resultMessage = null;
                 } else {
                     resultMessage = getErrorMessage(result) + "\n\nInput: " + inputPath + "\nOutput: " + outputPath;
@@ -4391,7 +4670,11 @@ public class MainActivity extends AppCompatActivity {
         return null;
     }
 
-    private void promptForChdSave(String chdCachePath, String displayName) {
+    private void promptForChdSave(String chdCachePath,
+                                  String displayName,
+                                  @Nullable Uri sourceUri,
+                                  @Nullable String sourceSerial,
+                                  @Nullable String sourceTitle) {
         File chdFile = new File(chdCachePath);
         if (!chdFile.exists()) {
             android.util.Log.e("ARMSX2_CHD", "CHD file missing in cache, cannot prompt for save: " + chdCachePath);
@@ -4401,6 +4684,9 @@ public class MainActivity extends AppCompatActivity {
 
         pendingChdCachePath = chdCachePath;
         pendingChdDisplayName = displayName;
+        pendingChdSourceUri = sourceUri;
+        pendingChdSourceSerial = sourceSerial;
+        pendingChdSourceTitle = sourceTitle;
 
         String baseName = displayName;
         if (baseName == null || baseName.trim().isEmpty()) {
@@ -5118,6 +5404,21 @@ public class MainActivity extends AppCompatActivity {
                 String rootId = android.provider.DocumentsContract.getTreeDocumentId(treeUri);
                 scanChildren(cr, treeUri, rootId, out, 0, 3);
             } catch (Exception ignored) {}
+            for (GameEntry e : out) {
+                if (e == null || !isChdEntry(e.uri, e.title)) {
+                    continue;
+                }
+                Pair<String, String> metadata = getPersistedChdMetadata(ctx, e.uri);
+                if (metadata == null) {
+                    continue;
+                }
+                if (TextUtils.isEmpty(e.serial) && !TextUtils.isEmpty(metadata.first)) {
+                    e.serial = metadata.first;
+                }
+                if (TextUtils.isEmpty(e.gameTitle) && !TextUtils.isEmpty(metadata.second)) {
+                    e.gameTitle = metadata.second;
+                }
+            }
             return out;
         }
 

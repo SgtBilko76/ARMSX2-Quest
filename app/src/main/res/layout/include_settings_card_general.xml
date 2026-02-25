@@ -31,6 +31,28 @@
             android:text="Fullscreen UI"
             app:useMaterialThemeColors="true" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:orientation="vertical">
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/sw_expand_cutout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_expand_cutout"
+                app:useMaterialThemeColors="true" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/settings_expand_cutout_summary"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="14sp" />
+        </LinearLayout>
+
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/sw_frame_limiter"
             android:layout_width="match_parent"

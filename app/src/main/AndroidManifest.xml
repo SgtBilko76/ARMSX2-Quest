@@ -59,17 +59,25 @@
         <meta-data android:name="android.max_aspect" android:value="2.4" />
 
         <activity
-            android:name=".activities.MainActivity"
-            android:screenOrientation="unspecified"
-            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize"
+            android:name=".activities.BootSplashActivity"
             android:exported="true"
-            android:launchMode="singleTop">
+            android:launchMode="singleTop"
+            android:screenOrientation="unspecified"
+            android:theme="@style/Theme.PCSX2.Boot"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.GAME" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".activities.MainActivity"
+            android:screenOrientation="unspecified"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize"
+            android:exported="true"
+            android:launchMode="singleTop" />
         <!-- Cheap but should work-->
         <activity-alias
             android:name=".MainActivity"

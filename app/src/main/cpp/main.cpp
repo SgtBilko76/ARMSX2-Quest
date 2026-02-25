@@ -300,6 +300,7 @@ Java_kr_co_iefriends_pcsx2_NativeApp_initialize(JNIEnv *env, jclass clazz,
             s_settings_interface->SetBoolValue("EmuCore/GS", "OsdShowGSStats", false);
             s_settings_interface->SetIntValue("EmuCore/GS", "OsdPerformancePos", 0); 
             s_settings_interface->SetBoolValue("UI", "EnableFullscreenUI", false);
+            s_settings_interface->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
             s_settings_interface->SetBoolValue("Achievements", "Enabled", false);
             s_settings_interface->SetBoolValue("Achievements", "ChallengeMode", false);
             s_settings_interface->SetBoolValue("Achievements", "AndroidMigrationV1", true);
@@ -318,6 +319,11 @@ Java_kr_co_iefriends_pcsx2_NativeApp_initialize(JNIEnv *env, jclass clazz,
             if (!s_settings_interface->ContainsValue("Achievements", "ChallengeMode"))
             {
                 s_settings_interface->SetBoolValue("Achievements", "ChallengeMode", false);
+                needs_save = true;
+            }
+            if (!s_settings_interface->ContainsValue("UI", "ExpandIntoDisplayCutout"))
+            {
+                s_settings_interface->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
                 needs_save = true;
             }
             if (needs_save)
@@ -377,6 +383,7 @@ Java_kr_co_iefriends_pcsx2_NativeApp_reloadDataRoot(JNIEnv* env, jclass, jstring
         s_settings_interface->SetBoolValue("EmuCore/GS", "OsdShowGSStats", false);
         s_settings_interface->SetIntValue("EmuCore/GS", "OsdPerformancePos", 0);
         s_settings_interface->SetBoolValue("UI", "EnableFullscreenUI", false);
+        s_settings_interface->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
         s_settings_interface->SetBoolValue("Achievements", "Enabled", false);
         s_settings_interface->SetBoolValue("Achievements", "ChallengeMode", false);
         s_settings_interface->SetBoolValue("Achievements", "AndroidMigrationV1", true);
@@ -395,6 +402,11 @@ Java_kr_co_iefriends_pcsx2_NativeApp_reloadDataRoot(JNIEnv* env, jclass, jstring
         if (!s_settings_interface->ContainsValue("Achievements", "ChallengeMode"))
         {
             s_settings_interface->SetBoolValue("Achievements", "ChallengeMode", false);
+            needs_save = true;
+        }
+        if (!s_settings_interface->ContainsValue("UI", "ExpandIntoDisplayCutout"))
+        {
+            s_settings_interface->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
             needs_save = true;
         }
         if (needs_save)

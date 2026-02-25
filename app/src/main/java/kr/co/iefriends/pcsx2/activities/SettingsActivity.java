@@ -91,6 +91,7 @@ public class SettingsActivity extends AppCompatActivity {
 	private static final int SECTION_CUSTOMIZATION = 5;
 	private static final int SECTION_STORAGE = 6;
 	private static final int SECTION_ACHIEVEMENTS = 7;
+	private static final String PREF_GPU_PROFILE_OVERRIDE_FALLBACK = "gpu_profile_override_fallback";
 	private static final String STATE_SELECTED_SECTION = "settings_selected_section";
 	private static final String EXTRA_SHOW_ADVANCED = "android.provider.extra.SHOW_ADVANCED";
 	private static final String ACTION_BROWSE_DOCUMENT_ROOT = "android.provider.action.BROWSE_DOCUMENT_ROOT";
@@ -103,6 +104,7 @@ public class SettingsActivity extends AppCompatActivity {
     private TabLayout sectionTabs;
     private int currentSection = SECTION_GENERAL;
     private boolean suppressNavigationCallbacks;
+	private final Intent pendingSettingsResult = new Intent();
     private TextView tvDiscordStatus;
 	private MaterialButton btnDiscordConnect;
 	private View groupDiscordIdentity;
@@ -184,7 +186,7 @@ public class SettingsActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
-    @Override
+	@Override
 	protected void onResume() {
 		super.onResume();
 		DiscordBridge.updateEngineActivity(this);
@@ -195,6 +197,47 @@ public class SettingsActivity extends AppCompatActivity {
         updateDiscordUi(DiscordBridge.isLoggedIn());
         RetroAchievementsBridge.refreshState();
     }
+
+	private void markSettingsResultChanged() {
+		setResult(RESULT_OK, pendingSettingsResult);
+	}
+
+	private void markLayoutNeedsRefresh() {
+		pendingSettingsResult.putExtra(MainActivity.EXTRA_SETTINGS_LAYOUT_CHANGED, true);
+		markSettingsResultChanged();
+	}
+
+	private static String normalizeGpuProfileOverride(@Nullable String value) {
+		if ("mali".equalsIgnoreCase(value)) {
+			return "mali";
+		}
+		if ("adreno".equalsIgnoreCase(value)) {
+			return "adreno";
+		}
+		return "auto";
+	}
+
+	private static int gpuProfileSelectionForValue(@Nullable String profile) {
+		String normalized = normalizeGpuProfileOverride(profile);
+		if ("mali".equals(normalized)) {
+			return 1;
+		}
+		if ("adreno".equals(normalized)) {
+			return 2;
+		}
+		return 0;
+	}
+
+	private static String gpuProfileValueForSelection(int position) {
+		switch (position) {
+			case 1:
+				return "mali";
+			case 2:
+				return "adreno";
+			default:
+				return "auto";
+		}
+	}
 
     private final RetroAchievementsBridge.Listener retroAchievementsListener = new RetroAchievementsBridge.Listener() {
         @Override
@@ -647,11 +690,21 @@ public class SettingsActivity extends AppCompatActivity {
 			} catch (Exception ignored) {}
 			swFsui.setOnCheckedChangeListener((buttonView, isChecked) -> {
 				NativeApp.setSetting("UI", "EnableFullscreenUI", "bool", isChecked ? "true" : "false");
-				new MaterialAlertDialogBuilder(this)
-						.setTitle("Restart Required")
-						.setMessage("Fullscreen UI setting will take effect after you restart the app.")
-						.setPositiveButton("OK", (d, w) -> d.dismiss())
-						.show();
+				markLayoutNeedsRefresh();
+			});
+		}
+
+		MaterialSwitch swExpandCutout = findViewById(R.id.sw_expand_cutout);
+		if (swExpandCutout != null) {
+			try {
+				String expand = NativeApp.getSetting("UI", "ExpandIntoDisplayCutout", "bool");
+				swExpandCutout.setChecked("true".equalsIgnoreCase(expand));
+			} catch (Exception ignored) {
+				swExpandCutout.setChecked(true);
+			}
+			swExpandCutout.setOnCheckedChangeListener((buttonView, isChecked) -> {
+				NativeApp.setSetting("UI", "ExpandIntoDisplayCutout", "bool", isChecked ? "true" : "false");
+				markLayoutNeedsRefresh();
 			});
 		}
 
@@ -864,50 +917,56 @@ public class SettingsActivity extends AppCompatActivity {
 					default: value = -1; break; // Auto
 				}
 				if (mIgnoreRendererInit || ignoreInit[0]) { mIgnoreRendererInit = false; ignoreInit[0] = false; return; }
-				Intent data = new Intent();
-				data.putExtra("SET_RENDERER", value);
-				setResult(RESULT_OK, data);
+				pendingSettingsResult.putExtra("SET_RENDERER", value);
+				markSettingsResultChanged();
 			}
 			@Override public void onNothingSelected(AdapterView<?> parent) {}
 		});
 
 		Spinner spGpuProfileOverride = findViewById(R.id.sp_gpu_profile_override);
 		if (spGpuProfileOverride != null) {
-			final boolean[] ignoreGpuProfileInit = new boolean[]{true};
+			final String[] currentProfile = new String[]{"auto"};
 			ArrayAdapter<CharSequence> gpuProfileAdapter = ArrayAdapter.createFromResource(
 					this, R.array.gpu_profile_override, android.R.layout.simple_spinner_item);
 			gpuProfileAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 			spGpuProfileOverride.setAdapter(gpuProfileAdapter);
+			android.content.SharedPreferences prefs = getSharedPreferences("armsx2", MODE_PRIVATE);
+			String fallbackProfile = normalizeGpuProfileOverride(
+					prefs.getString(PREF_GPU_PROFILE_OVERRIDE_FALLBACK, "auto"));
+			String activeProfile = fallbackProfile;
 			try {
-				String profile = NativeApp.getSetting("EmuCore/GS", "AndroidGpuProfileOverride", "string");
-				int selection = 0;
-				if ("mali".equalsIgnoreCase(profile)) {
-					selection = 1;
-				} else if ("adreno".equalsIgnoreCase(profile)) {
-					selection = 2;
+				String nativeProfile = NativeApp.getSetting("EmuCore/GS", "AndroidGpuProfileOverride", "string");
+				if (!TextUtils.isEmpty(nativeProfile)) {
+					activeProfile = normalizeGpuProfileOverride(nativeProfile);
 				}
-				spGpuProfileOverride.setSelection(selection, false);
 			} catch (Exception ignored) {}
+			currentProfile[0] = activeProfile;
+			spGpuProfileOverride.setSelection(gpuProfileSelectionForValue(activeProfile), false);
 			spGpuProfileOverride.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
 				@Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-					if (ignoreGpuProfileInit[0]) {
-						ignoreGpuProfileInit[0] = false;
+					final String value = gpuProfileValueForSelection(position);
+					if (value.equalsIgnoreCase(currentProfile[0])) {
 						return;
 					}
-
-					final String value;
-					switch (position) {
-						case 1:
-							value = "mali";
-							break;
-						case 2:
-							value = "adreno";
-							break;
-						default:
-							value = "auto";
-							break;
+					currentProfile[0] = value;
+					boolean persisted = false;
+					for (int attempt = 0; attempt < 2 && !persisted; attempt++) {
+						try {
+							NativeApp.setSetting("EmuCore/GS", "AndroidGpuProfileOverride", "string", value);
+							String verify = normalizeGpuProfileOverride(
+									NativeApp.getSetting("EmuCore/GS", "AndroidGpuProfileOverride", "string"));
+							persisted = value.equalsIgnoreCase(verify);
+						} catch (Exception ignored) {}
 					}
-					NativeApp.setSetting("EmuCore/GS", "AndroidGpuProfileOverride", "string", value);
+					prefs.edit().putString(PREF_GPU_PROFILE_OVERRIDE_FALLBACK, value).apply();
+					pendingSettingsResult.putExtra(MainActivity.EXTRA_SETTINGS_GPU_PROFILE_OVERRIDE, value);
+					pendingSettingsResult.putExtra(MainActivity.EXTRA_SETTINGS_GPU_PROFILE_PERSISTED, persisted);
+					markSettingsResultChanged();
+					if (!persisted) {
+						try {
+							Toast.makeText(SettingsActivity.this, R.string.settings_gpu_profile_persist_retrying, Toast.LENGTH_LONG).show();
+						} catch (Throwable ignored) {}
+					}
 				}
 				@Override public void onNothingSelected(AdapterView<?> parent) {}
 			});
