@@ -29,35 +29,7 @@ jobs:
       - name: Checkout of code
         uses: actions/checkout@v5
         with:
-          submodules: false
-
-      - name: Init mapped submodules only (Gitea-safe)
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          mapfile -t SUBMODULE_PATHS < <(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
-          if [ "${#SUBMODULE_PATHS[@]}" -eq 0 ]; then
-            echo "No mapped submodules found in .gitmodules"
-            exit 0
-          fi
-
-          git submodule sync -- "${SUBMODULE_PATHS[@]}"
-          git -c protocol.version=2 submodule update --init --force --depth=1 --recursive -- "${SUBMODULE_PATHS[@]}"
-
-          # libadrenotools has its own nested submodule (lib/linkernsbypass).
-          # Initialize it explicitly because some Gitea runners skip nested updates.
-          if [ -f "app/src/main/cpp/3rdparty/libadrenotools/.gitmodules" ]; then
-            git -C app/src/main/cpp/3rdparty/libadrenotools submodule sync --recursive
-            git -C app/src/main/cpp/3rdparty/libadrenotools -c protocol.version=2 submodule update --init --force --depth=1 --recursive
-          fi
-
-          # Fallback for environments where nested submodule checkout is incomplete.
-          if [ ! -f "app/src/main/cpp/3rdparty/libadrenotools/lib/linkernsbypass/CMakeLists.txt" ]; then
-            echo "Nested submodule missing CMakeLists.txt, cloning fallback copy of liblinkernsbypass."
-            rm -rf app/src/main/cpp/3rdparty/libadrenotools/lib/linkernsbypass
-            git clone --depth=1 https://github.com/bylaws/liblinkernsbypass.git app/src/main/cpp/3rdparty/libadrenotools/lib/linkernsbypass
-          fi
+          submodules: recursive
 
       - name: Java and Android SDK Setup
         uses: actions/setup-java@v5
@@ -65,42 +37,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'gradle'
-
-      - name: Android SDK Setup
-        uses: android-actions/setup-android@v3
-
-      - name: Configure Android SDK for Gradle
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-          if [ -z "${SDK_DIR}" ] || [ ! -d "${SDK_DIR}" ]; then
-            for d in "$HOME/Android/Sdk" "/usr/local/lib/android/sdk" "/opt/android-sdk"; do
-              if [ -d "$d" ]; then
-                SDK_DIR="$d"
-                break
-              fi
-            done
-          fi
-
-          if [ -z "${SDK_DIR}" ] || [ ! -d "${SDK_DIR}" ]; then
-            echo "Android SDK directory not found."
-            exit 1
-          fi
-
-          echo "ANDROID_SDK_ROOT=${SDK_DIR}" >> "$GITHUB_ENV"
-          echo "ANDROID_HOME=${SDK_DIR}" >> "$GITHUB_ENV"
-          echo "sdk.dir=${SDK_DIR}" > local.properties
-          echo "Using Android SDK at ${SDK_DIR}"
-
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-36" \
-            "build-tools;36.0.0" \
-            "ndk;29.0.14206865" \
-            "cmake;3.22.1"
 
       # --- Build Phase ---
       - name: Running the Debug Build (only Nightly)
@@ -139,7 +75,7 @@ jobs:
           echo "APK renamed and saved in: $NEW_FILE_PATH"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ steps.package_info.outputs.PACKAGE_NAME }}
           path: ${{ steps.rename_apk.outputs.APK_FILE_NIGHTLY }}
@@ -162,7 +98,7 @@ jobs:
 
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v5
         with:
           name: ${{ needs.build.outputs.package_name }}
           path: artifact
