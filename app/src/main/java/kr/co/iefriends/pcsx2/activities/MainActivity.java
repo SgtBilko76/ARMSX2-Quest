@@ -67,6 +67,8 @@ import androidx.core.view.GravityCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
@@ -1884,22 +1886,53 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void applyFullscreen() {
+        // 1️⃣ Determine if emulation UI is visible
         boolean emulationVisible = !isHomeVisible();
         boolean fullscreen = emulationVisible || isFullscreenUiModeEnabled();
-        applyDisplayCutoutMode(emulationVisible);
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), !fullscreen);
+
+        // 2️⃣ Edge-to-edge: disable system padding
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+
+        // 3️⃣ Handle display cutout (notch/punch-hole)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            WindowManager.LayoutParams attrs = getWindow().getAttributes();
+            attrs.layoutInDisplayCutoutMode = emulationVisible
+                    ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT;
+            getWindow().setAttributes(attrs);
+        }
+
+        // 4️⃣ Get decor view
         View decorView = getWindow().getDecorView();
         applyLegacyImmersiveFlags(decorView, fullscreen);
 
+        // 5️⃣ Disable contrast enforcement on Android Q+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             getWindow().setNavigationBarContrastEnforced(false);
             getWindow().setStatusBarContrastEnforced(false);
         }
 
+        // 6️⃣ Hide system bars
         WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(getWindow(), decorView);
         if (fullscreen) {
-            controller.hide(WindowInsetsCompat.Type.systemBars());
+            controller.hide(WindowInsetsCompat.Type.systemBars()); // status + nav bars
             controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars());
+            controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_DEFAULT);
+        }
+
+        // 7️⃣ Consume all insets on root layout so no padding is added
+        View root = findViewById(R.id.in_game_root);
+        if (root != null) {
+            ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+                v.setPadding(0, 0, 0, 0); // remove any padding for status/nav/cutout
+                return WindowInsetsCompat.CONSUMED;
+            });
+        }
+
+        // 8️⃣ Optional: touch listener for on-screen controls
+        if (fullscreen) {
             decorView.setOnTouchListener((v, e) -> {
                 if (disableTouchControls) return false;
                 if (e.getAction() == MotionEvent.ACTION_DOWN || e.getAction() == MotionEvent.ACTION_MOVE) {
@@ -1914,8 +1947,6 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             });
         } else {
-            controller.show(WindowInsetsCompat.Type.systemBars());
-            controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_DEFAULT);
             decorView.setOnTouchListener(null);
         }
     }
