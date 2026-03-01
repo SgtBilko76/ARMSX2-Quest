@@ -38,16 +38,14 @@ import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.CompoundButton;
-import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.DrawableRes;
@@ -57,21 +55,14 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.SwitchCompat;
-import androidx.appcompat.widget.TooltipCompat;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.core.util.Pair;
 import androidx.core.view.GravityCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.lifecycle.ViewModelProvider;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -81,62 +72,35 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.navigation.NavigationView;
-import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.slider.Slider;
-import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
-import com.google.android.material.textview.MaterialTextView;
-
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.text.Collator;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-import java.util.TreeMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 import java.util.zip.Inflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -265,6 +229,22 @@ public class MainActivity extends AppCompatActivity {
     public static final String EXTRA_SETTINGS_GPU_PROFILE_PERSISTED = "SET_GPU_PROFILE_PERSISTED";
     
     private int currentControllerMode = 0; // 0=2 Sticks, 1=1 Stick+Face, 2=D-Pad Only
+
+    private final OnBackPressedCallback onBackPressCallback =
+        new OnBackPressedCallback(false) {
+            @Override
+            public void handleOnBackPressed() {
+                shutdownVmToHome();
+            }
+        };
+    private final OnBackPressedCallback onSearchBackPressCallback =
+        new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                toggleSearchBar();
+                remove();
+            }
+        };
 
     private final RetroAchievementsBridge.Listener retroAchievementsListener = new RetroAchievementsBridge.Listener() {
         @Override
@@ -463,6 +443,7 @@ public class MainActivity extends AppCompatActivity {
     tvEmpty = findViewById(R.id.tv_empty);
     etSearch = findViewById(R.id.et_search);
     bgImage = findViewById(R.id.bg_image);
+    getOnBackPressedDispatcher().addCallback(onBackPressCallback);
     if (rvGames != null) {
         gamesGridLayoutManager = new GridLayoutManager(this, getGameGridSpanCount());
         rvGames.setLayoutManager(gamesGridLayoutManager);
@@ -746,12 +727,14 @@ public class MainActivity extends AppCompatActivity {
         boolean nowVisible = etSearch.getVisibility() != View.VISIBLE;
         etSearch.setVisibility(nowVisible ? View.VISIBLE : View.GONE);
         if (nowVisible) {
+            getOnBackPressedDispatcher().addCallback(onSearchBackPressCallback);
             etSearch.requestFocus();
             try {
                 android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (imm != null) imm.showSoftInput(etSearch, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
             } catch (Throwable ignored) {}
         } else {
+            onSearchBackPressCallback.remove();
             try {
                 android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (imm != null) imm.hideSoftInputFromWindow(etSearch.getWindowToken(), 0);
@@ -4286,26 +4269,8 @@ public class MainActivity extends AppCompatActivity {
                 maybeAutoHideControls();
                 return true;
             }
-        } else {
-            if (p_keyCode == KeyEvent.KEYCODE_BACK) {
-                if (!isHomeVisible()) {
-                    shutdownVmToHome();
-                } else {
-                    finish();
-                }
-                return true;
-            }
         }
         return super.onKeyDown(p_keyCode, p_event);
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (!isHomeVisible()) {
-            shutdownVmToHome();
-            return;
-        }
-        super.onBackPressed();
     }
 
     @Override
@@ -5176,6 +5141,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (homeContainer != null) {
             homeContainer.setVisibility(show ? View.VISIBLE : View.GONE);
+            onBackPressCallback.setEnabled(!show);
         }
         if (drawerLayout != null) {
             drawerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
