@@ -418,9 +418,14 @@ static __fi void mVU_sumXYZ(mV, const xmm& PQ, const xmm& Fs)
 //	xDP.PS(Fs, Fs, 0x71);
 //	xMOVSS(PQ, Fs);
 
-	armAsm->Fmul(PQ.V4S(), Fs.V4S(), Fs.V4S());
-	armAsm->Faddp(PQ.V4S(), PQ.V4S(), PQ.V4S());
-	armAsm->Faddp(PQ.S(), PQ.V2S());
+    armAsm->Fmul(PQ.V4S(), Fs.V4S(), Fs.V4S());
+    armAsm->Ins(PQ.V4S(), 3, a64::wzr);
+
+    armAsm->Faddp(PQ.V4S(), PQ.V4S(), PQ.V4S());
+    armAsm->Faddp(PQ.S(), PQ.V2S());
+
+    armAsm->Fmov(EAX, PQ.S());
+    armAsm->Fmov(PQ.S(), EAX);
 }
 
 mVUop(mVU_ELENG)
