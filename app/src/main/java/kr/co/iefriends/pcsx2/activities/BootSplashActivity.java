@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.VideoView;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.WindowCompat;
@@ -23,6 +24,13 @@ public class BootSplashActivity extends AppCompatActivity {
     private View rootView;
 
     private final Runnable timeoutRunnable = this::launchMainAndFinish;
+    private final OnBackPressedCallback onBackPressedCallback =
+        new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                launchMainAndFinish();
+            }
+        };
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -31,7 +39,7 @@ public class BootSplashActivity extends AppCompatActivity {
             launchMainAndFinish();
             return;
         }
-
+        getOnBackPressedDispatcher().addCallback(onBackPressedCallback);
         setContentView(R.layout.activity_boot_splash);
         rootView = findViewById(R.id.boot_splash_root);
         VideoView videoView = findViewById(R.id.boot_splash_video);
@@ -66,11 +74,6 @@ public class BootSplashActivity extends AppCompatActivity {
             rootView.removeCallbacks(timeoutRunnable);
         }
         super.onDestroy();
-    }
-
-    @Override
-    public void onBackPressed() {
-        launchMainAndFinish();
     }
 
     @Override
