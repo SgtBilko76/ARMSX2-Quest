@@ -39,7 +39,6 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.CompoundButton;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -55,6 +54,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.PopupMenu;
 import androidx.core.content.ContextCompat;
 import androidx.core.util.Pair;
 import androidx.core.view.GravityCompat;
@@ -1378,89 +1378,40 @@ public class MainActivity extends AppCompatActivity {
         } catch (IOException ignored) {}
     }
 
-    private void showGameOptionsDialog(GameEntry e) {
+    private void showGameOptionsPopup(View anchorView, GameEntry e) {
         if (e == null) return;
         String key = gameKeyFromEntry(e);
         String existing = getManualCoverUri(key);
-        android.widget.LinearLayout container = new android.widget.LinearLayout(this);
-        container.setOrientation(android.widget.LinearLayout.VERTICAL);
-        int pad = (int) (16 * getResources().getDisplayMetrics().density);
-        container.setPadding(pad, pad, pad, pad);
-        container.setBackgroundColor(0xEE222222);
-        android.widget.TextView title = new android.widget.TextView(this);
-        title.setText(e.gameTitle != null ? e.gameTitle : e.title);
-        title.setTextColor(0xFFFFFFFF);
-        title.setTextSize(18);
-        title.setPadding(0, 0, 0, pad / 2);
-        container.addView(title);
-
-    float density = getResources().getDisplayMetrics().density;
-    int primary = resolveThemeColor(android.R.attr.colorPrimary);
-    int onPrimary = resolveThemeColor(android.R.attr.textColorPrimary);
-    int surfaceVariant = resolveThemeColor(android.R.attr.colorBackground);
-    int onSurface = resolveThemeColor(android.R.attr.textColorPrimary);
-    int secondary = resolveThemeColor(com.google.android.material.R.attr.colorSecondary);
-    int onSecondary = resolveThemeColor(com.google.android.material.R.attr.colorOnSecondary);
-    int spacing = (int) (8f * density);
-
-    MaterialButton pick = new MaterialButton(this);
-    LinearLayout.LayoutParams pickParams = new LinearLayout.LayoutParams(
-        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-    pickParams.topMargin = spacing;
-    pick.setLayoutParams(pickParams);
-    pick.setText(getString(R.string.cover_action_choose));
-    pick.setBackgroundTintList(ColorStateList.valueOf(primary));
-    pick.setTextColor(onPrimary);
-    container.addView(pick);
-
-        MaterialAlertDialogBuilder mBuilder = new MaterialAlertDialogBuilder(this)
-                .setView(container)
-                .setNegativeButton(android.R.string.cancel, (d, w) -> d.dismiss());
-        AlertDialog dlg = mBuilder.create();
-
-        pick.setOnClickListener(v -> {
-            dlg.dismiss();
-            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-            intent.addCategory(Intent.CATEGORY_OPENABLE);
-            intent.setType("image/*");
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-            pendingManualCoverGameKey = key;
-            startActivityResultPickImage.launch(intent);
-        });
-
-        if (existing != null) {
-            MaterialButton remove = new MaterialButton(this);
-            LinearLayout.LayoutParams removeParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            removeParams.topMargin = spacing;
-            remove.setLayoutParams(removeParams);
-            remove.setText(getString(R.string.cover_action_remove));
-            remove.setBackgroundTintList(ColorStateList.valueOf(surfaceVariant));
-            remove.setTextColor(onSurface);
-            container.addView(remove);
-            remove.setOnClickListener(v -> {
-                dlg.dismiss();
+        PopupMenu menu = new PopupMenu(this, anchorView);
+        menu.inflate(R.menu.game_options_menu);
+        MenuItem removeChosenCoverMenuItem = menu.getMenu().findItem(R.id.remove_chosen_cover);
+        removeChosenCoverMenuItem.setVisible(existing != null);
+        menu.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == R.id.choose_cover) {
+                launchCoverImagePicker(key);
+                return true;
+            }
+            if (item.getItemId() == R.id.remove_chosen_cover) {
                 removeManualCoverUri(key);
                 if (gamesFolderUri != null) scanGamesFolder(gamesFolderUri);
-            });
-        }
-
-        MaterialButton perGame = new MaterialButton(this);
-        LinearLayout.LayoutParams perGameParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        perGameParams.topMargin = spacing * 2;
-        perGame.setLayoutParams(perGameParams);
-        perGame.setText(getString(R.string.per_game_settings_button));
-        perGame.setBackgroundTintList(ColorStateList.valueOf(secondary));
-        perGame.setTextColor(onSecondary);
-        container.addView(perGame);
-
-        perGame.setOnClickListener(v -> {
-            dlg.dismiss();
-            showPerGameSettingsDialog(e);
+                return true;
+            }
+            if (item.getItemId() == R.id.per_game_settings) {
+                showPerGameSettingsDialog(e);
+                return true;
+            }
+            return false;
         });
+        menu.show();
+    }
 
-        dlg.show();
+    private void launchCoverImagePicker(String key) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        pendingManualCoverGameKey = key;
+        startActivityResultPickImage.launch(intent);
     }
 
     private void showPerGameSettingsDialog(GameEntry entry) {
@@ -6376,7 +6327,7 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             });
             holder.itemView.setOnLongClickListener(v -> {
-                try { ((MainActivity)holder.itemView.getContext()).showGameOptionsDialog(e); } catch (Throwable ignored) {}
+                try { ((MainActivity)holder.itemView.getContext()).showGameOptionsPopup(v, e); } catch (Throwable ignored) {}
                 return true;
             });
         }
