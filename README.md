@@ -29,6 +29,11 @@ Please note that a BIOS dump from a legitimately-owned PS2 console is required t
 
 Any other website is not affiliated with ARMSX2. 
 
+##Translation 
+
+Help translate ARMSX2:
+https://crowdin.com/project/armsx2-translations/invite?h=940eaf6355b31b5fdb1771183c694ca32710218
+
 ## Download
 
 ARMSX2 is available on the Google Play Store once released. 
