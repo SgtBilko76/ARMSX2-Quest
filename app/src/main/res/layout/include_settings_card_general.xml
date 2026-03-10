@@ -28,7 +28,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:text="Fullscreen UI"
+            android:text="@string/settings_fullscreen_ui"
             app:useMaterialThemeColors="true" />
 
         <LinearLayout
@@ -58,7 +58,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:text="Frame Limiter"
+            android:text="@string/settings_frame_limiter"
             app:useMaterialThemeColors="true" />
 
         <LinearLayout
@@ -71,7 +71,7 @@
                 android:id="@+id/tv_fps_limit_value"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Custom FPS Limit: 60"
+                android:text="@string/settings_custom_fps_limit_default"
                 android:textColor="?attr/colorOnSurface"
                 android:textSize="16sp" />
 
@@ -113,7 +113,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:text="Fast Boot"
+            android:text="@string/settings_fast_boot"
             app:useMaterialThemeColors="true" />
 
         <LinearLayout
@@ -148,7 +148,7 @@
                 android:id="@+id/tv_brightness_value"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Brightness: 1.00"
+                android:text="@string/settings_brightness_default"
                 android:textColor="?attr/colorOnSurface"
                 android:textSize="16sp" />
 
@@ -175,7 +175,7 @@
                 android:id="@+id/tv_osc_timeout_value"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="On-screen controls timeout: 3s"
+                android:text="@string/settings_osc_timeout_default"
                 android:textColor="?attr/colorOnSurface"
                 android:textSize="16sp" />
 
@@ -196,7 +196,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Never hide on-screen controls"
+                android:text="@string/settings_osc_never_hide"
                 app:useMaterialThemeColors="true" />
         </LinearLayout>
     </LinearLayout>

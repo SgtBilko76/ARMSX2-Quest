@@ -17,7 +17,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Memory Card"
+            android:text="@string/settings_memory_card"
             android:textColor="?attr/colorPrimary"
             android:textSize="18sp"
             android:textStyle="bold"
@@ -28,6 +28,6 @@
             style="@style/Widget.Material3.Button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Import Memory Card" />
+            android:text="@string/settings_import_memory_card" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
