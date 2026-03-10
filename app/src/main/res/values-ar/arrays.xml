@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="renderers">
-        <item>Auto</item>
+        <item>تلقائي</item>
         <item>OpenGL</item>
         <item>Software</item>
         <item>Vulkan</item>
     </string-array>
     <string-array name="gpu_profile_override">
-        <item>Auto (Recommended)</item>
-        <item>Force Mali</item>
-        <item>Force Adreno</item>
+        <item>تلقائي (مُفضَّل)</item>
+        <item>إجبار Mali</item>
+        <item>إجبار Adreno</item>
     </string-array>
     <string-array name="texture_filtering">
-        <item>PS2 (default)</item>
-        <item>Forced</item>
-        <item>Nearest</item>
+        <item>PS2 (المُفترض)</item>
+        <item>مجبور </item>
+        <item>الأقرب</item>
     </string-array>
     <string-array name="interlace_modes">
-        <item>Automatic</item>
-        <item>Off</item>
+        <item>تلقائي</item>
+        <item>إطفاء</item>
         <item>Weave TFF</item>
         <item>Weave BFF</item>
         <item>Bob TFF</item>
@@ -29,50 +29,50 @@
         <item>Adaptive BFF</item>
     </string-array>
     <string-array name="cas_modes">
-        <item>None (Default)</item>
-        <item>Sharpen Only (Internal)</item>
-        <item>Sharpen and Resize (Display)</item>
+        <item>لا شيء (المُفترض)</item>
+        <item>حادًّا فقط (داخليًا)</item>
+        <item>الحدّة وتغيير الحجم (العرض)</item>
     </string-array>
     <string-array name="texture_preloading">
-        <item>Off</item>
-        <item>Partial</item>
+        <item>إطفاء</item>
+        <item>جُزئيّا</item>
         <item>Full</item>
     </string-array>
     <string-array name="bilinear_present">
-        <item>Off</item>
-        <item>Bilinear (Smooth)</item>
+        <item>إطفاء</item>
+        <item>Bilinear (سلس)</item>
         <item>Bilinear (Sharp)</item>
     </string-array>
     <string-array name="trilinear_filtering">
-        <item>Automatic</item>
-        <item>Off</item>
+        <item>تلقائي</item>
+        <item>إطفاء</item>
         <item>PS2</item>
-        <item>Forced</item>
+        <item>مجبور</item>
     </string-array>
     <string-array name="dithering_modes">
-        <item>Off</item>
-        <item>Scaled</item>
-        <item>Unscaled (Default)</item>
+        <item>إطفاء</item>
+        <item>قياسي</item>
+        <item>غير قياسي (المُفترض)</item>
         <item>Force 32-bit</item>
     </string-array>
     <string-array name="acc_blending">
-        <item>Minimum</item>
-        <item>Basic</item>
-        <item>Medium</item>
+        <item>الأدنى</item>
+        <item>الأساسي</item>
+        <item>متوسط</item>
         <item>High</item>
         <item>Full</item>
-        <item>Maximum</item>
+        <item>الأقصى</item>
     </string-array>
     <string-array name="anisotropic">
-        <item>Off</item>
+        <item>إطفاء</item>
         <item>2x</item>
         <item>4x</item>
         <item>8x</item>
         <item>16x</item>
     </string-array>
     <string-array name="aspect_ratios">
-        <item>Stretch</item>
-        <item>Auto 4:3/3:2</item>
+        <item>مُتَّسَع</item>
+        <item>تلقائي 4:3/3:2</item>
         <item>4:3</item>
         <item>16:9</item>
         <item>10:7</item>
@@ -88,17 +88,17 @@
         <item>8x</item>
     </string-array>
     <string-array name="auto_flush_hw">
-        <item>Disabled</item>
+        <item>غير مفعل</item>
         <item>Sprites Only</item>
-        <item>Enabled</item>
+        <item>مُفعل</item>
     </string-array>
     <string-array name="cpu_cores_basic">
-        <item>Translator (default)</item>
-        <item>Interpreter</item>
+        <item>المُترجم (المُفترض)</item>
+        <item>المُفسر</item>
     </string-array>
     <string-array name="network_ethapi">
-        <item>Unset</item>
-        <item>PCAP Bridged</item>
+        <item>غير مُحدد</item>
+        <item>PCAP bridged</item>
         <item>PCAP Switched</item>
         <item>Sockets</item>
     </string-array>
