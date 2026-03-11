@@ -151,11 +151,11 @@
     <string name="settings_antiblur">Anti-Blur</string>
     <string name="settings_achievements_title">Retro Achievements</string>
     <string name="settings_achievements_description">Link your RetroAchievements account to sync unlocks, view leaderboards, and track progress while you play.</string>
-    <string name="settings_achievements_button">Log In to RetroAchievements</string>
-    <string name="settings_achievements_button_change">Switch Account</string>
-    <string name="settings_achievements_logout">Log Out</string>
-    <string name="settings_achievements_enable_label">Enable RetroAchievements</string>
-    <string name="settings_achievements_status_loading">Checking RetroAchievements status…</string>
+    <string name="settings_achievements_button">تسجيل الدخول إلى RetroAchievements</string>
+    <string name="settings_achievements_button_change">تبديل الحساب</string>
+    <string name="settings_achievements_logout">تسجيل الخروج</string>
+    <string name="settings_achievements_enable_label">تفعيل RetroAchievements</string>
+    <string name="settings_achievements_status_loading">التحقق من حالة RetroAchievements…</string>
     <string name="settings_achievements_status_connected">Logged in as %1$s</string>
     <string name="settings_achievements_status_connected_generic">RetroAchievements is connected.</string>
     <string name="settings_achievements_status_signed_out">Not signed in</string>
