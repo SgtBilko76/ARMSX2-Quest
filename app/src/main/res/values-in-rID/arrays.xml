@@ -29,7 +29,7 @@
         <item>Adaptif BFF</item>
     </string-array>
     <string-array name="cas_modes">
-        <item>Tidak Ada (Default)</item>
+        <item>Tidak Ada (Bawaan)</item>
         <item>Hanya Asah (Internal)</item>
         <item>Pertajam dan Ubah Ukuran (Tampilan)</item>
     </string-array>
@@ -52,7 +52,7 @@
     <string-array name="dithering_modes">
         <item>Mati</item>
         <item>Disesuaikan</item>
-        <item>Tidak Disesuaikan (Default)</item>
+        <item>Tidak Disesuaikan (Bawaan)</item>
         <item>Paksa 32-bit</item>
     </string-array>
     <string-array name="acc_blending">
@@ -71,7 +71,7 @@
         <item>16x</item>
     </string-array>
     <string-array name="aspect_ratios">
-        <item>Merentang</item>
+        <item>Rentang</item>
         <item>Otomatis 4:3/3:2</item>
         <item>4:3</item>
         <item>16:9</item>
@@ -88,18 +88,18 @@
         <item>8x</item>
     </string-array>
     <string-array name="auto_flush_hw">
-        <item>Offkan</item>
-        <item>Hanya Sprites</item>
+        <item>Nonaktif</item>
+        <item>Hanya Sprite</item>
         <item>Aktifkan</item>
     </string-array>
     <string-array name="cpu_cores_basic">
         <item>Translator (default)</item>
-        <item>Interpreter</item>
+        <item>Penerjemah</item>
     </string-array>
     <string-array name="network_ethapi">
-        <item>Unset</item>
-        <item>PCAP Bridged</item>
-        <item>PCAP Switched</item>
-        <item>Sockets</item>
+        <item>Batalkan Pengaturan</item>
+        <item>PCAP Terhubung</item>
+        <item>PCAP Beralih</item>
+        <item>Soket</item>
     </string-array>
 </resources>
