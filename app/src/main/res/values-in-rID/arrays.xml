@@ -2,9 +2,9 @@
 <resources>
     <string-array name="renderers">
         <item>Otomatis</item>
-        <item></item>
-        <item>Perangkat lunak</item>
-        <item></item>
+        <item>OpenGL</item>
+        <item>Software</item>
+        <item>Vulkan</item>
     </string-array>
     <string-array name="gpu_profile_override">
         <item>Otomatis (Disarankan)</item>
@@ -19,18 +19,18 @@
     <string-array name="interlace_modes">
         <item>Otomatis</item>
         <item>Mati</item>
-        <item>Tenun TFF</item>
-        <item>Tenun BFF</item>
+        <item>Weave TFF</item>
+        <item>Weave BFF</item>
         <item>Bob TFF</item>
         <item>Bob BFF</item>
-        <item>Campur TFF</item>
-        <item>Campur BFF</item>
+        <item>Blend TFF</item>
+        <item>Blend BFF</item>
         <item>Adaptif TFF</item>
         <item>Adaptif BFF</item>
     </string-array>
     <string-array name="cas_modes">
         <item>Tidak Ada (Bawaan)</item>
-        <item>Hanya Asah (Internal)</item>
+        <item>Hanya Pertajam (Internal)</item>
         <item>Pertajam dan Ubah Ukuran (Tampilan)</item>
     </string-array>
     <string-array name="texture_preloading">
@@ -93,8 +93,8 @@
         <item>Aktifkan</item>
     </string-array>
     <string-array name="cpu_cores_basic">
-        <item>Translator (default)</item>
-        <item>Penerjemah</item>
+        <item>Translator (Bawaan)</item>
+        <item>Interpreter</item>
     </string-array>
     <string-array name="network_ethapi">
         <item>Batalkan Pengaturan</item>
