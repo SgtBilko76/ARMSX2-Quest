@@ -9,7 +9,7 @@
     <string-array name="gpu_profile_override">
         <item>Auto (Recommended)</item>
         <item>Force Mali</item>
-        <item>Force Adreno</item>
+        <item>Forçar Adreno</item>
     </string-array>
     <string-array name="texture_filtering">
         <item>PS2 (default)</item>
