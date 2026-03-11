@@ -41,7 +41,7 @@
     <string-array name="bilinear_present">
         <item>إطفاء</item>
         <item>Bilinear (سلس)</item>
-        <item>Bilinear (Sharp)</item>
+        <item>Bilinear (حاد)</item>
     </string-array>
     <string-array name="trilinear_filtering">
         <item>تلقائي</item>
