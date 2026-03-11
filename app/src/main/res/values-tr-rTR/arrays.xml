@@ -88,18 +88,18 @@
         <item>8x</item>
     </string-array>
     <string-array name="auto_flush_hw">
-        <item>Disabled</item>
-        <item>Sprites Only</item>
-        <item>Enabled</item>
+        <item>Devre dışı</item>
+        <item>Sadece Sprite\'lar</item>
+        <item>Etkinleştir</item>
     </string-array>
     <string-array name="cpu_cores_basic">
-        <item>Translator (default)</item>
+        <item>Çevirici (varsayılan)</item>
         <item>Interpreter</item>
     </string-array>
     <string-array name="network_ethapi">
-        <item>Unset</item>
-        <item>PCAP Bridged</item>
-        <item>PCAP Switched</item>
-        <item>Sockets</item>
+        <item>Ayarlanmamış</item>
+        <item>Köprülenmiş PCAP</item>
+        <item>Değiştirilmiş PCAP</item>
+        <item>Soketler</item>
     </string-array>
 </resources>
