@@ -36,7 +36,7 @@
     <string-array name="texture_preloading">
         <item>إطفاء</item>
         <item>جُزئيّا</item>
-        <item>Full</item>
+        <item>مملوء</item>
     </string-array>
     <string-array name="bilinear_present">
         <item>إطفاء</item>
@@ -53,14 +53,14 @@
         <item>إطفاء</item>
         <item>قياسي</item>
         <item>غير قياسي (المُفترض)</item>
-        <item>Force 32-bit</item>
+        <item>إجبار bit-32</item>
     </string-array>
     <string-array name="acc_blending">
         <item>الأدنى</item>
         <item>الأساسي</item>
         <item>متوسط</item>
-        <item>High</item>
-        <item>Full</item>
+        <item>مُرتفع</item>
+        <item>مملوء</item>
         <item>الأقصى</item>
     </string-array>
     <string-array name="anisotropic">
