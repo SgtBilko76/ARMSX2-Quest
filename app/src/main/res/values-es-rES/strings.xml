@@ -36,7 +36,7 @@
     <string name="settings_section_stats">Estadísticas</string>
     <string name="settings_section_controller">Mando</string>
     <string name="settings_section_customization">Personalizar</string>
-    <string name="settings_section_storage">Almacenamiento &amp; Datos</string>
+    <string name="settings_section_storage">Almacenamiento y Datos</string>
     <string name="settings_section_achievements">Conexiones</string>
     <string name="settings_on_screen_ui_style">Estilo de interfaz en pantalla</string>
     <string name="dialog_on_screen_ui_style_title">Estilo de interfaz en pantalla</string>
@@ -78,9 +78,9 @@ Ubicación: %1$s
     <string name="onboarding_storage_access_title">Se requiere permiso</string>
     <string name="onboarding_storage_access_error">Android denegó el acceso para: %1$s. Concede acceso a todos los archivos en los ajustes del sistema o elige una carpeta dentro del almacenamiento de ARMSX2.</string>
     <string name="onboarding_storage_access_settings">Abrir ajustes</string>
-    <string name="settings_dev9_title">Disco Duro de PS2 &amp; Red</string>
-    <string name="settings_dev9_hdd_summary">Activa el Disco Duro virtual para soportar juegos compatibles con DEV9. La imagen se almacena en el directorio de datos.</string>
-    <string name="settings_dev9_hdd_label">Activar Disco Duro virtual de DEV9</string>
+    <string name="settings_dev9_title">Disco duro de PS2 y Red</string>
+    <string name="settings_dev9_hdd_summary">Activa el disco duro virtual para soportar juegos compatibles con DEV9. La imagen se almacena en el directorio de datos.</string>
+    <string name="settings_dev9_hdd_label">Activar disco duro virtual de DEV9</string>
     <string name="settings_dev9_hdd_use_default">Usar imagen por defecto</string>
     <string name="settings_dev9_network_label">Red</string>
     <string name="settings_dev9_network_switch">Activar Ethernet DEV9</string>
@@ -114,7 +114,7 @@ Ubicación: %1$s
     <string name="drawer_action_pause">Pausa</string>
     <string name="drawer_action_power">Encender</string>
     <string name="drawer_action_fast_forward">Avance Rápido</string>
-    <string name="drawer_section_mods">Mods &amp; Trucos</string>
+    <string name="drawer_section_mods">Mods y Trucos</string>
     <string name="drawer_enable_cheats">Activar trucos</string>
     <string name="drawer_apply_widescreen_patch">Aplicar parche de pantalla ancha</string>
     <string name="drawer_action_import_cheats">Importar trucos</string>
@@ -142,10 +142,10 @@ Ubicación: %1$s
     <string name="settings_expand_cutout">Expand into display cutout</string>
     <string name="settings_expand_cutout_summary">Allow gameplay to render into the notch/camera cutout area.</string>
     <string name="settings_texture_preloading">Precargar Texturas</string>
-    <string name="settings_acc_blending">Blending Accuracy</string>
+    <string name="settings_acc_blending">Precisión de Mezcla</string>
     <string name="settings_anisotropic_filtering">Filtro Anisotrópico</string>
     <string name="settings_trilinear_filtering">Filtro Trilineal</string>
-    <string name="settings_dithering">Dithering</string>
+    <string name="settings_dithering">Difuminado</string>
     <string name="settings_bilinear_present">Bilinear Upscaling</string>
     <string name="settings_integer_scaling">Integer Upscaling</string>
     <string name="settings_screen_offsets">Desplazamiento de Pantalla</string>
