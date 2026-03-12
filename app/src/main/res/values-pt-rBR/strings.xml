@@ -8,7 +8,7 @@
     <string name="controller_mapping_instruction">Select an action to rebind. When prompted, press the new controller button.</string>
     <string name="controller_mapping_rebind">Rebind</string>
     <string name="controller_mapping_clear">Clear</string>
-    <string name="controller_mapping_waiting">Press a button…</string>
+    <string name="controller_mapping_waiting">Pressione um botão…</string>
     <string name="controller_mapping_unbound">Unbound</string>
     <string name="controller_mapping_reset">Reset to Default</string>
     <string name="controller_action_dpad_up">D-Pad Up</string>
