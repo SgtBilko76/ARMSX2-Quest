@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="renderers">
-        <item>Auto</item>
+        <item>Автоопределение</item>
         <item>OpenGL</item>
-        <item>Software</item>
+        <item>Программный</item>
         <item>Vulkan</item>
     </string-array>
     <string-array name="gpu_profile_override">
-        <item>Auto (Recommended)</item>
-        <item>Force Mali</item>
-        <item>Force Adreno</item>
+        <item>Автоопределение (рекомендовано)</item>
+        <item>Mali принудительно</item>
+        <item>Adreno принудительно</item>
     </string-array>
     <string-array name="texture_filtering">
-        <item>PS2 (default)</item>
+        <item>PS2 (по умолчанию)</item>
         <item>Forced</item>
         <item>Nearest</item>
     </string-array>
