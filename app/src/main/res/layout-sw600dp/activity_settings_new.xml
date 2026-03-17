@@ -246,7 +246,7 @@
             android:layout_height="wrap_content"
             android:layout_marginEnd="12dp"
             android:layout_weight="1"
-            android:text="About" />
+            android:text="@string/drawer_about" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_back"
@@ -255,6 +255,6 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
             android:layout_weight="1"
-            android:text="Back" />
+            android:text="@string/onboarding_back" />
     </LinearLayout>
 </LinearLayout>

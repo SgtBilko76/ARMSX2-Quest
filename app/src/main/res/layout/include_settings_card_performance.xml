@@ -33,7 +33,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:text="CPU Core"
+                android:text="@string/settings_cpu_core"
                 android:textColor="?attr/colorOnSurface"
                 android:textSize="16sp" />
 
@@ -48,7 +48,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:text="Hardware Readbacks"
+            android:text="@string/settings_hardware_readbacks"
             app:useMaterialThemeColors="true" />
 
         <com.google.android.material.materialswitch.MaterialSwitch
@@ -56,7 +56,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:text="Skip Duplicate Frames"
+            android:text="@string/settings_skip_duplicate_frames"
             app:useMaterialThemeColors="true" />
 
         <LinearLayout
@@ -69,7 +69,7 @@
                 android:id="@+id/tv_hw_download_mode"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Hardware Download Mode: 0"
+                android:text="@string/settings_hw_download_mode_default"
                 android:textColor="?attr/colorOnSurface"
                 android:textSize="16sp" />
 
@@ -96,7 +96,7 @@
                 android:id="@+id/tv_ee_cycle_rate"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="EE Cycle Rate: 0"
+                android:text="@string/settings_ee_cycle_rate_default"
                 android:textColor="?attr/colorOnSurface"
                 android:textSize="16sp" />
 
@@ -123,7 +123,7 @@
                 android:id="@+id/tv_ee_cycle_skip"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="EE Cycle Skip: 0"
+                android:text="@string/settings_ee_cycle_skip_default"
                 android:textColor="?attr/colorOnSurface"
                 android:textSize="16sp" />
 
@@ -145,7 +145,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:text="VU Thread (MTVU)"
+            android:text="@string/settings_vu_thread_mtvu"
             app:useMaterialThemeColors="true" />
 
         <com.google.android.material.materialswitch.MaterialSwitch
@@ -153,7 +153,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:text="Wait Loop Detection"
+            android:text="@string/settings_wait_loop_detection"
             app:useMaterialThemeColors="true" />
 
         <com.google.android.material.materialswitch.MaterialSwitch
@@ -161,7 +161,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:text="INTC Spin Detection"
+            android:text="@string/settings_intc_spin_detection"
             app:useMaterialThemeColors="true" />
 
         <com.google.android.material.materialswitch.MaterialSwitch
@@ -169,7 +169,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:text="mVU Flag Hack"
+            android:text="@string/settings_mvu_flag_hack"
             app:useMaterialThemeColors="true" />
 
         <com.google.android.material.materialswitch.MaterialSwitch
@@ -177,14 +177,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:text="Instant VU1"
+            android:text="@string/settings_instant_vu1"
             app:useMaterialThemeColors="true" />
 
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/sw_fast_cdvd"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Fast CDVD"
+            android:text="@string/settings_fast_cdvd"
             app:useMaterialThemeColors="true" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
