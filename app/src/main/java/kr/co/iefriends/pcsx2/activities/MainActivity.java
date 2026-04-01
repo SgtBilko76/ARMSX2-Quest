@@ -2208,6 +2208,14 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
+        MaterialButton btnChangeDisc = findViewById(R.id.drawer_btn_change_disc);
+        if (btnChangeDisc != null) {
+            btnChangeDisc.setOnClickListener(v -> {
+                closeInGameDrawer();
+                SwapDisc();
+            });
+        }
+
         MaterialButton btnTestController = findViewById(R.id.drawer_btn_test_controller);
         if (btnTestController != null) {
             btnTestController.setOnClickListener(v -> {
@@ -5243,6 +5251,39 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             });
+
+    private final ActivityResultLauncher<Intent> startActivityResultSwapDisc = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                    Uri uri = result.getData().getData();
+                    if (uri != null) {
+                        try {
+                            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        } catch (Exception ignored) {}
+
+                        String displayName = queryOpenableDisplayName(uri);
+                        if (displayName == null) {
+                            displayName = uri.getLastPathSegment();
+                        }
+                        if (NativeApp.changeDisc(uri.toString())) {
+                            Toast.makeText(this, "Disc Changed: " + displayName, Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(this, "Failure to Change Disk: " + displayName, Toast.LENGTH_LONG).show();
+                        }
+                    }
+                }
+            });
+
+    private void SwapDisc() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        String[] mimeTypes = {"application/octet-stream", "application/x-iso9660-image", "application/x-cd-image"};
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+        startActivityResultSwapDisc.launch(intent);
+    }
+
     private void applySavedBackground() {
         if (bgImage == null) return;
         android.content.SharedPreferences sp = getSharedPreferences(PREFS, MODE_PRIVATE);
