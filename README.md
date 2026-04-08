@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/github/license/ARMSX2/ARMSX2)](https://www.gnu.org/licenses/gpl-3.0.html)
 [![Discord](https://img.shields.io/discord/914421153827794975?logo=discord&logoColor=white&label=ARMSX2%20Discord&color=5865F2)](https://discord.gg/KwAChKDctz)
-[![Patreon]((https://patreon.com/ARMSX2)
+((https://patreon.com/ARMSX2)
 [![Nightly Build](https://github.com/ARMSX2/ARMSX2/actions/workflows/android_nightly_build.yml/badge.svg)](https://github.com/ARMSX2/ARMSX2/actions/workflows/android_nightly_build.yml)
 
 </div>
