@@ -708,70 +708,6 @@ public class SettingsActivity extends AppCompatActivity {
 			});
 		}
 
-		final Slider sbFpsLimit = findViewById(R.id.sb_fps_limit);
-		final TextView tvFpsLimit = findViewById(R.id.tv_fps_limit_value);
-
-		MaterialSwitch swFrameLimiter = findViewById(R.id.sw_frame_limiter);
-		if (swFrameLimiter != null) {
-			try {
-				String ns = NativeApp.getSetting("Framerate", "NominalScalar", "float");
-				float scalar = (ns == null || ns.isEmpty()) ? 1.0f : Float.parseFloat(ns);
-				swFrameLimiter.setChecked(scalar < 5.0f);
-			} catch (Exception ignored) {}
-			swFrameLimiter.setOnCheckedChangeListener((buttonView, isChecked) -> {
-				if (!isChecked) {
-					NativeApp.setSetting("Framerate", "NominalScalar", "float", Float.toString(10.0f));
-				} else {
-					float baseFps = 59.94f;
-					try {
-						String ntsc = NativeApp.getSetting("EmuCore/GS", "FramerateNTSC", "float");
-						if (ntsc != null && !ntsc.isEmpty()) {
-							baseFps = Float.parseFloat(ntsc);
-						}
-					} catch (Exception ignored2) {}
-					int fps = 60;
-					if (sbFpsLimit != null) {
-						fps = Math.max(30, Math.min(180, Math.round(sbFpsLimit.getValue())));
-					}
-					float scalar = fps / baseFps;
-					NativeApp.setSetting("Framerate", "NominalScalar", "float", Float.toString(scalar));
-				}
-			});
-		}
-
-		if (sbFpsLimit != null && tvFpsLimit != null) {
-			try {
-				float baseFps = 59.94f;
-				try {
-					String ntsc = NativeApp.getSetting("EmuCore/GS", "FramerateNTSC", "float");
-					if (ntsc != null && !ntsc.isEmpty()) baseFps = Float.parseFloat(ntsc);
-				} catch (Exception ignored2) {}
-
-				String ns = NativeApp.getSetting("Framerate", "NominalScalar", "float");
-				float scalar = (ns == null || ns.isEmpty()) ? 1.0f : Float.parseFloat(ns);
-				int fpsValue = Math.round(scalar * baseFps);
-				if (fpsValue < 30) fpsValue = 30;
-				if (fpsValue > 180) fpsValue = 180;
-				sbFpsLimit.setValue(fpsValue);
-				tvFpsLimit.setText(getString(R.string.settings_custom_fps_limit_value, fpsValue));
-			} catch (Exception ignored) {
-				sbFpsLimit.setValue(60f);
-				tvFpsLimit.setText(R.string.settings_custom_fps_limit_default);
-			}
-			sbFpsLimit.addOnChangeListener((slider, value, fromUser) -> {
-				int fps = Math.max(30, Math.min(180, Math.round(value)));
-				if (fps != Math.round(value)) slider.setValue(fps);
-				tvFpsLimit.setText(getString(R.string.settings_custom_fps_limit_value, fps));
-				float baseFps = 59.94f;
-				try {
-					String ntsc = NativeApp.getSetting("EmuCore/GS", "FramerateNTSC", "float");
-					if (ntsc != null && !ntsc.isEmpty()) baseFps = Float.parseFloat(ntsc);
-				} catch (Exception ignored2) {}
-				float scalar = fps / baseFps;
-				NativeApp.setSetting("Framerate", "NominalScalar", "float", Float.toString(scalar));
-			});
-		}
-
 		Spinner spAspectRatio = findViewById(R.id.sp_aspect_ratio);
 		ArrayAdapter<CharSequence> aspectAdapter = ArrayAdapter.createFromResource(this, R.array.aspect_ratios, android.R.layout.simple_spinner_item);
 		aspectAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -1545,7 +1481,7 @@ public class SettingsActivity extends AppCompatActivity {
 				NativeApp.setSetting("EmuCore/Speedhacks", "vuThread", "bool", isChecked ? "true" : "false");
 				if (swInstantVu1 != null) {
 					if (isChecked && swInstantVu1.isChecked()) {
-						swInstantVu1.setChecked(false);
+						swInstantVu1.setChecked(true);
 					}
 					swInstantVu1.setEnabled(!isChecked);
 				}
@@ -1561,6 +1497,133 @@ public class SettingsActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
             swFastCdvd.setOnCheckedChangeListener((b, isChecked) ->
                     NativeApp.setSetting("EmuCore/Speedhacks", "fastCDVD", "bool", isChecked ? "true" : "false"));
+        }
+
+        // Frame Limiter
+        final Slider sbFpsLimit = findViewById(R.id.sb_fps_limit);
+        final TextView tvFpsLimit = findViewById(R.id.tv_fps_limit_value);
+
+        MaterialSwitch swFrameLimiter = findViewById(R.id.sw_frame_limiter);
+        if (swFrameLimiter != null) {
+            try {
+                String ns = NativeApp.getSetting("Framerate", "NominalScalar", "float");
+                float scalar = (ns == null || ns.isEmpty()) ? 1.0f : Float.parseFloat(ns);
+                swFrameLimiter.setChecked(scalar < 5.0f);
+            } catch (Exception ignored) {}
+            swFrameLimiter.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                if (!isChecked) {
+                    NativeApp.setSetting("Framerate", "NominalScalar", "float", Float.toString(10.0f));
+                } else {
+                    float baseFps = 59.94f;
+                    try {
+                        String ntsc = NativeApp.getSetting("EmuCore/GS", "FramerateNTSC", "float");
+                        if (ntsc != null && !ntsc.isEmpty()) {
+                            baseFps = Float.parseFloat(ntsc);
+                        }
+                    } catch (Exception ignored2) {}
+                    int fps = 60;
+                    if (sbFpsLimit != null) {
+                        fps = Math.max(30, Math.min(180, Math.round(sbFpsLimit.getValue())));
+                    }
+                    float scalar = fps / baseFps;
+                    NativeApp.setSetting("Framerate", "NominalScalar", "float", Float.toString(scalar));
+                }
+            });
+        }
+
+        if (sbFpsLimit != null && tvFpsLimit != null) {
+            try {
+                float baseFps = 59.94f;
+                try {
+                    String ntsc = NativeApp.getSetting("EmuCore/GS", "FramerateNTSC", "float");
+                    if (ntsc != null && !ntsc.isEmpty()) baseFps = Float.parseFloat(ntsc);
+                } catch (Exception ignored2) {}
+
+                String ns = NativeApp.getSetting("Framerate", "NominalScalar", "float");
+                float scalar = (ns == null || ns.isEmpty()) ? 1.0f : Float.parseFloat(ns);
+                int fpsValue = Math.round(scalar * baseFps);
+                if (fpsValue < 30) fpsValue = 30;
+                if (fpsValue > 180) fpsValue = 180;
+                sbFpsLimit.setValue(fpsValue);
+                tvFpsLimit.setText(getString(R.string.settings_custom_fps_limit_value, fpsValue));
+            } catch (Exception ignored) {
+                sbFpsLimit.setValue(60f);
+                tvFpsLimit.setText(R.string.settings_custom_fps_limit_default);
+            }
+            sbFpsLimit.addOnChangeListener((slider, value, fromUser) -> {
+                int fps = Math.max(30, Math.min(180, Math.round(value)));
+                if (fps != Math.round(value)) slider.setValue(fps);
+                tvFpsLimit.setText(getString(R.string.settings_custom_fps_limit_value, fps));
+                float baseFps = 59.94f;
+                try {
+                    String ntsc = NativeApp.getSetting("EmuCore/GS", "FramerateNTSC", "float");
+                    if (ntsc != null && !ntsc.isEmpty()) baseFps = Float.parseFloat(ntsc);
+                } catch (Exception ignored2) {}
+                float scalar = fps / baseFps;
+                NativeApp.setSetting("Framerate", "NominalScalar", "float", Float.toString(scalar));
+            });
+        }
+
+        // Framerate Control
+        //NTSC
+        final Slider sbNtscRate = findViewById(R.id.sb_ntsc_framerate);
+        final TextView tvNtscRate = findViewById(R.id.tv_ntsc_framerate);if (sbNtscRate != null && tvNtscRate != null) {
+            try {
+                String rate = NativeApp.getSetting("EmuCore/GS", "FramerateNTSC", "float");
+                float v = (rate == null || rate.isEmpty()) ? 59.94f : Float.parseFloat(rate);
+                sbNtscRate.setValue(v);
+                tvNtscRate.setText(getString(R.string.settings_ntsc_framerate_value, v));
+            } catch (Exception ignored) {
+                sbNtscRate.setValue(59.94f);
+            }
+            sbNtscRate.addOnChangeListener((slider, value, fromUser) -> {
+                tvNtscRate.setText(getString(R.string.settings_ntsc_framerate_value, value));
+                NativeApp.setSetting("EmuCore/GS", "FramerateNTSC", "float", String.valueOf(value));
+            });
+        }
+        //PAL
+        final Slider sbPalRate = findViewById(R.id.sb_pal_framerate);
+        final TextView tvPalRate = findViewById(R.id.tv_pal_framerate);
+        if (sbPalRate != null && tvPalRate != null) {
+            try {
+                String rate = NativeApp.getSetting("EmuCore/GS", "FrameratePAL", "float");
+                float v = (rate == null || rate.isEmpty()) ? 50.00f : Float.parseFloat(rate);
+                sbPalRate.setValue(v);
+                tvPalRate.setText(getString(R.string.settings_pal_framerate_value, v));
+            } catch (Exception ignored) {
+                sbPalRate.setValue(50.00f);
+            }
+            sbPalRate.addOnChangeListener((slider, value, fromUser) -> {
+                tvPalRate.setText(getString(R.string.settings_pal_framerate_value, value));
+                NativeApp.setSetting("EmuCore/GS", "FrameratePAL", "float", String.valueOf(value));
+            });
+        }
+
+        // Reset Framrates
+        MaterialButton btnResetFramerates = findViewById(R.id.btn_reset_framerates);
+
+        if (btnResetFramerates != null) {
+            btnResetFramerates.setOnClickListener(v -> {
+                float defaultNtsc = 59.94f;
+                float defaultPal = 50.00f;
+
+                if (sbNtscRate != null) sbNtscRate.setValue(defaultNtsc);
+                if (sbPalRate != null) sbPalRate.setValue(defaultPal);
+
+                if (tvNtscRate != null) tvNtscRate.setText(getString(R.string.settings_ntsc_framerate_value, defaultNtsc));
+                if (tvPalRate != null) tvPalRate.setText(getString(R.string.settings_pal_framerate_value, defaultPal));
+
+                NativeApp.setSetting("EmuCore/GS", "FramerateNTSC", "float", String.valueOf(defaultNtsc));
+                NativeApp.setSetting("EmuCore/GS", "FrameratePAL", "float", String.valueOf(defaultPal));
+
+                if (sbFpsLimit != null) sbFpsLimit.setValue(60f);
+                if (tvFpsLimit != null) tvFpsLimit.setText(R.string.settings_custom_fps_limit_default);
+                if (swFrameLimiter != null) swFrameLimiter.setChecked(true);
+
+                NativeApp.setSetting("Framerate", "NominalScalar", "float", "1.0");
+
+                Toast.makeText(this, "Default FrameRates", Toast.LENGTH_SHORT).show();
+            });
         }
     }
 
