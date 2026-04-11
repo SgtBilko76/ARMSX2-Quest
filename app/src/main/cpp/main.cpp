@@ -32,6 +32,7 @@
 #include <fstream>
 #include <algorithm>
 #include <mutex>
+#include "pcsx2/CDVD/CDVDcommon.h"
 
 namespace
 {
@@ -1445,6 +1446,19 @@ Java_kr_co_iefriends_pcsx2_utils_RetroAchievementsBridge_nativeSetHardcore(JNIEn
     NotifyRetroAchievementsState();
 }
 
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_changeDisc(JNIEnv* env, jclass clazz, jstring p_path) {
+    std::string path = GetJavaString(env, p_path);
+    if (!VMManager::HasValidVM()) return JNI_FALSE;
+
+    std::string displayName = path;
+    size_t lastSlash = path.find_last_of("");
+    if (lastSlash != std::string::npos) {
+        displayName = path.substr(lastSlash + 1);
+    }
+    return VMManager::ChangeDisc(CDVD_SourceType::Iso, path) ? JNI_TRUE : JNI_FALSE;
+}
 
 void Host::CommitBaseSettingChanges()
 {

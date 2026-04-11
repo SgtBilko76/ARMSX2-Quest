@@ -159,4 +159,5 @@ public class NativeApp {
     public static native void setCustomDriverPath(String path);
     public static native String getCustomDriverPath();
     public static native void setNativeLibraryDir(String path);
+	public static native boolean changeDisc(String path);
 }
