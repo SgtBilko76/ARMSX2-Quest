@@ -685,7 +685,7 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_kr_co_iefriends_pcsx2_NativeApp_renderUpscalemultiplier(JNIEnv *env, jclass clazz,
                                                              jfloat p_value) {
-    const float clamped = std::clamp(p_value, 1.0f, 12.0f);
+    const float clamped = std::clamp(p_value, 0.25f, 12.0f);
 
     EmuConfig.GS.UpscaleMultiplier = clamped;
     GSConfig.UpscaleMultiplier = clamped;
