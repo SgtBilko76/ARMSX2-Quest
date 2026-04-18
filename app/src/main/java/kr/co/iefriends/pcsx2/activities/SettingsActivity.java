@@ -910,26 +910,30 @@ public class SettingsActivity extends AppCompatActivity {
 			});
 		}
 
-		Slider sbUpscale = findViewById(R.id.sb_upscale);
-		TextView tvUpscale = findViewById(R.id.tv_upscale_value);
-		if (sbUpscale != null && tvUpscale != null) {
-			try {
-				String up = NativeApp.getSetting("EmuCore/GS", "upscale_multiplier", "float");
-				float f = up == null || up.isEmpty() ? 1f : Float.parseFloat(up);
-				int mult = Math.max(1, Math.min(8, Math.round(f)));
-				sbUpscale.setValue(mult);
-				tvUpscale.setText(getString(R.string.settings_upscale_value, mult));
-			} catch (Exception ignored) {
-				sbUpscale.setValue(1f);
-				tvUpscale.setText(R.string.settings_upscale_default);
-			}
-			sbUpscale.addOnChangeListener((slider, value, fromUser) -> {
-				int mult = Math.max(1, Math.min(8, Math.round(value)));
-				if (mult != Math.round(value)) slider.setValue(mult);
-				tvUpscale.setText(getString(R.string.settings_upscale_value, mult));
-				NativeApp.setSetting("EmuCore/GS", "upscale_multiplier", "float", String.valueOf(mult));
-			});
-		}
+        Slider sbUpscale = findViewById(R.id.sb_upscale);
+        TextView tvUpscale = findViewById(R.id.tv_upscale_value);
+        if (sbUpscale != null && tvUpscale != null) {
+            try {
+                String up = NativeApp.getSetting("EmuCore/GS", "upscale_multiplier", "float");
+                float f = (up == null || up.isEmpty()) ? 1.0f : Float.parseFloat(up);
+                float clamped = Math.max(0.25f, Math.min(8.0f, f));
+                sbUpscale.setValue(clamped);
+                String formattedInitial = (clamped == (int) clamped)
+                        ? String.valueOf((int) clamped) : String.valueOf(clamped);
+                tvUpscale.setText(getString(R.string.settings_upscale_value, formattedInitial));
+            } catch (Exception ignored) {
+                sbUpscale.setValue(1.0f);
+                tvUpscale.setText(R.string.settings_upscale_default);
+            }
+            sbUpscale.addOnChangeListener((slider, value, fromUser) -> {
+                String valStr = (value == (int) value) ? String.valueOf((int) value) : String.valueOf(value);
+                tvUpscale.setText(getString(R.string.settings_upscale_value, valStr));
+
+                NativeApp.setSetting("EmuCore/GS", "upscale_multiplier", "float", String.valueOf(value));
+                NativeApp.renderUpscalemultiplier(value);
+                markSettingsResultChanged();
+            });
+        }
 
 		// Texture Filtering
 		Spinner spFiltering = findViewById(R.id.sp_filtering);

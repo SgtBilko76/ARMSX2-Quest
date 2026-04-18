@@ -2638,25 +2638,29 @@ public class MainActivity extends AppCompatActivity {
             ArrayAdapter<CharSequence> scaleAdapter = ArrayAdapter.createFromResource(this, R.array.resolution_scales, android.R.layout.simple_spinner_item);
             scaleAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             scaleSpinner.setAdapter(scaleAdapter);
-            int current = 0;
+            final String[] scales = getResources().getStringArray(R.array.resolution_scales);
+            int current = 2;
             try {
                 String value = NativeApp.getSetting("EmuCore/GS", "upscale_multiplier", "float");
                 if (value != null && !value.isEmpty()) {
-                    float parsed = Float.parseFloat(value);
-                    current = Math.max(1, Math.min(scaleAdapter.getCount(), Math.round(parsed))) - 1;
+                    float f = Float.parseFloat(value);
+                    String search = (f == (int)f) ? (int)f + "x" : f + "x";
+                    for (int i = 0; i < scales.length; i++) {
+                        if (scales[i].equalsIgnoreCase(search)) {
+                            current = i;
+                            break;
+                        }
+                    }
                 }
             } catch (Exception ignored) {}
-            if (current < 0 || current >= scaleAdapter.getCount()) current = 0;
             scaleSpinner.setSelection(current, false);
             scaleSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    NativeApp.setSetting("EmuCore/GS", "upscale_multiplier", "float", String.valueOf(position + 1));
+                    String val = scales[position].replace("x", "");
+                    NativeApp.setSetting("EmuCore/GS", "upscale_multiplier", "float", val);
                 }
-
-                @Override
-                public void onNothingSelected(AdapterView<?> parent) {
-                }
+                @Override public void onNothingSelected(AdapterView<?> parent) {}
             });
         }
 
