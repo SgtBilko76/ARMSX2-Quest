@@ -3196,7 +3196,7 @@ public class MainActivity extends AppCompatActivity {
         boolean isNether = STYLE_NETHER.equals(currentOnScreenUiStyle);
         PSButtonView btn_pad_select = findViewById(R.id.btn_pad_select);
         if (btn_pad_select != null) {
-            applyButtonIcon(btn_pad_select, R.drawable.playstation3_button_select, "ic_controller_select_button.png");
+            applyButtonIcon(btn_pad_select, R.drawable.ic_ps_select, "ic_controller_select_button.png");
             btn_pad_select.setRectangular(true);
             float selectScale = isNether ? 0.75f : 1.0f;
             btn_pad_select.setScaleX(selectScale);
@@ -3206,7 +3206,7 @@ public class MainActivity extends AppCompatActivity {
 
         PSButtonView btn_pad_start = findViewById(R.id.btn_pad_start);
         if (btn_pad_start != null) {
-            applyButtonIcon(btn_pad_start, R.drawable.playstation3_button_start, "ic_controller_start_button.png");
+            applyButtonIcon(btn_pad_start, R.drawable.ic_ps_start, "ic_controller_start_button.png");
             float selectScale = isNether ? 0.75f : 1.0f;
             btn_pad_start.setScaleX(selectScale);
             btn_pad_start.setScaleY(selectScale);
@@ -3217,7 +3217,7 @@ public class MainActivity extends AppCompatActivity {
 
         PSButtonView btn_pad_a = findViewById(R.id.btn_pad_a);
         if (btn_pad_a != null) {
-            applyButtonIcon(btn_pad_a, R.drawable.playstation_button_color_cross_outline, "ic_controller_cross_button.png");
+            applyButtonIcon(btn_pad_a, R.drawable.ic_ps_cross, "ic_controller_cross_button.png");
             btn_pad_a.setScaleX(faceScale);
             btn_pad_a.setScaleY(faceScale);
             btn_pad_a.setOnPSButtonListener(pressed -> {
@@ -3228,7 +3228,7 @@ public class MainActivity extends AppCompatActivity {
 
         PSButtonView btn_pad_b = findViewById(R.id.btn_pad_b);
         if (btn_pad_b != null) {
-            applyButtonIcon(btn_pad_b, R.drawable.playstation_button_color_circle_outline, "ic_controller_circle_button.png");
+            applyButtonIcon(btn_pad_b, R.drawable.ic_ps_circle, "ic_controller_circle_button.png");
             btn_pad_b.setScaleX(faceScale);
             btn_pad_b.setScaleY(faceScale);
             btn_pad_b.setOnPSButtonListener(pressed -> {
@@ -3239,7 +3239,7 @@ public class MainActivity extends AppCompatActivity {
 
         PSButtonView btn_pad_x = findViewById(R.id.btn_pad_x);
         if (btn_pad_x != null) {
-            applyButtonIcon(btn_pad_x, R.drawable.playstation_button_color_square_outline, "ic_controller_square_button.png");
+            applyButtonIcon(btn_pad_x, R.drawable.ic_ps_square, "ic_controller_square_button.png");
             btn_pad_x.setScaleX(faceScale);
             btn_pad_x.setScaleY(faceScale);
             btn_pad_x.setOnPSButtonListener(pressed -> {
@@ -3250,7 +3250,7 @@ public class MainActivity extends AppCompatActivity {
 
         PSButtonView btn_pad_y = findViewById(R.id.btn_pad_y);
         if (btn_pad_y != null) {
-            applyButtonIcon(btn_pad_y, R.drawable.playstation_button_color_triangle_outline, "ic_controller_triangle_button.png");
+            applyButtonIcon(btn_pad_y, R.drawable.ic_ps_triangle, "ic_controller_triangle_button.png");
             btn_pad_y.setScaleX(faceScale);
             btn_pad_y.setScaleY(faceScale);
             btn_pad_y.setOnPSButtonListener(pressed -> {
@@ -3261,7 +3261,7 @@ public class MainActivity extends AppCompatActivity {
 
         PSShoulderButtonView btn_pad_l1 = findViewById(R.id.btn_pad_l1);
         if (btn_pad_l1 != null) {
-            applyShoulderIcon(btn_pad_l1, R.drawable.playstation_trigger_l1_alternative_outline, "ic_controller_l1_button.png");
+            applyShoulderIcon(btn_pad_l1, R.drawable.ic_ps_l1, "ic_controller_l1_button.png");
             btn_pad_l1.setScaleX(1.0f);
             btn_pad_l1.setScaleY(isNether ? 0.6f : 1.0f);
             btn_pad_l1.setOnPSShoulderButtonListener(pressed -> NativeApp.setPadButton(KeyEvent.KEYCODE_BUTTON_L1, 0, pressed));
@@ -3269,7 +3269,7 @@ public class MainActivity extends AppCompatActivity {
 
         PSShoulderButtonView btn_pad_r1 = findViewById(R.id.btn_pad_r1);
         if (btn_pad_r1 != null) {
-            applyShoulderIcon(btn_pad_r1, R.drawable.playstation_trigger_r1_alternative_outline, "ic_controller_r1_button.png");
+            applyShoulderIcon(btn_pad_r1, R.drawable.ic_ps_r1, "ic_controller_r1_button.png");
             btn_pad_r1.setScaleX(1.0f);
             btn_pad_r1.setScaleY(isNether ? 0.6f : 1.0f);
             btn_pad_r1.setOnPSShoulderButtonListener(pressed -> NativeApp.setPadButton(KeyEvent.KEYCODE_BUTTON_R1, 0, pressed));
@@ -3277,7 +3277,7 @@ public class MainActivity extends AppCompatActivity {
 
         PSShoulderButtonView btn_pad_l2 = findViewById(R.id.btn_pad_l2);
         if (btn_pad_l2 != null) {
-            applyShoulderIcon(btn_pad_l2, R.drawable.playstation_trigger_l2_alternative_outline, "ic_controller_l2_button.png");
+            applyShoulderIcon(btn_pad_l2, R.drawable.ic_ps_l2, "ic_controller_l2_button.png");
             btn_pad_l2.setScaleX(1.0f);
             btn_pad_l2.setScaleY(isNether ? 0.6f : 1.0f);
             btn_pad_l2.setOnPSShoulderButtonListener(pressed -> NativeApp.setPadButton(KeyEvent.KEYCODE_BUTTON_L2, 0, pressed));
@@ -3285,7 +3285,7 @@ public class MainActivity extends AppCompatActivity {
 
         PSShoulderButtonView btn_pad_r2 = findViewById(R.id.btn_pad_r2);
         if (btn_pad_r2 != null) {
-            applyShoulderIcon(btn_pad_r2, R.drawable.playstation_trigger_r2_alternative_outline, "ic_controller_r2_button.png");
+            applyShoulderIcon(btn_pad_r2, R.drawable.ic_ps_r2, "ic_controller_r2_button.png");
             btn_pad_r2.setScaleX(1.0f);
             btn_pad_r2.setScaleY(isNether ? 0.6f : 1.0f);
             btn_pad_r2.setOnPSShoulderButtonListener(pressed -> NativeApp.setPadButton(KeyEvent.KEYCODE_BUTTON_R2, 0, pressed));
@@ -3293,13 +3293,13 @@ public class MainActivity extends AppCompatActivity {
 
         PSButtonView btn_pad_l3 = findViewById(R.id.btn_pad_l3);
         if (btn_pad_l3 != null) {
-            applyButtonIcon(btn_pad_l3, R.drawable.playstation_button_l3_outline, "ic_controller_l3_button.png");
+            applyButtonIcon(btn_pad_l3, R.drawable.ic_ps_l3, "ic_controller_l3_button.png");
             btn_pad_l3.setOnPSButtonListener(pressed -> NativeApp.setPadButton(KeyEvent.KEYCODE_BUTTON_THUMBL, 0, pressed));
         }
 
         PSButtonView btn_pad_r3 = findViewById(R.id.btn_pad_r3);
         if (btn_pad_r3 != null) {
-            applyButtonIcon(btn_pad_r3, R.drawable.playstation_button_r3_outline, "ic_controller_r3_button.png");
+            applyButtonIcon(btn_pad_r3, R.drawable.ic_ps_r3, "ic_controller_r3_button.png");
             btn_pad_r3.setOnPSButtonListener(pressed -> NativeApp.setPadButton(KeyEvent.KEYCODE_BUTTON_THUMBR, 0, pressed));
         }
 
