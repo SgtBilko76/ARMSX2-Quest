@@ -88,6 +88,28 @@
             android:orientation="vertical">
 
             <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/sw_warn_unsafe_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_warn_unsafe_settings"
+                app:useMaterialThemeColors="true" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/settings_warn_unsafe_settings_summary"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:orientation="vertical">
+
+            <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/sw_record_logs"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

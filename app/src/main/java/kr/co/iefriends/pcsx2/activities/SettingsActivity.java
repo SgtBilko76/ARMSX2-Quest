@@ -90,7 +90,8 @@ public class SettingsActivity extends AppCompatActivity {
 	private static final int SECTION_CONTROLLER = 4;
 	private static final int SECTION_CUSTOMIZATION = 5;
 	private static final int SECTION_STORAGE = 6;
-	private static final int SECTION_ACHIEVEMENTS = 7;
+    private static final int SECTION_MEMORY = 7;
+	private static final int SECTION_ACHIEVEMENTS = 8;
 	private static final String PREF_GPU_PROFILE_OVERRIDE_FALLBACK = "gpu_profile_override_fallback";
 	private static final String STATE_SELECTED_SECTION = "settings_selected_section";
 	private static final String EXTRA_SHOW_ADVANCED = "android.provider.extra.SHOW_ADVANCED";
@@ -746,6 +747,17 @@ public class SettingsActivity extends AppCompatActivity {
 			swFastBoot.setOnCheckedChangeListener((b, isChecked) ->
 					NativeApp.setSetting("EmuCore", "EnableFastBoot", "bool", isChecked ? "true" : "false"));
 		}
+
+        MaterialSwitch swWarnUnsafe = findViewById(R.id.sw_warn_unsafe_settings);
+        if (swWarnUnsafe != null) {
+            try {
+                String warn = NativeApp.getSetting("EmuCore", "WarnAboutUnsafeSettings", "bool");
+                swWarnUnsafe.setChecked(!"false".equalsIgnoreCase(warn));
+            } catch (Exception ignored) {}
+            swWarnUnsafe.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                NativeApp.setSetting("EmuCore", "WarnAboutUnsafeSettings", "bool", isChecked ? "true" : "false");
+            });
+        }
 
 		MaterialSwitch swRecordLogs = findViewById(R.id.sw_record_logs);
 		if (swRecordLogs != null) {
@@ -1969,18 +1981,238 @@ public class SettingsActivity extends AppCompatActivity {
 		}
 	}
 
-	private void initializeMemoryCardSettings() {
-		Button btnImportMc = findViewById(R.id.btn_import_memcard);
-		btnImportMc.setOnClickListener(v -> {
-			Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-			i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-			i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false);
-			i.setType("application/octet-stream");
-			String[] types = new String[]{"application/octet-stream", "application/x-binary"};
-			i.putExtra(Intent.EXTRA_MIME_TYPES, types);
-			startActivityForResult(Intent.createChooser(i, "Select memory card"), REQ_IMPORT_MEMCARD);
-		});
-	}
+    private void initializeMemoryCardSettings() {
+        View btnCreateCard = findViewById(R.id.btn_create_card);
+        if (btnCreateCard != null) {
+            btnCreateCard.setOnClickListener(v -> showCreateCardDialog());
+        }
+        View btnImportMc = findViewById(R.id.btn_import_memcard);
+        if (btnImportMc != null) {
+            btnImportMc.setOnClickListener(v -> {
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                i.setType("*/*");
+                startActivityForResult(Intent.createChooser(i, "Select memory card"), REQ_IMPORT_MEMCARD);
+            });
+        }
+
+        View btnSwapCards = findViewById(R.id.btn_swap_cards);
+        if (btnSwapCards != null) {
+            btnSwapCards.setOnClickListener(v -> {
+                String slot1 = NativeApp.getSetting("MemoryCards", "Slot1_Filename", "string");
+                String slot2 = NativeApp.getSetting("MemoryCards", "Slot2_Filename", "string");
+                NativeApp.setSetting("MemoryCards", "Slot1_Filename", "string", slot2);
+                NativeApp.setSetting("MemoryCards", "Slot2_Filename", "string", slot1);
+                updateMemoryCardUi();
+                Toast.makeText(this, R.string.settings_swap_cards, Toast.LENGTH_SHORT).show();
+            });
+        }
+        MaterialSwitch swFilter = findViewById(R.id.sw_memcard_filter);
+        if (swFilter != null) {
+            try {
+                String val = NativeApp.getSetting("EmuCore", "McdFolderAutoManage", "bool");
+                swFilter.setChecked("true".equalsIgnoreCase(val));
+            } catch (Exception ignored) {}
+            swFilter.setOnCheckedChangeListener((b, isChecked) ->
+                    NativeApp.setSetting("EmuCore", "McdFolderAutoManage", "bool", isChecked ? "true" : "false"));
+        }
+        setupCardSlotControls(1, R.id.sw_card_1_enabled, R.id.btn_card_1_name, R.id.tv_card_1_name_value);
+        setupCardSlotControls(2, R.id.sw_card_2_enabled, R.id.btn_card_2_name, R.id.tv_card_2_name_value);
+    }
+
+    private void setupCardSlotControls(int slot, int swId, int btnId, int tvId) {
+        MaterialSwitch sw = findViewById(swId);
+        View btn = findViewById(btnId);
+        TextView tv = findViewById(tvId);
+        String section = "MemoryCards";
+        String keyEnable = "Slot" + slot + "_Enable";
+        String keyFile = "Slot" + slot + "_Filename";
+
+        if (sw != null) {
+            try {
+                String enabled = NativeApp.getSetting(section, keyEnable, "bool");
+                sw.setChecked("true".equalsIgnoreCase(enabled));
+            } catch (Exception ignored) {}
+            sw.setOnCheckedChangeListener((b, isChecked) ->
+                    NativeApp.setSetting(section, keyEnable, "bool", isChecked ? "true" : "false"));
+        }
+        if (tv != null) {
+            try {
+                String filename = NativeApp.getSetting(section, keyFile, "string");
+                tv.setText(TextUtils.isEmpty(filename) ? "None" : filename);
+            } catch (Exception ignored) {}
+        }
+        if (btn != null) {
+            btn.setOnClickListener(v -> showMemoryCardSelector(slot));
+        }
+    }
+
+    private void showCreateCardDialog() {
+        final TextInputEditText input = new TextInputEditText(this);
+        input.setHint("Memory card name (e.g. MySave)");
+
+        final String[] options = {
+                "8 MB (Standard High compatibility)",
+                "16 MB (May cause issues)",
+                "32 MB (May cause issues)",
+                "64 MB (Too Large - May cause issues)",
+                "Folder (Recommended - Unlimited size)"
+        };
+
+        final long[] sizes = {
+                8650752,       // 8MB
+                17301504,      // 16MB
+                34603008,      // 32MB
+                69206016,      // 64MB
+                -1             // Folder
+        };
+
+        final int[] selectedOption = {0};
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Create New Memory Card")
+                .setView(input)
+                .setSingleChoiceItems(options, 0, (dialog, which) -> {
+                    selectedOption[0] = which;
+                })
+                .setPositiveButton("Create", (dialog, which) -> {
+                    String name = input.getText().toString().trim();
+                    if (TextUtils.isEmpty(name)) return;
+
+                    if (!name.toLowerCase().endsWith(".ps2")) {
+                        name += ".ps2";
+                    }
+
+                    File memcardsDir = new File(DataDirectoryManager.getDataRoot(this), "memcards");
+                    if (!memcardsDir.exists() && !memcardsDir.mkdirs()) return;
+
+                    long size = sizes[selectedOption[0]];
+
+                    if (size == -1) {
+                        File folderCard = new File(memcardsDir, name);
+                        if (folderCard.exists()) {
+                            Toast.makeText(this, "Folder or File already exists", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        if (folderCard.mkdirs()) {
+                            Toast.makeText(this, "Folder memory card created!", Toast.LENGTH_SHORT).show();
+                            updateMemoryCardUi();
+                        }
+                    } else {
+                        File fileCard = new File(memcardsDir, name);
+                        if (fileCard.exists()) {
+                            Toast.makeText(this, "File already exists", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        try {
+                            if (fileCard.createNewFile()) {
+                                java.io.RandomAccessFile raf = new java.io.RandomAccessFile(fileCard, "rw");
+                                byte[] buffer = new byte[1024 * 1024];
+                                java.util.Arrays.fill(buffer, (byte) 0xFF);
+
+                                long bytesWritten = 0;
+                                while (bytesWritten < size) {
+                                    long toWrite = Math.min(buffer.length, size - bytesWritten);
+                                    raf.write(buffer, 0, (int) toWrite);
+                                    bytesWritten += toWrite;
+                                }
+                                raf.close();
+                                Toast.makeText(this, "File card created: " + name, Toast.LENGTH_SHORT).show();
+                                updateMemoryCardUi();
+                            }
+                        } catch (Exception e) {
+                            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                        }
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void showMemoryCardSelector(int slot) {
+        File memcardsDir = new File(DataDirectoryManager.getDataRoot(this), "memcards");
+        if (!memcardsDir.exists()) memcardsDir.mkdirs();
+
+        File[] files = memcardsDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".ps2"));
+        if (files == null || files.length == 0) {
+            Toast.makeText(this, "No memory cards found in /memcards", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] displayNames = new String[files.length];
+        String[] realNames = new String[files.length];
+
+        for (int i = 0; i < files.length; i++) {
+            realNames[i] = files[i].getName();
+            if (files[i].isDirectory()) {
+                displayNames[i] = files[i].getName() + " (Folder)";
+            } else {
+                displayNames[i] = files[i].getName();
+            }
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setItems(displayNames, (dialog, which) -> {
+                    String selected = realNames[which];
+                    int otherSlot = (slot == 1) ? 2 : 1;
+                    String otherCard = NativeApp.getSetting("MemoryCards", "Slot" + otherSlot + "_Filename", "string");
+                    if (selected.equals(otherCard)) {
+                        Toast.makeText(this, getString(R.string.settings_memory_card_already_in_use, otherSlot), Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    NativeApp.setSetting("MemoryCards", "Slot" + slot + "_Filename", "string", selected);
+                    updateMemoryCardUi();
+                    Toast.makeText(this, "Slot " + slot + " set to: " + selected, Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void updateMemoryCardUi() {
+        TextView tvSlot1 = findViewById(R.id.tv_card_1_name_value);
+        TextView tvSlot2 = findViewById(R.id.tv_card_2_name_value);
+
+        String name1 = NativeApp.getSetting("MemoryCards", "Slot1_Filename", "string");
+        String name2 = NativeApp.getSetting("MemoryCards", "Slot2_Filename", "string");
+
+        File memcardsDir = new File(DataDirectoryManager.getDataRoot(this), "memcards");
+
+        if (!TextUtils.isEmpty(name1)) {
+            File file1 = new File(memcardsDir, name1);
+            if (!file1.exists()) {
+                NativeApp.setSetting("MemoryCards", "Slot1_Filename", "string", "");
+                name1 = "";
+            }
+        }
+
+        if (!TextUtils.isEmpty(name2)) {
+            File file2 = new File(memcardsDir, name2);
+            if (!file2.exists()) {
+                NativeApp.setSetting("MemoryCards", "Slot2_Filename", "string", "");
+                name2 = "";
+            }
+        }
+
+        if (tvSlot1 != null) {
+            if (TextUtils.isEmpty(name1)) {
+                tvSlot1.setText("None");
+            } else {
+                File f1 = new File(memcardsDir, name1);
+                String suffix = f1.isDirectory() ? " (Folder)" : "";
+                tvSlot1.setText(name1 + suffix);
+            }
+        }
+
+        if (tvSlot2 != null) {
+            if (TextUtils.isEmpty(name2)) {
+                tvSlot2.setText("None");
+            } else {
+                File f2 = new File(memcardsDir, name2);
+                String suffix = f2.isDirectory() ? " (Folder)" : "";
+                tvSlot2.setText(name2 + suffix);
+            }
+        }
+    }
 
 	private void initializeStorageSettings() {
 		tvDataDirPath = findViewById(R.id.tv_data_dir_path);
@@ -2210,6 +2442,7 @@ public class SettingsActivity extends AppCompatActivity {
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_controller));
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_customization));
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_storage));
+                sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_memory));
                 sectionTabs.addTab(sectionTabs.newTab().setText(R.string.settings_section_achievements));
 		}
 			sectionTabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
@@ -2283,6 +2516,7 @@ public class SettingsActivity extends AppCompatActivity {
             case SECTION_CONTROLLER: return R.string.settings_section_controller;
             case SECTION_CUSTOMIZATION: return R.string.settings_section_customization;
             case SECTION_STORAGE: return R.string.settings_section_storage;
+            case SECTION_MEMORY: return R.string.settings_section_memory;
             case SECTION_ACHIEVEMENTS: return R.string.settings_section_achievements;
             case SECTION_GENERAL:
             default: return R.string.settings_section_general;
@@ -2296,6 +2530,7 @@ public class SettingsActivity extends AppCompatActivity {
         if (buttonId == R.id.btn_section_controller) return SECTION_CONTROLLER;
         if (buttonId == R.id.btn_section_customization) return SECTION_CUSTOMIZATION;
         if (buttonId == R.id.btn_section_storage) return SECTION_STORAGE;
+        if (buttonId == R.id.btn_section_memory) return SECTION_MEMORY;
         if (buttonId == R.id.btn_section_achievements) return SECTION_ACHIEVEMENTS;
         return SECTION_GENERAL;
     }
@@ -2308,6 +2543,7 @@ public class SettingsActivity extends AppCompatActivity {
             case SECTION_CONTROLLER: return R.id.btn_section_controller;
             case SECTION_CUSTOMIZATION: return R.id.btn_section_customization;
             case SECTION_STORAGE: return R.id.btn_section_storage;
+            case SECTION_MEMORY: return R.id.btn_section_memory;
             case SECTION_ACHIEVEMENTS: return R.id.btn_section_achievements;
             case SECTION_GENERAL:
             default: return R.id.btn_section_general;
@@ -2631,17 +2867,25 @@ public class SettingsActivity extends AppCompatActivity {
 	@Override
 	protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
 		super.onActivityResult(requestCode, resultCode, data);
-		if (requestCode == REQ_IMPORT_MEMCARD && resultCode == RESULT_OK && data != null && data.getData() != null) {
-			Uri uri = data.getData();
-			try { 
-				getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION); 
-			} catch (Exception ignored) {}
-			if (importMemcardToSlot1(uri)) {
-				NativeApp.setSetting("MemoryCards", "Slot1_Enable", "bool", "false");
-				NativeApp.setSetting("MemoryCards", "Slot1_Filename", "string", "Mcd001.ps2");
-				NativeApp.setSetting("MemoryCards", "Slot1_Enable", "bool", "true");
-				Toast.makeText(this, R.string.settings_memory_card_inserted_slot1, Toast.LENGTH_SHORT).show();
-			} else {
+        if (requestCode == REQ_IMPORT_MEMCARD && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            Uri uri = data.getData();
+            String fileName = "imported_card.ps2";
+            try (android.database.Cursor cursor = getContentResolver().query(uri, null, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                    if (nameIndex != -1) fileName = cursor.getString(nameIndex);
+                }
+            } catch (Exception ignored) {}
+
+            try {
+                getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } catch (Exception ignored) {}
+
+            if (importMemcardToSlot1(uri, fileName)) {
+                NativeApp.setSetting("MemoryCards", "Slot1_Filename", "string", fileName);
+                updateMemoryCardUi();
+                Toast.makeText(this, "Imported: " + fileName, Toast.LENGTH_SHORT).show();
+            } else {
 				Toast.makeText(this, R.string.settings_memory_card_import_failed, Toast.LENGTH_LONG).show();
 			}
 		} else if (requestCode == 9912 && resultCode == RESULT_OK && data != null && data.getData() != null) {
@@ -2665,14 +2909,14 @@ public class SettingsActivity extends AppCompatActivity {
 		}
 	}
 
-	private boolean importMemcardToSlot1(Uri uri) {
-		try {
-			File base = DataDirectoryManager.getDataRoot(getApplicationContext());
-			File memDir = new File(base, "memcards");
-			if (!memDir.exists() && !memDir.mkdirs()) return false;
-			File out = new File(memDir, "Mcd001.ps2");
-			try (InputStream in = getContentResolver().openInputStream(uri);
-				 OutputStream os = new FileOutputStream(out)) {
+    private boolean importMemcardToSlot1(Uri uri, String fileName) {
+        try {
+            File base = DataDirectoryManager.getDataRoot(getApplicationContext());
+            File memDir = new File(base, "memcards");
+            if (!memDir.exists() && !memDir.mkdirs()) return false;
+            File out = new File(memDir, fileName);
+            try (InputStream in = getContentResolver().openInputStream(uri);
+                 OutputStream os = new FileOutputStream(out)) {
 				if (in == null) return false;
 				byte[] buf = new byte[8192];
 				int n;
