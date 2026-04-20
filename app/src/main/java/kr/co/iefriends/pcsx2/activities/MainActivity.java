@@ -5041,7 +5041,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             String fileName = String.format("%s_%08X.pnach", serial, crcInt);
-            File cheatsDir = new File(getExternalFilesDir(null), "cheats");
+            File cheatsDir = new File(DataDirectoryManager.getDataRoot(this), "cheats");
             if (!cheatsDir.exists()) cheatsDir.mkdirs();
 
             File targetFile = new File(cheatsDir, fileName);
