@@ -78,12 +78,14 @@ import com.google.android.material.textfield.TextInputLayout;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -900,7 +902,6 @@ public class MainActivity extends AppCompatActivity {
                             ge.gameTitle = cached.second;
                         }
                     }
-                    continue;
                 }
                 boolean needsSerial = TextUtils.isEmpty(ge.serial);
                 boolean needsTitle = TextUtils.isEmpty(ge.gameTitle);
@@ -2244,7 +2245,7 @@ public class MainActivity extends AppCompatActivity {
         if (btnImportCheats != null) {
             btnImportCheats.setOnClickListener(v -> {
                 closeInGameDrawer();
-                launchCheatImportPicker();
+                openPnachPicker();
             });
         }
 
@@ -4992,20 +4993,70 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
+    private final ActivityResultLauncher<Intent> startActivityResultImportPnach = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                    Uri uri = result.getData().getData();
+                    if (uri != null) {
+                        processSelectedPnach(uri);
+                    }
+                }
+            });
+
     private void pickGamesFolder() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         startActivityResultPickFolder.launch(intent);
     }
 
-    private void launchCheatImportPicker() {
+    private void openPnachPicker() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("*/*");
-        intent.putExtra(Intent.EXTRA_TITLE, getString(R.string.drawer_import_cheats_picker_title));
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/x-pnach", "application/octet-stream", "text/plain"});
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-        startActivityResultImportCheats.launch(intent);
+        startActivityResultImportPnach.launch(intent);
+    }
+
+    private void processSelectedPnach(Uri uri) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            try (InputStream is = getContentResolver().openInputStream(uri);
+                 BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String trimmed = line.trim();
+                    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                        sb.append("// ").append(line).append("\n");
+                    } else {
+                        sb.append(line).append("\n");
+                    }
+                }
+            }
+
+            String serial = NativeApp.getGameSerial();
+            int crcInt = NativeApp.getGameCRC();
+
+            if (TextUtils.isEmpty(serial) || crcInt == 0) {
+                Toast.makeText(this, "Erro: Start the Game First", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            String fileName = String.format("%s_%08X.pnach", serial, crcInt);
+            File cheatsDir = new File(getExternalFilesDir(null), "cheats");
+            if (!cheatsDir.exists()) cheatsDir.mkdirs();
+
+            File targetFile = new File(cheatsDir, fileName);
+            try (FileOutputStream fos = new FileOutputStream(targetFile)) {
+                fos.write(sb.toString().getBytes());
+            }
+            NativeApp.reloadCheats();
+            NativeApp.setEnableCheats(false);
+            NativeApp.setEnableCheats(true);
+
+            Toast.makeText(this, "Cheat Imported: " + fileName, Toast.LENGTH_LONG).show();
+
+        } catch (Exception e) {
+            Toast.makeText(this, "Erro: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void launchTextureImportPicker() {
@@ -5036,7 +5087,8 @@ public class MainActivity extends AppCompatActivity {
             try {
                 if (ge != null && (ge.serial == null || ge.serial.isEmpty())) {
                     String name = ge.title != null ? ge.title.toLowerCase() : "";
-                    if (name.endsWith(".iso") || name.endsWith(".img") || name.endsWith(".bin"))
+                    if (name.endsWith(".iso") || name.endsWith(".img") || name.endsWith(".bin") ||
+                            name.endsWith(".chd") || name.endsWith(".cso") || name.endsWith(".zso") || name.endsWith(".gz"))
                         toResolve.add(ge);
                 }
             } catch (Throwable ignored) {}
@@ -5047,18 +5099,23 @@ public class MainActivity extends AppCompatActivity {
                 int n = 0;
                 for (GameEntry ge : toResolve) {
                     try {
-                        RedumpDB.Result rd = RedumpDB.lookupByFile(cr, ge.uri);
-                        if (rd != null && rd.serial != null && !rd.serial.isEmpty()) {
-                            ge.serial = rd.serial;
-                            ge.gameTitle = rd.name;
-                            n++;
-                            if (n % 2 == 1) {
-                                runOnUiThread(() -> gamesAdapter.notifyDataSetChanged());
+                        String info = NativeApp.getDiskInfo(ge.uri.toString());
+                        if (!TextUtils.isEmpty(info)) {
+                            String[] parts = info.split("\\|");
+                            if (parts.length >= 3) {
+                                ge.gameTitle = parts[0];
+                                ge.serial = parts[1];
+                                ge.region = parts[2];
+                                if (isChdEntry(ge.uri, ge.title)) {
+                                    persistChdMetadata(ge.uri, ge.serial, ge.gameTitle);
+                                }
+                                n++;
                             }
+                            if (n > 0) runOnUiThread(() -> gamesAdapter.notifyDataSetChanged());
                         }
-                    } catch (Throwable ignored) {}
+                    } catch (Throwable ignored) {
+                    }
                 }
-                if (n > 0) runOnUiThread(() -> gamesAdapter.notifyDataSetChanged());
             }, "RedumpResolve").start();
         }
         if (etSearch != null && etSearch.getText() != null && etSearch.length() > 0) {
@@ -5380,7 +5437,8 @@ public class MainActivity extends AppCompatActivity {
         final String title;      
         final Uri uri;
         String serial;           
-        String gameTitle;        
+        String gameTitle;
+        public String region;
         GameEntry(String t, Uri u) { title = t; uri = u; }
         String fileTitleNoExt() {
             int i = title.lastIndexOf('.');
@@ -6153,11 +6211,13 @@ public class MainActivity extends AppCompatActivity {
         interface OnClick { void onClick(GameEntry e); }
         static class VH extends RecyclerView.ViewHolder {
             final TextView tv;
+            final TextView tvRegion;
             final android.widget.ImageView img;
             final TextView tvOverlay;
             VH(View v) {
                 super(v);
                 this.tv = v.findViewById(R.id.tv_title);
+                this.tvRegion = v.findViewById(R.id.tv_region);
                 this.img = v.findViewById(R.id.img_cover);
                 this.tvOverlay = v.findViewById(R.id.tv_cover_fallback);
             }
@@ -6312,6 +6372,10 @@ public class MainActivity extends AppCompatActivity {
                         holder.tvOverlay.bringToFront();
                     }
                 }
+            }
+            if (holder.tvRegion != null) {
+                holder.tvRegion.setText(e.region != null ? e.region : "");
+                holder.tvRegion.setVisibility(TextUtils.isEmpty(e.region) ? View.GONE : View.VISIBLE);
             }
             holder.itemView.setOnClickListener(v -> onClick.onClick(e));
             holder.itemView.setOnKeyListener((v, keyCode, event) -> {
