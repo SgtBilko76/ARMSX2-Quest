@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <mutex>
 #include "pcsx2/CDVD/CDVDcommon.h"
+#include "pcsx2/CDVD/CDVD.h"
 
 namespace
 {
@@ -264,6 +265,64 @@ std::string GetJavaString(JNIEnv *env, jstring jstr) {
     std::string cpp_string = std::string(str);
     env->ReleaseStringUTFChars(jstr, str);
     return cpp_string;
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_getDiskInfo(JNIEnv* env, jclass, jstring j_path) {
+    std::string path = GetJavaString(env, j_path);
+
+    const CDVD_API* old_api = CDVD;
+    CDVD = &CDVDapi_Iso;
+    Error error;
+    if (!CDVD->open(path, &error)) {
+        CDVD = old_api;
+        return nullptr;
+    }
+
+    std::string serial, version, elf_path;
+    u32 crc = 0;
+    CDVDDiscType disc_type;
+    cdvdGetDiscInfo(&serial, &elf_path, &version, &crc, &disc_type);
+    CDVD->close();
+    CDVD = old_api;
+    if (serial.empty()) return nullptr;
+
+    std::string finalTitle;
+    std::string region = "Unknown";
+
+    const auto* db_entry = GameDatabase::findGame(serial);
+    if (db_entry) {
+        if (!db_entry->name.empty()) {
+            finalTitle = db_entry->name;
+        } else {
+            finalTitle = Path::URLDecode(std::string(Path::GetFileTitle(path)));
+        }
+
+        if (!db_entry->region.empty()) {
+            region = db_entry->region;
+        }
+    } else {
+        finalTitle = Path::URLDecode(std::string(Path::GetFileTitle(path)));
+    }
+    std::string result = finalTitle + "|" + serial + "|" + region;
+    return env->NewStringUTF(result.c_str());
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_reloadCheats(JNIEnv *env, jclass clazz) {
+    if (!VMManager::HasValidVM())
+        return;
+    const std::string serial = VMManager::GetDiscSerial();
+    const u32 crc = VMManager::GetDiscCRC();
+    Patch::ReloadPatches(serial, crc, true, true, true, false);
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_getGameCRC(JNIEnv *env, jclass clazz) {
+    return (jint)VMManager::GetDiscCRC();
 }
 
 extern "C"
