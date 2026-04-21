@@ -916,6 +916,9 @@ public class MainActivity extends AppCompatActivity {
                     if (needsTitle && !TextUtils.isEmpty(rd.name)) {
                         ge.gameTitle = rd.name;
                     }
+                    if (isChdEntry(ge.uri, ge.title)) {
+                        persistChdMetadata(ge.uri, ge.serial, ge.gameTitle);
+                    }
                 }
             } catch (Throwable ignored) {}
         }
@@ -6161,20 +6164,26 @@ public class MainActivity extends AppCompatActivity {
                 long total = 0;
                 final int BUF = 1024 * 1024;
                 byte[] buf = new byte[BUF];
+                boolean isChd = file.toString().toLowerCase().endsWith(".chd");
+                long maxRead = isChd ? 16L * 1024 * 1024 : -1;
                 try (java.io.InputStream in = CsoUtils.openInputStream(cr, file)) {
-                    if (in == null) return null;
                     while (true) {
+                        if (maxRead > 0 && total >= maxRead) break;
                         int r = in.read(buf);
                         if (r <= 0) break;
                         md.update(buf, 0, r);
                         total += r;
                     }
+                    if (isChd) {
+                        try (android.content.res.AssetFileDescriptor afd = cr.openAssetFileDescriptor(file, "r")) {
+                            if (afd != null) total = afd.getLength();
+                        }
+                    }
                 }
                 String md5 = new java.math.BigInteger(1, md.digest()).toString(16);
                 while (md5.length() < 32) md5 = "0" + md5;
                 String key = md5ToLower(md5) + "|" + Long.toString(total);
-                Result r = sMd5SizeToResult.get(key);
-                return r;
+                return sMd5SizeToResult.get(key);
             } catch (Exception ignored) {
                 return null;
             }
@@ -6300,26 +6309,41 @@ public class MainActivity extends AppCompatActivity {
         @Override public void onBindViewHolder(@NonNull VH holder, int position) {
             GameEntry e = filtered.get(position);
             String tpl = ((MainActivity)holder.itemView.getContext()).getCoversUrlTemplate();
+            String requestKey = (e.uri != null ? e.uri.toString() : e.title) + "|" +
+                    (e.serial != null ? e.serial : "") + "|" +
+                    (e.gameTitle != null ? e.gameTitle : "");
+            if (requestKey.equals(holder.img.getTag(R.id.tag_request_key))) {
+                return;
+            }
+            holder.img.setTag(R.id.tag_request_key, requestKey);
             boolean loaded = false;
-            try { holder.img.setImageDrawable(null); } catch (Throwable ignored) {}
-            try { holder.img.setBackgroundColor(android.graphics.Color.TRANSPARENT); } catch (Throwable ignored) {}
+            android.graphics.Bitmap fastCache = sCoverCache.get(requestKey);
+            if (fastCache != null) {
+                holder.img.setImageBitmap(fastCache);
+                loaded = true;
+            } else {
+                try { holder.img.setImageDrawable(null); } catch (Throwable ignored) {}
+            }
             if (holder.tvOverlay != null) holder.tvOverlay.setVisibility(View.GONE);
-            try {
-                String gameKey = gameKeyFromEntry(e);
-                String manual = ((MainActivity)holder.itemView.getContext()).getManualCoverUri(gameKey);
-                if (manual != null && !manual.isEmpty()) {
-                    android.net.Uri mu = android.net.Uri.parse(manual);
-                    try (java.io.InputStream is = holder.itemView.getContext().getContentResolver().openInputStream(mu)) {
-                        if (is != null) {
+
+            if (!loaded) {
+                try {
+                    String gameKey = gameKeyFromEntry(e);
+                    String manual = ((MainActivity)holder.itemView.getContext()).getManualCoverUri(gameKey);
+                    if (manual != null && !manual.isEmpty()) {
+                        android.net.Uri mu = android.net.Uri.parse(manual);
+                        try (java.io.InputStream is = holder.itemView.getContext().getContentResolver().openInputStream(mu)) {
                             android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(is);
                             if (bmp != null) {
                                 holder.img.setImageBitmap(bmp);
+                                sCoverCache.put(requestKey, bmp);
                                 loaded = true;
                             }
-                        }
-                    } catch (Throwable ignored) {}
-                }
-            } catch (Throwable ignored) {}
+                        } catch (Throwable ignored) {}
+                    }
+                } catch (Throwable ignored) {}
+            }
+
             if (!loaded) {
                 File cachedLocal = findCachedCoverFile(holder.itemView.getContext(), e);
                 if (cachedLocal != null && cachedLocal.exists()) {
@@ -6327,12 +6351,14 @@ public class MainActivity extends AppCompatActivity {
                     android.graphics.Bitmap cachedBmp = sCoverCache.get(localKey);
                     if (cachedBmp != null) {
                         holder.img.setImageBitmap(cachedBmp);
+                        sCoverCache.put(requestKey, cachedBmp);
                         loaded = true;
                     } else {
                         android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeFile(localKey);
                         if (bmp != null) {
                             holder.img.setImageBitmap(bmp);
                             sCoverCache.put(localKey, bmp);
+                            sCoverCache.put(requestKey, bmp);
                             loaded = true;
                         }
                     }
@@ -6341,19 +6367,19 @@ public class MainActivity extends AppCompatActivity {
             boolean online = MainActivity.hasInternetConnection(holder.itemView.getContext());
             if (!loaded && online && tpl != null && !tpl.isEmpty()) {
                 java.util.List<String> urls = MainActivity.buildCoverCandidateUrls(e, tpl);
-                String requestKey = (e.uri != null ? e.uri.toString() : e.title) + "|" + (e.serial != null ? e.serial : "") + "|" + (e.title != null ? e.title : "");
-                holder.img.setTag(R.id.tag_request_key, requestKey);
                 for (String u : urls) {
                     if (u == null || u.isEmpty() || u.contains("${")) continue;
                     android.graphics.Bitmap cached = sCoverCache.get(u);
                     if (cached != null) {
-                        loaded = true;
                         holder.img.setImageBitmap(cached);
+                        sCoverCache.put(requestKey, cached);
+                        loaded = true;
                         break;
                     }
                 }
-                if (!loaded && !urls.isEmpty())
+                if (!loaded && !urls.isEmpty()) {
                     loadImageWithFallback(holder.img, holder.tvOverlay, holder.itemView.getContext(), e, urls, requestKey);
+                }
             }
             holder.img.setVisibility(View.VISIBLE);
             if (listMode) {
