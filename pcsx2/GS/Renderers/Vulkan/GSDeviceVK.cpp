@@ -6,6 +6,7 @@
 #include "GS/GSPerfMon.h"
 #include "GS/GSUtil.h"
 #include "GS/Renderers/Vulkan/GSDeviceVK.h"
+#include "GS/Renderers/Common/GSRenderer.h"
 #include "GS/Renderers/Vulkan/GSLsfg.h"
 #include "GS/Renderers/Vulkan/VKBuilders.h"
 #include "GS/Renderers/Vulkan/VKShaderCache.h"
@@ -6047,6 +6048,153 @@ bool GSDeviceVK::CreateRenderPasses()
 	return true;
 }
 
+bool GSDeviceVK::CompileStereoPipelines()
+{
+	const std::optional<std::string> present_source = ReadShaderSource("shaders/vulkan/present.glsl");
+	const std::optional<std::string> convert_source = ReadShaderSource("shaders/vulkan/convert.glsl");
+	if (!present_source || !convert_source)
+		return false;
+
+	VkShaderModule present_vs = GetUtilityVertexShader(*present_source);
+	if (present_vs == VK_NULL_HANDLE)
+		return false;
+	ScopedGuard present_vs_guard([this, &present_vs]() { vkDestroyShaderModule(m_device, present_vs, nullptr); });
+
+	// Eye pass: same state as the ordinary present pipelines, straight onto the swap chain.
+	{
+		Vulkan::GraphicsPipelineBuilder gpb;
+		SetPipelineProvokingVertex(m_features, gpb);
+		AddUtilityVertexAttributes(gpb);
+		gpb.SetPipelineLayout(m_utility_pipeline_layout);
+		gpb.SetDynamicViewportAndScissorState();
+		gpb.AddDynamicState(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
+		gpb.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
+		gpb.SetNoCullRasterizationState();
+		gpb.SetNoBlendingState();
+		gpb.SetVertexShader(present_vs);
+		gpb.SetDepthState(false, false, VK_COMPARE_OP_ALWAYS);
+		gpb.SetNoStencilState();
+		gpb.SetRenderPass(m_swap_chain_render_pass, 0);
+
+		VkShaderModule ps = GetUtilityFragmentShader(*present_source, "ps_stereo");
+		if (ps == VK_NULL_HANDLE)
+			return false;
+		ScopedGuard ps_guard([this, &ps]() { vkDestroyShaderModule(m_device, ps, nullptr); });
+		gpb.SetFragmentShader(ps);
+
+		m_present_stereo = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		if (!m_present_stereo)
+			return false;
+		Vulkan::SetObjectName(m_device, m_present_stereo, "Stereo present pipeline");
+	}
+
+	// Depth-pack pass: writes ONLY alpha, so the frame already copied into the packed texture
+	// survives. The mask is baked into the pipeline rather than set per draw.
+	{
+		VkShaderModule convert_vs = GetUtilityVertexShader(*convert_source);
+		if (convert_vs == VK_NULL_HANDLE)
+			return false;
+		ScopedGuard convert_vs_guard([this, &convert_vs]() { vkDestroyShaderModule(m_device, convert_vs, nullptr); });
+
+		const VkRenderPass rp = GetRenderPass(LookupNativeFormat(GSTexture::Format::Color),
+			LookupNativeFormat(GSTexture::Format::Invalid), VK_ATTACHMENT_LOAD_OP_LOAD);
+		if (!rp)
+			return false;
+
+		Vulkan::GraphicsPipelineBuilder gpb;
+		SetPipelineProvokingVertex(m_features, gpb);
+		AddUtilityVertexAttributes(gpb);
+		gpb.SetPipelineLayout(m_utility_pipeline_layout);
+		gpb.SetDynamicViewportAndScissorState();
+		gpb.AddDynamicState(VK_DYNAMIC_STATE_BLEND_CONSTANTS);
+		gpb.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
+		gpb.SetNoCullRasterizationState();
+		gpb.SetNoBlendingState();
+		gpb.SetColorWriteMask(0, VK_COLOR_COMPONENT_A_BIT);
+		gpb.SetVertexShader(convert_vs);
+		gpb.SetDepthState(false, false, VK_COMPARE_OP_ALWAYS);
+		gpb.SetNoStencilState();
+		gpb.SetRenderPass(rp, 0);
+
+		VkShaderModule ps = GetUtilityFragmentShader(*convert_source, "ps_depth_to_alpha");
+		if (ps == VK_NULL_HANDLE)
+			return false;
+		ScopedGuard ps_guard([this, &ps]() { vkDestroyShaderModule(m_device, ps, nullptr); });
+		gpb.SetFragmentShader(ps);
+
+		m_depth_to_alpha = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true), false);
+		if (!m_depth_to_alpha)
+			return false;
+		Vulkan::SetObjectName(m_device, m_depth_to_alpha, "Stereo depth pack pipeline");
+	}
+
+	return true;
+}
+
+GSTexture* GSDeviceVK::PrepareStereoFrame(GSTexture* sTex, GSTexture* depth)
+{
+	if (!sTex || !depth)
+		return nullptr;
+
+	if (!m_stereo_compile_attempted)
+	{
+		m_stereo_compile_attempted = true;
+		if (!CompileStereoPipelines())
+			Console.Error("GS: Failed to compile stereo pipelines, VR stereo output is disabled.");
+	}
+	if (m_present_stereo == VK_NULL_HANDLE || m_depth_to_alpha == VK_NULL_HANDLE)
+		return nullptr;
+
+	const GSVector2i size(sTex->GetSize());
+	if (m_stereo_packed && m_stereo_packed->GetSize() != size)
+	{
+		Recycle(m_stereo_packed);
+		m_stereo_packed = nullptr;
+	}
+	if (!m_stereo_packed)
+	{
+		m_stereo_packed = CreateRenderTarget(size.x, size.y, GSTexture::Format::Color, false);
+		if (!m_stereo_packed)
+			return nullptr;
+	}
+
+	const GSVector4 full_uv(0.0f, 0.0f, 1.0f, 1.0f);
+	const GSVector4 full_rect(0.0f, 0.0f, static_cast<float>(size.x), static_cast<float>(size.y));
+	// RGB gets the frame; A then gets the depth buffer, scaled from whatever resolution the depth
+	// target happens to be at (it is the same draw scale as the colour target in practice).
+	StretchRect(sTex, full_uv, m_stereo_packed, full_rect, ShaderConvert::COPY, Nearest);
+	DoStretchRect(static_cast<GSTextureVK*>(depth), full_uv, static_cast<GSTextureVK*>(m_stereo_packed),
+		full_rect, m_depth_to_alpha, Biln, false);
+	return m_stereo_packed;
+}
+
+void GSDeviceVK::PresentStereoRect(GSTexture* sTex, const GSVector4& sRect, const GSVector4& dRectLeft,
+	const GSVector4& dRectRight, float separation, float convergence, float shaderTime, Filter filter)
+{
+	if (m_present_stereo == VK_NULL_HANDLE || !sTex)
+		return;
+
+	const GSVector2i pres_size = GetPresentationSize();
+	for (int eye = 0; eye < 2; eye++)
+	{
+		const GSVector4& dRect = (eye == 0) ? dRectLeft : dRectRight;
+		DisplayConstantBuffer cb;
+		cb.SetSource(sRect, sTex->GetSize());
+		cb.SetTarget(dRect, pres_size);
+		// TimeAndPad doubles as the stereo parameters -- only .x (time) is read by the other present
+		// shaders, so this needs no change to the shared constant buffer. The eyes take opposite
+		// shifts, which is the whole of the parallax.
+		//
+		// ★ The LEFT eye takes the NEGATIVE shift. A nearer-than-convergence pixel has to appear
+		// further RIGHT in the left eye (and further left in the right eye); the shader samples at
+		// uv.x + shift, so sampling left of the output pixel is what moves the content right.
+		// Getting this backwards swaps the eyes, which reads as depth turned inside out.
+		cb.TimeAndPad = GSVector4(shaderTime, (eye == 0) ? -separation : separation, convergence, 0.0f);
+		SetUtilityPushConstants(&cb, sizeof(cb));
+		DoStretchRect(static_cast<GSTextureVK*>(sTex), sRect, nullptr, dRect, m_present_stereo, filter, true);
+	}
+}
+
 bool GSDeviceVK::CompileConvertPipelines()
 {
 	const std::optional<std::string> source = ReadShaderSource("shaders/vulkan/convert.glsl");
@@ -6692,7 +6840,16 @@ void GSDeviceVK::RenderImGui()
 	// rotated and unrotated paths.
 	const float phys_w = static_cast<float>(m_window_info.surface_width);
 	const float phys_h = static_cast<float>(m_window_info.surface_height);
-	const GSVector4 uniforms(2.0f / phys_w, 2.0f / phys_h, -1.0f, -1.0f);
+	// Quest VR stereo: the UI was laid out for one eye (ImGuiManager::GetUIPresentationSize), so it
+	// is drawn once per half, shifted by a half-surface translation in NDC. Without this the OSD
+	// spans both eyes and neither can read it.
+	const int eye_count = (GSStereo::enabled.load(std::memory_order_relaxed) && GetPresentationSize().x > 1) ? 2 : 1;
+	const float eye_width = phys_w / static_cast<float>(eye_count);
+
+	for (int eye = 0; eye < eye_count; eye++)
+	{
+	const float eye_offset = static_cast<float>(eye) * eye_width;
+	const GSVector4 uniforms(2.0f / phys_w, 2.0f / phys_h, -1.0f + (2.0f * eye_offset / phys_w), -1.0f);
 
 	SetUtilityPushConstants(&uniforms, sizeof(uniforms));
 	SetPipeline(m_imgui_pipeline);
@@ -6803,7 +6960,9 @@ void GSDeviceVK::RenderImGui()
 				clip = GSVector4(xmin, ymin, xmax, ymax);
 			}
 
-			SetScissor(GSVector4i(clip).max_i32(GSVector4i::zero()));
+			// Clip rects are in the same one-eye logical space as the vertices.
+			const GSVector4 eye_clip = clip + GSVector4(eye_offset, 0.0f, eye_offset, 0.0f);
+			SetScissor(GSVector4i(eye_clip).max_i32(GSVector4i::zero()));
 
 			// Since we don't have the GSTexture...
 			GSTextureVK* tex = reinterpret_cast<GSTextureVK*>(pcmd->GetTexID());
@@ -6819,6 +6978,7 @@ void GSDeviceVK::RenderImGui()
 
 		g_perfmon.Put(GSPerfMon::DrawCalls, cmd_list->CmdBuffer.Size);
 	}
+	} // per-eye
 }
 
 void GSDeviceVK::RenderBlankFrame()
@@ -7074,6 +7234,16 @@ bool GSDeviceVK::DoSGSR(GSTexture* sTex, GSTexture* dTex, const std::array<u32, 
 
 void GSDeviceVK::DestroyResources()
 {
+	if (m_present_stereo != VK_NULL_HANDLE)
+		vkDestroyPipeline(m_device, m_present_stereo, nullptr);
+	if (m_depth_to_alpha != VK_NULL_HANDLE)
+		vkDestroyPipeline(m_device, m_depth_to_alpha, nullptr);
+	if (m_stereo_packed)
+	{
+		Recycle(m_stereo_packed);
+		m_stereo_packed = nullptr;
+	}
+
 	if (m_tfx_ubo_descriptor_set != VK_NULL_HANDLE)
 		FreePersistentDescriptorSet(m_tfx_ubo_descriptor_set);
 

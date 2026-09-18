@@ -169,6 +169,20 @@ void GSRendererHW::VSync(u32 field, bool registers_written, bool idle_frame)
 	GSRenderer::VSync(field, registers_written, idle_frame);
 }
 
+GSTexture* GSRendererHW::GetStereoDepthTexture()
+{
+	const int area = m_stereo_depth_area;
+	// One frame only: a stale depth buffer would freeze the scene's shape while the image moves.
+	m_stereo_depth_area = 0;
+	if (area <= 0)
+		return nullptr;
+
+	// By address, not by a pointer kept since the draw: the texture cache is free to evict or
+	// resize the target in between, and a dangling one would be presented as garbage depth.
+	GSTextureCache::Target* t = g_texture_cache->GetTargetWithSharedBits(m_stereo_depth_bp, m_stereo_depth_psm);
+	return (t && t->m_type == GSTextureCache::DepthStencil) ? t->m_texture : nullptr;
+}
+
 GSTexture* GSRendererHW::GetOutput(int i, float& scale, int& y_offset)
 {
 	int index = i >= 0 ? i : 1;
@@ -3986,6 +4000,20 @@ void GSRendererHW::Draw()
 
 		ZBUF_TEX0.TBW = m_channel_shuffle ? src->m_from_target_TEX0.TBW : m_cached_ctx.FRAME.FBW;
 
+		// Quest VR stereo: remember the biggest depth-writing draw of the frame. Its depth target is
+		// what GetStereoDepthTexture() reprojects the finished image with; smaller passes (HUD,
+		// shadows, post) would give the screen a shape that has nothing to do with the scene.
+		if (ds && m_cached_ctx.DepthWrite())
+		{
+			const int stereo_area = m_r.width() * m_r.height();
+			if (stereo_area > m_stereo_depth_area)
+			{
+				m_stereo_depth_area = stereo_area;
+				m_stereo_depth_bp = ZBUF_TEX0.TBP0;
+				m_stereo_depth_psm = ZBUF_TEX0.PSM;
+			}
+		}
+
 		if (!ds && m_cached_ctx.FRAME.FBP != m_cached_ctx.ZBUF.ZBP)
 		{
 			ds = g_texture_cache->CreateTarget(ZBUF_TEX0, t_size, GetValidSize(src, possible_shuffle), target_scale, GSTextureCache::DepthStencil,
@@ -4628,6 +4656,20 @@ void GSRendererHW::Draw()
 			src, nullptr, -1);
 
 		ZBUF_TEX0.TBW = m_channel_shuffle ? src->m_from_target_TEX0.TBW : m_cached_ctx.FRAME.FBW;
+
+		// Quest VR stereo: remember the biggest depth-writing draw of the frame. Its depth target is
+		// what GetStereoDepthTexture() reprojects the finished image with; smaller passes (HUD,
+		// shadows, post) would give the screen a shape that has nothing to do with the scene.
+		if (ds && m_cached_ctx.DepthWrite())
+		{
+			const int stereo_area = m_r.width() * m_r.height();
+			if (stereo_area > m_stereo_depth_area)
+			{
+				m_stereo_depth_area = stereo_area;
+				m_stereo_depth_bp = ZBUF_TEX0.TBP0;
+				m_stereo_depth_psm = ZBUF_TEX0.PSM;
+			}
+		}
 
 		// This should never happen, but just to be safe..
 		if (!ds)

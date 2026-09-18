@@ -649,4 +649,13 @@ void main()
 }
 #endif
 
+#ifdef ps_depth_to_alpha
+// Writes the depth buffer into the alpha channel of the packed present texture; the colour
+// channels are masked off by the pipeline, so the frame already copied there survives.
+void ps_depth_to_alpha()
+{
+	o_col0 = vec4(0.0f, 0.0f, 0.0f, sample_c(v_tex).r);
+}
+#endif
+
 #endif

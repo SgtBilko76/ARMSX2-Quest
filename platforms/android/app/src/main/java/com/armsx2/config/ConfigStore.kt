@@ -53,6 +53,8 @@ object ConfigStore {
     // One-time flip of existing all-on OSD saves to the new default-off.
     private const val KEY_OSD_OFF_MIGRATED = "config.migrated.osdDefaultOff"
     private const val KEY_OSD_SCALE_MIGRATED = "config.migrated.osdScale65"
+    // Quest build: one-time switch of Hardware Download Mode to Unsynchronized. See loadGlobal.
+    private const val KEY_QUEST_HW_DOWNLOAD_MIGRATED = "config.migrated.questHwDownloadUnsync"
     // One-time reconcile for the fresh-install + reused-data-folder case (people who
     // can't update in place and re-point setup at their old folder). See reconcileReusedFolder.
     private const val KEY_FOLDER_RECONCILE = "config.migrated.folderReconcile"
@@ -169,6 +171,29 @@ object ConfigStore {
         }
         if (!MainActivityRuntime.prefs.getBoolean(KEY_OSD_SCALE_MIGRATED, false)) {
             MainActivityRuntime.prefs.edit { putBoolean(KEY_OSD_SCALE_MIGRATED, true) }
+        }
+
+        // Quest build: Hardware Download Mode -> Unsynchronized (3), once. Games that decide whether
+        // to draw sun glare or a lens flare by reading the frame back from the GPU stall the whole
+        // emulator on every such read in the default Accurate mode, and on the headset that turned
+        // every sunlit scene into a slideshow. Unsynchronized reads without waiting; at worst a flare
+        // appears a frame late. Per-game overrides that pin the mode are moved too, or the global
+        // value would never reach those games. Once only, so a later choice in Settings sticks.
+        if (com.armsx2.BuildConfig.QUEST_VR &&
+            !MainActivityRuntime.prefs.getBoolean(KEY_QUEST_HW_DOWNLOAD_MIGRATED, false)) {
+            if (parsed.hardwareDownloadMode != 3) {
+                parsed = parsed.copy(hardwareDownloadMode = 3)
+                dirty = true
+            }
+            for ((key, value) in MainActivityRuntime.prefs.all) {
+                if (!key.startsWith("config.game.") || value !is String) continue
+                val overrides = try { JSONObject(value) } catch (_: Exception) { continue }
+                if (overrides.has("hardwareDownloadMode") && overrides.optInt("hardwareDownloadMode") != 3) {
+                    overrides.put("hardwareDownloadMode", 3)
+                    MainActivityRuntime.prefs.edit { putString(key, overrides.toString()) }
+                }
+            }
+            MainActivityRuntime.prefs.edit { putBoolean(KEY_QUEST_HW_DOWNLOAD_MIGRATED, true) }
         }
 
         if (dirty) saveGlobal(parsed)

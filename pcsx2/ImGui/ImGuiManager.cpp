@@ -10,6 +10,7 @@
 #include "ImGui/FullscreenUI.h"
 #include "ImGui/ImGuiFullscreen.h"
 #include "ImGui/ImGuiManager.h"
+#include "GS/Renderers/Common/GSRenderer.h"
 #include "ImGui/ImGuiOverlays.h"
 #include "Input/InputManager.h"
 #include "MTGS.h"
@@ -40,6 +41,20 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_MODULE_H
+
+/// Presentation size the UI lays itself out for.
+///
+/// Quest VR stereo puts both eye images side by side in one surface. The UI is laid out for ONE
+/// eye and drawn into each half by the device (GSDeviceVK::RenderImGui); laid out across the whole
+/// surface it would be stretched over both eyes and legible in neither.
+static GSVector2i GetUIPresentationSize()
+{
+	GSVector2i size = g_gs_device ? g_gs_device->GetPresentationSize() : GSVector2i(0, 0);
+	if (GSStereo::enabled.load(std::memory_order_relaxed) && size.x > 1)
+		size.x /= 2;
+	return size;
+}
+
 
 namespace ImGuiManager
 {
@@ -191,7 +206,7 @@ bool ImGuiManager::Initialize()
 	g.ConfigNavWindowingWithGamepad = false;
 
 	{
-		const GSVector2i pres = g_gs_device->GetPresentationSize();
+		const GSVector2i pres = GetUIPresentationSize();
 		s_window_width = static_cast<float>(pres.x);
 		s_window_height = static_cast<float>(pres.y);
 	}
@@ -270,7 +285,7 @@ void ImGuiManager::WindowResized()
 {
 	GSVector2i new_size{};
 	if (g_gs_device)
-		new_size = g_gs_device->GetPresentationSize();
+		new_size = GetUIPresentationSize();
 
 	s_window_width = static_cast<float>(new_size.x);
 	s_window_height = static_cast<float>(new_size.y);

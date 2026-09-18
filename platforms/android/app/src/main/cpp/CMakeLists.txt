@@ -384,3 +384,14 @@ if(ARMSX2_ENABLE_LSFG)
 	# test in place would silently drop the define and ship the toggle with nothing behind it.
 	target_compile_definitions(PCSX2_FLAGS INTERFACE ARMSX2_HAS_LSFG=1)
 endif()
+
+# Quest VR mode, quest flavour only. The OpenXR loader comes from the
+# org.khronos.openxr:openxr_loader_for_android prefab package, which only the quest flavour
+# depends on, so find_package must stay inside this gate. The layer talks to the core only
+# through xr/QuestXrBridge.h, so it needs nothing from PCSX2_FLAGS.
+option(ARMSX2_ENABLE_OPENXR "Build the Meta Quest OpenXR virtual-screen mode" OFF)
+if(ARMSX2_ENABLE_OPENXR)
+	find_package(OpenXR REQUIRED CONFIG)
+	target_sources(${ARMSX2_EMUCORE_LIBRARY_NAME} PRIVATE xr/QuestXr.cpp)
+	target_link_libraries(${ARMSX2_EMUCORE_LIBRARY_NAME} PRIVATE OpenXR::openxr_loader EGL)
+endif()

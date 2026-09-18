@@ -147,6 +147,13 @@ ANativeWindow* s_window = nullptr;
 // thread). The lock is only held for pointer swaps and a refcount bump, so
 // the UI thread never waits on GPU work.
 static std::mutex s_window_mutex;
+// Quest VR (quest flavour): the Surface behind the OpenXR virtual screen, set by QuestXr.cpp via
+// ArmsX2Xr::SetRenderWindow. While set it wins over s_window, so the 2D EmulationSurface being
+// destroyed behind the immersive activity changes nothing. Guarded by s_window_mutex too.
+static ANativeWindow* s_xr_window = nullptr;
+static int s_xr_window_width = 0;
+static int s_xr_window_height = 0;
+static float s_xr_window_refresh_rate = 0.0f;
 // The GS thread's own reference on the window it last acquired, released on
 // the next acquire or via ReleaseRenderWindow. Keeps the window alive past
 // the UI thread dropping its reference; surface creation on an abandoned
@@ -2488,6 +2495,53 @@ Java_kr_co_iefriends_pcsx2_NativeApp_onNativeSurfaceDestroyed(JNIEnv *env, jclas
     });
 }
 
+// Quest VR bridge (see xr/QuestXrBridge.h). Compiled into every flavour — only the quest build has
+// a caller, and with no caller s_xr_window simply stays null.
+#include "xr/QuestXrBridge.h"
+#include "GS/Renderers/Common/GSRenderer.h"
+
+void ArmsX2Xr::SetRenderWindow(ANativeWindow* window, int width, int height, float refresh_hz)
+{
+    {
+        std::lock_guard<std::mutex> lock(s_window_mutex);
+        if (window)
+            ANativeWindow_acquire(window);
+        if (s_xr_window)
+            ANativeWindow_release(s_xr_window);
+        s_xr_window = window;
+        s_xr_window_width = window ? width : 0;
+        s_xr_window_height = window ? height : 0;
+        s_xr_window_refresh_rate = (window && refresh_hz > 1.0f) ? refresh_hz : 0.0f;
+    }
+    // Called from the XR thread. Same CPU-thread hop as onNativeSurfaceChanged, for the same reason.
+    Host::RunOnCPUThread([]() {
+        if (MTGS::IsOpen())
+            MTGS::UpdateDisplayWindow();
+    });
+}
+
+void ArmsX2Xr::SetStereo(bool enabled, float separation, float convergence)
+{
+    // Read by the GS thread in GSRenderer::VSync; atomics, so no hop is needed and a mid-frame
+    // change simply takes effect on the next present.
+    GSStereo::separation.store(separation, std::memory_order_relaxed);
+    GSStereo::convergence.store(convergence, std::memory_order_relaxed);
+    GSStereo::enabled.store(enabled, std::memory_order_relaxed);
+}
+
+void ArmsX2Xr::SetStereoReprojection(bool enabled)
+{
+    GSStereo::reproject.store(enabled, std::memory_order_relaxed);
+}
+
+void ArmsX2Xr::SetPadInput(int code, float value)
+{
+    // applyPadButton treats a press with range 0 as a full digital press, so anything that rounds
+    // to 0 has to be a release — otherwise a trigger resting at 0.00001 would read as fully held.
+    const jint range = (value <= 0.0f) ? 0 : (value >= 1.0f) ? 32767 : static_cast<jint>(value * 32767.0f + 0.5f);
+    applyPadButton(0, code, range, range > 0 ? JNI_TRUE : JNI_FALSE);
+}
+
 
 std::optional<WindowInfo> Host::AcquireRenderWindow(bool recreate_window)
 {
@@ -2511,7 +2565,13 @@ std::optional<WindowInfo> Host::AcquireRenderWindow(bool recreate_window)
     // and SIGSEGVs inside the loader (RefBase::incStrong on null+4). The next
     // onNativeSurfaceChanged triggers MTGS::UpdateDisplayWindow and we
     // re-acquire the real surface.
-    if (!s_window) {
+    //
+    // Quest VR's virtual screen, when there is one, wins over the 2D surface.
+    const bool use_xr = s_xr_window != nullptr;
+    ANativeWindow* const window = use_xr ? s_xr_window : s_window;
+    const int window_width = use_xr ? s_xr_window_width : s_window_width;
+    const int window_height = use_xr ? s_xr_window_height : s_window_height;
+    if (!window) {
         _windowInfo.type = WindowInfo::Type::Surfaceless;
         return _windowInfo;
     }
@@ -2519,24 +2579,24 @@ std::optional<WindowInfo> Host::AcquireRenderWindow(bool recreate_window)
     // Take our own reference so the UI thread releasing its reference (next
     // surfaceChanged/Destroyed) can't free the window out from under the GS
     // thread. Surface creation on an abandoned-but-live window fails cleanly.
-    ANativeWindow_acquire(s_window);
-    s_acquired_window = s_window;
+    ANativeWindow_acquire(window);
+    s_acquired_window = window;
 
     float _fScale = 1.0;
-    if (s_window_width > 0 && s_window_height > 0) {
-        int _nSize = s_window_width;
-        if (s_window_width <= s_window_height) {
-            _nSize = s_window_height;
+    if (window_width > 0 && window_height > 0) {
+        int _nSize = window_width;
+        if (window_width <= window_height) {
+            _nSize = window_height;
         }
         _fScale = (float)_nSize / 800.0f;
     }
     ////
     _windowInfo.type = WindowInfo::Type::Android;
-    _windowInfo.surface_width = s_window_width;
-    _windowInfo.surface_height = s_window_height;
+    _windowInfo.surface_width = window_width;
+    _windowInfo.surface_height = window_height;
     _windowInfo.surface_scale = _fScale;
-    _windowInfo.surface_refresh_rate = s_window_refresh_rate;
-    _windowInfo.window_handle = s_window;
+    _windowInfo.surface_refresh_rate = use_xr ? s_xr_window_refresh_rate : s_window_refresh_rate;
+    _windowInfo.window_handle = window;
 
     return _windowInfo;
 }
@@ -2769,8 +2829,9 @@ Java_kr_co_iefriends_pcsx2_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
         return false;
     }
 
-    // Wait for Android surface before opening GS
-    while (!s_window)
+    // Wait for Android surface before opening GS (either one: a boot can land while the Quest
+    // immersive activity already owns the display and the 2D surface is gone)
+    while (!s_window && !s_xr_window)
         usleep(10000);
 
     VMManager::ApplySettings();

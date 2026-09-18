@@ -801,6 +801,31 @@ void GSRenderer::ExecVsyncRecord(const GSBackQueue::VsyncRecord& rec)
 	VSync(rec.field, rec.registers_written, rec.idle_frame);
 }
 
+namespace GSStereo
+{
+	std::atomic<bool> enabled{false};
+	std::atomic<float> separation{0.004f};
+	std::atomic<float> convergence{0.5f};
+	std::atomic<bool> reproject{true};
+} // namespace GSStereo
+
+bool GSRenderer::CalculateStereoDrawRects(const GSVector4i& src_rect, const GSVector2i& src_size,
+	GSVector4& left_rect, GSVector4& right_rect)
+{
+	if (!GSStereo::enabled.load(std::memory_order_relaxed))
+		return false;
+
+	const GSVector2i pres_size = g_gs_device->GetPresentationSize();
+	const int half_width = pres_size.x / 2;
+	if (half_width <= 0)
+		return false;
+
+	left_rect = CalculateDrawDstRect(half_width, pres_size.y, src_rect, src_size, s_display_alignment,
+		g_gs_device->UsesLowerLeftOrigin(), GetVideoMode() == GSVideoMode::SDTV_480P);
+	right_rect = left_rect + GSVector4(static_cast<float>(half_width), 0.0f, static_cast<float>(half_width), 0.0f);
+	return true;
+}
+
 void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 {
 	if (GSConfig.ShouldDump(s_n, g_perfmon.GetFrame()))
@@ -1136,6 +1161,27 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 			}
 		}
 
+		// Quest VR stereo. The surface is double-width, one half per eye, and each half gets the
+		// frame reprojected by its depth. Packing must happen BEFORE BeginPresentFrame (it renders
+		// off-screen); the two eye draws then replace the single present draw below.
+		GSTexture* stereo_packed = nullptr;
+		GSVector4 stereo_left_rect = GSVector4::zero();
+		GSVector4 stereo_right_rect = GSVector4::zero();
+		bool stereo_eyes = false;
+		if (current && !blank_frame)
+		{
+			stereo_eyes = CalculateStereoDrawRects(src_rect, current->GetSize(), stereo_left_rect, stereo_right_rect);
+			if (stereo_eyes)
+			{
+				// No depth this frame (a 2D menu, an FMV, the BIOS) just means no parallax to add.
+				// The frame still has to go into BOTH halves, flat, or each eye gets half a picture.
+				// Still consume the depth record when reprojection is off, so it cannot go stale.
+				GSTexture* stereo_depth = GetStereoDepthTexture();
+				if (stereo_depth && GSStereo::reproject.load(std::memory_order_relaxed))
+					stereo_packed = g_gs_device->PrepareStereoFrame(current, stereo_depth);
+			}
+		}
+
 		if (BeginPresentFrame(false))
 		{
 			if (current && !blank_frame)
@@ -1143,8 +1189,27 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 				const u64 current_time = Common::Timer::GetCurrentValue();
 				const float shader_time = static_cast<float>(Common::Timer::ConvertValueToSeconds(current_time - m_shader_time_start));
 
-				g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect,
-					s_tv_shader_indices[GSConfig.TVShader], shader_time, BilnIf(GSConfig.LinearPresent != GSPostBilinearMode::Off));
+				if (stereo_packed)
+				{
+					g_gs_device->PresentStereoRect(stereo_packed, src_uv, stereo_left_rect, stereo_right_rect,
+						GSStereo::separation.load(std::memory_order_relaxed),
+						GSStereo::convergence.load(std::memory_order_relaxed), shader_time,
+						BilnIf(GSConfig.LinearPresent != GSPostBilinearMode::Off));
+				}
+				else if (stereo_eyes)
+				{
+					for (const GSVector4& eye_rect : {stereo_left_rect, stereo_right_rect})
+					{
+						g_gs_device->PresentRect(current, src_uv, nullptr, eye_rect,
+							s_tv_shader_indices[GSConfig.TVShader], shader_time,
+							BilnIf(GSConfig.LinearPresent != GSPostBilinearMode::Off));
+					}
+				}
+				else
+				{
+					g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect,
+						s_tv_shader_indices[GSConfig.TVShader], shader_time, BilnIf(GSConfig.LinearPresent != GSPostBilinearMode::Off));
+				}
 				// This condition IS "the GS produced a frame this vsync" — every other present
 				// path either has no output to draw or redraws the previous one. Frame generation
 				// reads it so it does not interpolate motion into frames the game never drew.
@@ -1393,8 +1458,22 @@ void GSRenderer::PresentCurrentFrame()
 			const u64 current_time = Common::Timer::GetCurrentValue();
 			const float shader_time = static_cast<float>(Common::Timer::ConvertValueToSeconds(current_time - m_shader_time_start));
 
-			g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect,
-				s_tv_shader_indices[GSConfig.TVShader], shader_time, BilnIf(GSConfig.LinearPresent != GSPostBilinearMode::Off));
+			GSVector4 stereo_left_rect, stereo_right_rect;
+			if (CalculateStereoDrawRects(src_rect, current->GetSize(), stereo_left_rect, stereo_right_rect))
+			{
+				// Redraw of a still frame (paused, OSD-only): flat in both eyes, but in both eyes.
+				for (const GSVector4& eye_rect : {stereo_left_rect, stereo_right_rect})
+				{
+					g_gs_device->PresentRect(current, src_uv, nullptr, eye_rect,
+						s_tv_shader_indices[GSConfig.TVShader], shader_time,
+						BilnIf(GSConfig.LinearPresent != GSPostBilinearMode::Off));
+				}
+			}
+			else
+			{
+				g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect,
+					s_tv_shader_indices[GSConfig.TVShader], shader_time, BilnIf(GSConfig.LinearPresent != GSPostBilinearMode::Off));
+			}
 		}
 
 		EndPresentFrame();

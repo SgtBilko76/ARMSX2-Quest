@@ -2028,6 +2028,18 @@ public:
 	/// Performs a screen blit for display. If dTex is null, it assumes you are writing to the system framebuffer/swap chain.
 	virtual void PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, PresentShader shader, float shaderTime, Filter filter) = 0;
 
+	/// Quest VR stereo. Packs the frame (RGB) and its depth buffer (A) into one texture, because a
+	/// present pipeline samples exactly one. MUST be called BEFORE BeginPresentFrame: it renders to
+	/// an off-screen target, which is illegal once the swap chain's render pass is open. Returns
+	/// null on devices with no stereo path, and the caller then presents normally.
+	virtual GSTexture* PrepareStereoFrame(GSTexture* /*sTex*/, GSTexture* /*depth*/) { return nullptr; }
+
+	/// Draws the packed frame once per eye, into the two halves of a side-by-side surface. Called
+	/// inside the present pass, in place of PresentRect.
+	virtual void PresentStereoRect(GSTexture* /*sTex*/, const GSVector4& /*sRect*/, const GSVector4& /*dRectLeft*/,
+		const GSVector4& /*dRectRight*/, float /*separation*/, float /*convergence*/, float /*shaderTime*/,
+		Filter /*filter*/) {}
+
 	/// Same as doing StretchRect for each item, except tries to batch together rectangles in as few draws as possible.
 	/// The provided list should be sorted by texture, the implementations only check if it's the same as the last.
 	void DrawMultiStretchRects(const MultiStretchRect* rects, u32 num_rects, GSTexture* dTex, ShaderConvertSelector shader = ShaderConvert::COPY)

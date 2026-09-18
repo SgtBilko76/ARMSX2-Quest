@@ -10,6 +10,23 @@
 
 MULTI_ISA_DEF(class GSSwPrimRenderFunctions;)
 
+#include <atomic>
+
+/// Quest VR stereoscopic output (platforms/android/app/src/main/cpp/xr). Driven from the XR thread
+/// via ArmsX2Xr::SetStereo, read by GSRenderer::VSync on the GS thread, hence the atomics. Off
+/// everywhere else, which leaves the present path exactly as it was.
+namespace GSStereo
+{
+	extern std::atomic<bool> enabled;
+	/// Horizontal shift, in source UV, applied at depth 1 relative to the convergence plane.
+	extern std::atomic<float> separation;
+	/// Depth value that lands on the screen plane; nearer pixels come forward, further ones recede.
+	extern std::atomic<float> convergence;
+	/// When false, frames still go to both eyes but without the depth reprojection -- flat, and
+	/// without its extra full-screen passes. For isolating what the 3D costs.
+	extern std::atomic<bool> reproject;
+} // namespace GSStereo
+
 class GSRenderer : public GSState
 {
 	// The software prim render reads the drawing state through a GSRenderer reference, so its
@@ -58,6 +75,16 @@ protected:
 	GSVector2i m_real_size{0, 0};
 
 	virtual GSTexture* GetOutput(int i, float& scale, int& y_offset) = 0;
+
+	/// Splits the presentation surface into the two side-by-side eye halves, and returns false
+	/// when stereo is off. EVERY present path has to use these rects while it is on: a frame drawn
+	/// once across the whole surface is seen half by each eye.
+	bool CalculateStereoDrawRects(const GSVector4i& src_rect, const GSVector2i& src_size,
+		GSVector4& left_rect, GSVector4& right_rect);
+
+	/// Depth buffer of this frame's main 3D pass, for stereo reprojection. Null when there is
+	/// none to be had (software renderer, 2D-only frame).
+	virtual GSTexture* GetStereoDepthTexture() { return nullptr; }
 	virtual GSTexture* GetFeedbackOutput(float& scale) { return nullptr; }
 
 public:

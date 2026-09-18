@@ -29,6 +29,10 @@ layout(push_constant) uniform cb10
 	vec2 u_source_resolution;
 	vec2 u_rcp_source_resolution; // 1 / u_source_resolution
 	float u_time;
+	// Quest VR stereo, packed into the spare push-constant tail. Signed per eye.
+	float u_stereo_separation;
+	float u_stereo_convergence;
+	float u_stereo_pad;
 };
 
 layout(location = 0) in vec2 v_tex;
@@ -440,6 +444,30 @@ void ps_automagical_supersampling()
 	}
 
 	o_col0 = vec4(col / div, 1.0);
+}
+#endif
+
+#ifdef ps_stereo
+// Depth-reprojected stereo for the Quest virtual screen. samp0 carries the frame in RGB and its
+// depth buffer in A (packed by GSDeviceVK::PrepareStereoFrame). Each eye samples the frame at a
+// horizontally shifted position; the shift grows with how near the pixel is, and that disparity is
+// what the eyes read as depth. Pixels at u_stereo_convergence sit on the screen plane.
+//
+// Solved by iteration rather than in one step: the correct shift depends on the depth at the
+// SHIFTED position, not on the depth under the output pixel. A handful of steps converges
+// everywhere except at silhouettes, where there is no data for what the shift uncovers anyway.
+void ps_stereo()
+{
+	vec2 uv = v_tex;
+	for (int i = 0; i < 6; i++)
+	{
+		float depth = sample_c(uv).a;
+		uv.x = v_tex.x + u_stereo_separation * (depth - u_stereo_convergence);
+	}
+	// Clamp into the frame: a shift that reaches past the edge has nothing to sample, and letting
+	// it run would smear the opposite edge in.
+	uv.x = clamp(uv.x, u_source_rect.x, u_source_rect.z);
+	o_col0 = vec4(sample_c(uv).rgb, 1.0f);
 }
 #endif
 

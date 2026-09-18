@@ -539,6 +539,12 @@ private:
 
 	std::vector<VkPipeline> m_convert;
 	std::array<VkPipeline, static_cast<int>(PresentShader::Count)> m_present{};
+	// Quest VR stereo (see GSStereo). Compiled on first use rather than at device creation, so a
+	// runtime without them still starts, and a non-VR session never pays for them.
+	VkPipeline m_present_stereo = VK_NULL_HANDLE;
+	VkPipeline m_depth_to_alpha = VK_NULL_HANDLE;
+	GSTexture* m_stereo_packed = nullptr;
+	bool m_stereo_compile_attempted = false;
 	std::array<VkPipeline, 2> m_merge{};
 	std::array<VkPipeline, NUM_INTERLACE_SHADERS> m_interlace{};
 	VkPipeline m_colclip_setup_pipelines[2][2] = {}; // [depth][feedback_loop]
@@ -749,6 +755,10 @@ public:
 
 	void PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
 		PresentShader shader, float shaderTime, Filter filter) override;
+	GSTexture* PrepareStereoFrame(GSTexture* sTex, GSTexture* depth) override;
+	void PresentStereoRect(GSTexture* sTex, const GSVector4& sRect, const GSVector4& dRectLeft,
+		const GSVector4& dRectRight, float separation, float convergence, float shaderTime, Filter filter) override;
+	bool CompileStereoPipelines();
 	void DoDrawMultiStretchRects(
 		const MultiStretchRect* rects, u32 num_rects, GSTexture* dTex, ShaderConvertSelector shader) override;
 	void DoMultiStretchRects(const MultiStretchRect* rects, u32 num_rects, GSTextureVK* dTex, ShaderConvertSelector shader);

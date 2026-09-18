@@ -2635,6 +2635,21 @@ open class MainActivityRuntime : ComponentActivity() {
                         com.armsx2.PauseMusic.stop()
                     }
                 }
+                // Quest VR: a running game with no frontend over it belongs in the headset. Keyed on
+                // the same pauseMenuUp as above, so it covers every route back into the game —
+                // boot, Resume from the pause menu, closing an in-game screen. The delay lets the
+                // overlay's 220 ms dismiss finish before the panel goes away. No-op off Quest.
+                val gameInFront = eState.value == EmuState.RUNNING && !pauseMenuUp
+                androidx.compose.runtime.LaunchedEffect(gameInFront) {
+                    if (gameInFront && com.armsx2.vr.QuestVr.isHeadset) {
+                        kotlinx.coroutines.delay(500)
+                        if (eState.value == EmuState.RUNNING && !WindowImpl.overlayVisible.value &&
+                            WindowImpl.inGameScreen.value == null
+                        ) {
+                            com.armsx2.vr.QuestVr.enter(this@MainActivityRuntime)
+                        }
+                    }
+                }
                 // Screen orientation follows whichever tier is live: a running game's per-game
                 // rotation, the library's global one. Driven reactively off currentGame rather
                 // than from each site that mutates it — THREE paths clear it (stop-to-library,
@@ -5191,7 +5206,9 @@ open class MainActivityRuntime : ComponentActivity() {
         // know to open the menu and tap Resume. open() pauses the VM AND shows
         // the pause menu, so returning lands straight on the Resume button.
         // No-op if the overlay is already up (it already paused the game).
-        if (eState.value == EmuState.RUNNING)
+        // Except when the game just went into the Quest headset: the immersive activity covering
+        // this panel is exactly where the user is playing it.
+        if (eState.value == EmuState.RUNNING && !com.armsx2.vr.QuestVr.active)
             InGameOverlay.open()
         // Persist Vulkan pipeline cache before Android can reap the process.
         // ~VKShaderCache only fires on a clean device teardown, but swipe-kill

@@ -30,6 +30,13 @@ class GSRendererHW : public GSRenderer
 	MULTI_ISA_FRIEND(GSRendererHWFunctions);
 	friend GSHwHack;
 
+	// Quest VR stereo: the depth target of the largest depth-writing draw in the frame, which is as
+	// good a guess at "the main 3D pass" as the GS offers. Held as address + format rather than a
+	// pointer, because the texture cache can drop the target before the frame is presented.
+	u32 m_stereo_depth_bp = 0;
+	u32 m_stereo_depth_psm = 0;
+	int m_stereo_depth_area = 0;
+
 public:
 	static constexpr int MAX_FRAMEBUFFER_HEIGHT = 1280;
 
@@ -416,6 +423,7 @@ public:
 	void VSync(u32 field, bool registers_written, bool idle_frame) override;
 
 	GSTexture* GetOutput(int i, float& scale, int& y_offset) override;
+	GSTexture* GetStereoDepthTexture() override;
 	GSTexture* GetFeedbackOutput(float& scale) override;
 	void InvalidateVideoMem(const GIFRegBITBLTBUF& BITBLTBUF, const GSVector4i& r) override;
 	void InvalidateLocalMem(const GIFRegBITBLTBUF& BITBLTBUF, const GSVector4i& r, bool clut = false) override;

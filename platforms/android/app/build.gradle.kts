@@ -246,6 +246,7 @@ android {
             // Play distribution should carry. The NATIVE side is gated here rather than in
             // Kotlin so a play build never even fetches the library.
             buildConfigField("boolean", "LSFG", "true")
+            buildConfigField("boolean", "QUEST_VR", "false")
             externalNativeBuild { cmake { arguments += "-DARMSX2_ENABLE_LSFG=ON" } }
         }
         create("play") {
@@ -253,9 +254,29 @@ android {
             buildConfigField("boolean", "STORAGE_ALL_FILES", "false")
             buildConfigField("boolean", "IN_APP_UPDATER", "false")
             buildConfigField("boolean", "LSFG", "false")
+            buildConfigField("boolean", "QUEST_VR", "false")
             externalNativeBuild { cmake { arguments += "-DARMSX2_ENABLE_LSFG=OFF" } }
         }
+        // Meta Quest standalone APK (sideloaded): the normal app as a 2D panel, plus an immersive
+        // OpenXR activity that shows the running game on a virtual screen with the Touch
+        // controllers mapped to the pad (src/quest, cpp/xr). Sideload storage like github; no
+        // in-app updater and no LSFG (frame generation would fight the compositor's own pacing).
+        create("quest") {
+            dimension = "store"
+            buildConfigField("boolean", "STORAGE_ALL_FILES", "true")
+            buildConfigField("boolean", "IN_APP_UPDATER", "false")
+            buildConfigField("boolean", "LSFG", "false")
+            buildConfigField("boolean", "QUEST_VR", "true")
+            externalNativeBuild {
+                cmake {
+                    arguments += "-DARMSX2_ENABLE_LSFG=OFF"
+                    arguments += "-DARMSX2_ENABLE_OPENXR=ON"
+                }
+            }
+        }
     }
+    // quest ships without the updater and LSFG: src/quest carries copies of play's no-op stubs for
+    // both (an extra srcDir pointing at src/play is not compiled by AGP 9's built-in Kotlin).
     // Merge the generated bin/resources tree in as a second assets root. Passing
     // the task's output provider (not a bare path) makes AGP's asset-merge tasks
     // depend on generateSharedResources, so the tree is materialized before it is
@@ -285,6 +306,9 @@ android {
         // Generated BuildConfig.DEBUG used by Main.kt's debug-only auto-boot
         // path. AGP 8 made this opt-in.
         buildConfig = true
+        // The quest flavour's OpenXR loader is consumed as a prefab package (find_package(OpenXR)
+        // in cpp/CMakeLists.txt). Harmless for github/play, which have no prefab dependencies.
+        prefab = true
     }
 
     packaging {
@@ -419,6 +443,10 @@ dependencies {
     implementation(libs.coil.gif) // animated GIF / WebP / APNG (library background)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+
+    // Quest VR mode: Khronos OpenXR loader (native .so + prefab headers). Its manifest brings the
+    // OPENXR permissions and the runtime-broker <queries> the loader needs.
+    "questImplementation"(libs.openxr.loader)
 
     testImplementation(libs.junit)
     // Real org.json for JVM unit tests: the mockable android.jar stubs throw "not mocked", and
