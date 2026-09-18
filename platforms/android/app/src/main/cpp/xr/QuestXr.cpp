@@ -84,9 +84,9 @@ namespace
 		const float parsed = std::strtof(value, nullptr);
 		return std::isfinite(parsed) ? parsed : fallback;
 	}
-	// ~67 degrees wide (2.4 m across at 1.8 m): a big screen that still keeps the HUD corners in
+	// ~77 degrees wide (2.4 m across at 1.5 m): a big screen that still keeps the HUD corners in
 	// view without turning your head. Tuned in the headset; see the live properties above.
-	constexpr float kScreenDistanceM = 1.8f;
+	constexpr float kScreenDistanceM = 1.5f;
 	constexpr float kScreenWidthM = 2.4f;
 
 	using ArmsX2Xr::ControllerInput;
