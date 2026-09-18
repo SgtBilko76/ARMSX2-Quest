@@ -31,8 +31,15 @@
             android:name="com.oculus.supportedDevices"
             android:value="quest2|questpro|quest3|quest3s" />
 
-        <!-- Panel activities: the launcher splash and the emulator UI it hands over to. -->
+        <!-- Panel activities: the launcher splash and the emulator UI it hands over to.
+             <layout> is how Horizon OS sizes a 2D panel. Without it the app opened at the system
+             default, far too small for a library of covers; 1440x810dp is the largest 16:9 inside
+             the 1440x1000dp panel maximum. On both activities because the FIRST one opened (the
+             splash) sizes the panel, and Main is reopened on its own when leaving VR. -->
         <activity android:name="com.armsx2.BootSplashActivity">
+            <layout
+                android:defaultWidth="1440dp"
+                android:defaultHeight="810dp" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -40,6 +47,9 @@
             </intent-filter>
         </activity>
         <activity android:name="com.armsx2.Main">
+            <layout
+                android:defaultWidth="1440dp"
+                android:defaultHeight="810dp" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.DEFAULT" />
