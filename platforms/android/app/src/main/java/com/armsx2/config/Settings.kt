@@ -319,7 +319,8 @@ data class Settings(
     /** EmuCore/GS/GSBackThreadMode — GV7 GS front/back thread split.
      * 0 Off (single-threaded), 1 Inline, 2 Lockstep, 3 Pipelined (fastest).
      * Defaults to Off (opt-in); a per-game override can raise it. Restart-required. */
-    val gsBackThreadMode: Int = 0,
+    // Quest: Pipelined, from the settings tuned on the headset (with QGO). Everywhere else Off.
+    val gsBackThreadMode: Int = if (com.armsx2.BuildConfig.QUEST_VR) 3 else 0,
     /** EmuCore/GS/DisableVertexShaderExpand — force CPU vertex expansion. Renderer-init; restart to apply. */
     val disableVertexShaderExpand: Boolean = false,
     /** EmuCore/GS/UseBlitSwapChain — blit present model instead of flip. Renderer-init; restart to apply. */
@@ -357,7 +358,8 @@ data class Settings(
     /** EmuCore/GS/dithering_ps2 — 0 Off / 1 Scaled / 2 Unscaled / 3 Force 32bit. PCSX2 default Unscaled. */
     val dithering: Int = 2,
     /** EmuCore/GS/VsyncQueueSize — frames the GS thread may queue (0-3). PCSX2 default 2. */
-    val vsyncQueueSize: Int = 2,
+    // Quest: 0 (no queued frames) -- tuned on the headset. See ConfigStore.migrateLowLatencyOff.
+    val vsyncQueueSize: Int = if (com.armsx2.BuildConfig.QUEST_VR) 0 else 2,
     // Output-surface scaling. App-side (no EmuCore key) but PER-GAME scoped: a heavy
     // game can render its output smaller while the library and lighter games stay
     // sharp. Were global-only prefs until #-Duda reported that changing them in Game
@@ -380,7 +382,8 @@ data class Settings(
     /** EmuCore/GS/FMVAspectRatioSwitch — aspect ratio used ONLY while an FMV/MPEG is
      *  playing (restores [aspectRatio] when it ends). 0 Off (no override) · 1 Auto
      *  4:3/3:2 · 2 4:3 · 3 16:9 · 4 10:7 · 5 21:9 · 6 20:9 · 7 19.5:9 · 8 Custom. Default Off. */
-    val fmvAspectRatio: Int = 0,
+    // Quest: 16:9 for FMVs, matching the headset's 16:9 screen.
+    val fmvAspectRatio: Int = if (com.armsx2.BuildConfig.QUEST_VR) 3 else 0,
     /** EmuCore/GS/CustomAspectRatio — width/height used when [aspectRatio] is 8 (Custom).
      *  A ratio rather than separate W/H so any value is expressible; clamped 0.5..5.0 natively. */
     val customAspectRatio: Float = 16f / 9f,
@@ -391,7 +394,8 @@ data class Settings(
     /** Internal resolution multiplier (0.25..5.0; 1.0 = native). Applied live via
      *  the GS upscale helper; per-game so each title keeps its own. Seeded from the
      *  legacy global "upscaleFloat" pref on first load. */
-    val upscaleFloat: Float = 1.0f,
+    // Quest: 3x -- tuned on the headset, where the screen is big enough to show it.
+    val upscaleFloat: Float = if (com.armsx2.BuildConfig.QUEST_VR) 3.0f else 1.0f,
     /** Installed custom Vulkan GPU driver id to pin (e.g. a Turnip build). "" = system
      *  driver. Applied at (re)launch via CustomDriver.applyToNative in
      *  MainActivityRuntime.applyRendererPrefs; per-game so a title can pin the driver it
@@ -577,7 +581,8 @@ data class Settings(
      *  ★ 5 (Asynchronous) is EXPERIMENTAL: a non-blocking GPU→CPU readback pipeline, so the EE
      *  thread never stalls on the GS thread. Note the enum stops being ordered at 5 — never write
      *  `mode > n` comparisons against it. Keep the clamp in applyTo in sync with this list. */
-    val hardwareDownloadMode: Int = 0,
+    // Quest: Unsynchronized. GPU readbacks for sun/lens-flare checks stalled sunlit scenes.
+    val hardwareDownloadMode: Int = if (com.armsx2.BuildConfig.QUEST_VR) 3 else 0,
     /** EmuCore/GS/TVShader — CRT / TV shader preset. */
     val tvShader: Int = 0,
     /** EmuCore/GS/ShadeBoost. */

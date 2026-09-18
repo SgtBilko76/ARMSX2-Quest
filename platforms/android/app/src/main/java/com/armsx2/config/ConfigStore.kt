@@ -255,6 +255,9 @@ object ConfigStore {
         MainActivityRuntime.prefs.edit().putBoolean(KEY_LOWLATENCY_OFF_MIGRATED, true).apply()
         // Fresh installs are handled by seedFreshInstallDefaults; only touch an existing global save.
         if (MainActivityRuntime.prefs.getString(KEY_GLOBAL, null) == null) return
+        // The Quest build defaults to queue 0 on purpose (tuned on the headset). seedFreshInstallDefaults
+        // runs just before this, so without this line a fresh Quest install would be reset to 2 at once.
+        if (com.armsx2.BuildConfig.QUEST_VR) return
         val g = loadGlobal()
         if (g.vsyncQueueSize == 0) saveGlobal(g.copy(vsyncQueueSize = 2))
     }
