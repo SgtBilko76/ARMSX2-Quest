@@ -10,11 +10,11 @@
 //   A / B / X / Y          Cross / Circle / Square / Triangle
 //   Grips / Triggers       L1 R1 / L2 R2 (triggers are analog)
 //   Stick clicks           L3 / R3
-//   Sticks                 left / right analog (the left stick ALSO presses the D-pad)
+//   Sticks                 left / right analog; a hard push on the left stick is the D-pad
 //   Menu tap               Start
 //   Menu held + right stick    D-pad
 //   Menu held + A              Select
-//   Menu held + B              left stick: D-pad + analog (default), or analog only
+//   Menu held + B              left stick: analog + D-pad on hard push (default), or analog only
 //   Menu held + right trigger  recenter the screen
 //   Menu held + right grip     leave VR (back to the panel and the pause menu)
 //
@@ -99,6 +99,11 @@ namespace ArmsX2Xr
 		static constexpr float kPressThreshold = 0.6f;
 		static constexpr float kReleaseThreshold = 0.4f;
 		static constexpr float kDpadThreshold = 0.5f;
+		// Left-stick D-pad: a HARD push, with hysteresis. Pressed past kStickDpadPress, released
+		// only back under kStickDpadRelease, so a push hovering near the edge cannot chatter into a
+		// run of presses that skips menu entries.
+		static constexpr float kStickDpadPress = 0.75f;
+		static constexpr float kStickDpadRelease = 0.55f;
 		static constexpr double kMenuTapSeconds = 0.5;
 		// Start is sent on Menu RELEASE (only then is it known not to be a chord), so it has to be
 		// held long enough for the game to poll it at least a few times.
@@ -171,13 +176,37 @@ namespace ArmsX2Xr
 				SplitStick(pad, in.right_x, in.right_y, PAD_R_UP, PAD_R_DOWN, PAD_R_LEFT, PAD_R_RIGHT);
 			}
 
-			// The left stick always drives the analog stick, and by default the D-pad as well: plenty
-			// of PS2 menus only answer to the D-pad, and with the pad in digital mode the analog
-			// sticks send nothing at all -- a menu that cannot be moved is the worse failure. Menu + B
-			// turns the D-pad half off for games where the D-pad does something of its own.
+			// Left stick: analog, and by default a hard push is the D-pad INSTEAD on that axis. Plenty of
+			// PS2 menus only answer to the D-pad (GT4's in-race pause menu), so the stick has to reach
+			// it -- but menus that read both (GT4's main menu) moved two entries per push when the stick
+			// sent both at once. Exclusive per axis fixes that, and keeps steering analog through
+			// everything short of full lock, where digital and analog amount to the same thing.
+			// Menu + B switches to analog only, for games whose D-pad does something of its own.
 			SplitStick(pad, in.left_x, in.left_y, PAD_L_UP, PAD_L_DOWN, PAD_L_LEFT, PAD_L_RIGHT);
 			if (m_dpad_mode)
-				AddDpad(in.left_x, in.left_y, up, down, left, right);
+			{
+				m_left_dpad_x = StickDpadAxis(m_left_dpad_x, in.left_x);
+				m_left_dpad_y = StickDpadAxis(m_left_dpad_y, in.left_y);
+				if (m_left_dpad_x != 0)
+				{
+					right |= m_left_dpad_x > 0;
+					left |= m_left_dpad_x < 0;
+					pad.Set(PAD_L_RIGHT, 0.0f);
+					pad.Set(PAD_L_LEFT, 0.0f);
+				}
+				if (m_left_dpad_y != 0)
+				{
+					up |= m_left_dpad_y > 0;
+					down |= m_left_dpad_y < 0;
+					pad.Set(PAD_L_UP, 0.0f);
+					pad.Set(PAD_L_DOWN, 0.0f);
+				}
+			}
+			else
+			{
+				m_left_dpad_x = 0;
+				m_left_dpad_y = 0;
+			}
 
 			pad.Set(PAD_UP, up ? 1.0f : 0.0f);
 			pad.Set(PAD_DOWN, down ? 1.0f : 0.0f);
@@ -226,6 +255,16 @@ namespace ArmsX2Xr
 			return false;
 		}
 
+		// One axis of the left-stick D-pad: -1, 0 or +1, with hysteresis around the current state.
+		static int StickDpadAxis(int state, float value)
+		{
+			if (state > 0)
+				return (value > kStickDpadRelease) ? 1 : (value < -kStickDpadPress ? -1 : 0);
+			if (state < 0)
+				return (value < -kStickDpadRelease) ? -1 : (value > kStickDpadPress ? 1 : 0);
+			return (value > kStickDpadPress) ? 1 : (value < -kStickDpadPress ? -1 : 0);
+		}
+
 		static void AddDpad(float x, float y, bool& up, bool& down, bool& left, bool& right)
 		{
 			up |= y > kDpadThreshold;
@@ -245,6 +284,7 @@ namespace ArmsX2Xr
 		}
 
 		bool m_dpad_mode = true;
+		int m_left_dpad_x = 0, m_left_dpad_y = 0;
 		bool m_menu_down = false;
 		bool m_menu_chorded = false;
 		double m_menu_pressed_at = 0.0;
