@@ -103,6 +103,7 @@ namespace
 	using EnumerateRefreshRatesFn = XrResult(XRAPI_PTR*)(XrSession, uint32_t, uint32_t*, float*);
 	using GetRefreshRateFn = XrResult(XRAPI_PTR*)(XrSession, float*);
 	using RequestRefreshRateFn = XrResult(XRAPI_PTR*)(XrSession, float);
+	using SetPerformanceLevelFn = XrResult(XRAPI_PTR*)(XrSession, XrPerfSettingsDomainEXT, XrPerfSettingsLevelEXT);
 
 	template <typename Fn>
 	bool LoadFunction(XrInstance instance, const char* name, Fn& out)
@@ -295,7 +296,13 @@ namespace
 				extensions.push_back(XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME);
 				m_has_refresh_rate_ext = true;
 			}
-			// Curved screen. Optional: without it the screen is submitted as a flat quad instead.
+			// CPU/GPU clock requests. Optional.
+			if (has_ext(XR_EXT_PERFORMANCE_SETTINGS_EXTENSION_NAME))
+			{
+				extensions.push_back(XR_EXT_PERFORMANCE_SETTINGS_EXTENSION_NAME);
+				m_has_perf_settings_ext = true;
+			}
+						// Curved screen. Optional: without it the screen is submitted as a flat quad instead.
 			if (has_ext(XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME))
 			{
 				extensions.push_back(XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME);
@@ -341,6 +348,8 @@ namespace
 			{
 				return Fail("runtime is missing required extension functions");
 			}
+			if (m_has_perf_settings_ext)
+				m_has_perf_settings_ext = LoadFunction(m_instance, "xrPerfSettingsSetPerformanceLevelEXT", m_set_performance_level);
 			if (m_has_refresh_rate_ext)
 			{
 				m_has_refresh_rate_ext =
@@ -569,6 +578,7 @@ namespace
 					}
 					m_session_running = true;
 					PickRefreshRate();
+					RequestPerformanceBoost();
 					// Only now: before the session runs nothing consumes the Surface, and a GS
 					// presenting into a full buffer queue would stall the whole emulator.
 					if (!m_window_handed_over)
@@ -661,26 +671,42 @@ namespace
 			if (!m_has_refresh_rate_ext)
 				return;
 
-			// PS2 NTSC output is ~60 Hz. At 72 or 90 Hz some game frames are shown longer than
-			// others, which reads as judder on every camera pan; at 120 Hz each frame is shown for
-			// exactly two refreshes.
+			// The highest rate the headset offers, which is what the Quest Games Optimizer profile
+			// this was tuned with asks for (it went further, to 200 Hz, through a debug property an
+			// app cannot set -- while QGO runs, its value wins over this request anyway).
 			uint32_t count = 0;
 			if (XR_SUCCEEDED(m_enumerate_refresh_rates(m_session, 0, &count, nullptr)) && count > 0)
 			{
 				std::vector<float> rates(count);
 				m_enumerate_refresh_rates(m_session, count, &count, rates.data());
+				std::string offered;
+				float highest = 0.0f;
 				for (float rate : rates)
 				{
-					if (std::fabs(rate - 120.0f) < 1.0f)
-					{
-						m_request_refresh_rate(m_session, rate);
-						break;
-					}
+					offered += std::to_string(static_cast<int>(rate + 0.5f)) + " ";
+					highest = std::max(highest, rate);
 				}
+				XR_LOG("display refresh rates offered: %s", offered.c_str());
+				if (highest > 0.0f)
+					m_request_refresh_rate(m_session, highest);
 			}
 			float current = 0.0f;
 			if (XR_SUCCEEDED(m_get_refresh_rate(m_session, &current)))
 				m_refresh_hz = current;
+			XR_LOG("display refresh rate %.1f Hz", m_refresh_hz);
+		}
+
+		// The closest an app can get to the QGO profile (CPU level 8, GPU level 7): OpenXR's highest
+		// performance level for both domains. QGO's levels come from debug properties an app cannot
+		// write, so with QGO running its own values still apply.
+		void RequestPerformanceBoost()
+		{
+			if (!m_has_perf_settings_ext)
+				return;
+			const XrResult cpu = m_set_performance_level(m_session, XR_PERF_SETTINGS_DOMAIN_CPU_EXT, XR_PERF_SETTINGS_LEVEL_BOOST_EXT);
+			const XrResult gpu = m_set_performance_level(m_session, XR_PERF_SETTINGS_DOMAIN_GPU_EXT, XR_PERF_SETTINGS_LEVEL_BOOST_EXT);
+			XR_LOG("performance level BOOST: cpu %s, gpu %s", XR_SUCCEEDED(cpu) ? "ok" : "refused",
+				XR_SUCCEEDED(gpu) ? "ok" : "refused");
 		}
 
 		void RunFrame(JNIEnv* env)
@@ -990,6 +1016,8 @@ namespace
 		float m_stereo_convergence = kStereoConvergence;
 		int m_tuning_countdown = 0;
 		bool m_has_refresh_rate_ext = false;
+		bool m_has_perf_settings_ext = false;
+		SetPerformanceLevelFn m_set_performance_level = nullptr;
 		bool m_has_image_layout_ext = false;
 		float m_refresh_hz = 0.0f;
 		CreateSurfaceSwapchainFn m_create_surface_swapchain = nullptr;
