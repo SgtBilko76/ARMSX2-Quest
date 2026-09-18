@@ -2534,6 +2534,13 @@ void ArmsX2Xr::SetStereoReprojection(bool enabled)
     GSStereo::reproject.store(enabled, std::memory_order_relaxed);
 }
 
+static std::atomic<ArmsX2Xr::RumbleSink> s_xr_rumble_sink{nullptr};
+
+void ArmsX2Xr::SetRumbleSink(RumbleSink sink)
+{
+    s_xr_rumble_sink.store(sink, std::memory_order_release);
+}
+
 void ArmsX2Xr::SetPadInput(int code, float value)
 {
     // applyPadButton treats a press with range 0 as a full digital press, so anything that rounds
@@ -5280,6 +5287,14 @@ void Native::vmSetPaused(bool paused) {
 }
 
 void Native::onPadRumble(int pad, int largeMotor, int smallMotor) {
+    // Quest VR: Player 1's rumble also drives the Touch controllers. The Java path below is kept,
+    // so a Bluetooth pad paired to the headset still rumbles as before.
+    if (pad == 0)
+    {
+        if (const ArmsX2Xr::RumbleSink sink = s_xr_rumble_sink.load(std::memory_order_acquire))
+            sink(static_cast<float>(largeMotor) / 255.0f, static_cast<float>(smallMotor) / 255.0f);
+    }
+
     if (!s_jvm || !s_NativeApp_class || !s_onPadRumble_mid) return;
 
     JNIEnv* env = nullptr;

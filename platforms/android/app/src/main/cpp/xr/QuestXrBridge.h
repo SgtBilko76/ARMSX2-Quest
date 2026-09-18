@@ -23,6 +23,12 @@ namespace ArmsX2Xr
 	// Keep the eye split but skip the depth reprojection (and its GPU passes). Diagnostic A/B.
 	void SetStereoReprojection(bool enabled);
 
+	// Player 1 rumble, 0..1 per motor, delivered from the emulator thread whenever it changes. The
+	// XR layer registers a sink while its session runs; nullptr unregisters. The sink must be cheap
+	// and thread-safe -- it only stores the values for the XR thread to act on.
+	using RumbleSink = void (*)(float large_motor, float small_motor);
+	void SetRumbleSink(RumbleSink sink);
+
 	// Set one Player 1 input. `code` is the Android-keycode PS2 code applyPadButton() understands
 	// (see QuestPadMapper.h); `value` is 0..1, where 0 releases.
 	void SetPadInput(int code, float value);

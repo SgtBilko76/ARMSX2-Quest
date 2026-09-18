@@ -114,6 +114,17 @@ namespace
 		return true;
 	}
 
+	// Latest PS2 rumble for Player 1, stored by the emulator thread (ArmsX2Xr::SetRumbleSink) and
+	// turned into controller haptics on the XR thread.
+	std::atomic<float> s_rumble_large{0.0f};
+	std::atomic<float> s_rumble_small{0.0f};
+
+	void OnPadRumble(float large_motor, float small_motor)
+	{
+		s_rumble_large.store(large_motor, std::memory_order_relaxed);
+		s_rumble_small.store(small_motor, std::memory_order_relaxed);
+	}
+
 	class QuestXr
 	{
 	public:
@@ -146,6 +157,7 @@ namespace
 			XrAction left_trigger = XR_NULL_HANDLE, right_trigger = XR_NULL_HANDLE;
 			XrAction left_grip = XR_NULL_HANDLE, right_grip = XR_NULL_HANDLE;
 			XrAction left_stick = XR_NULL_HANDLE, right_stick = XR_NULL_HANDLE;
+			XrAction left_haptic = XR_NULL_HANDLE, right_haptic = XR_NULL_HANDLE;
 		};
 
 		void ThreadMain()
@@ -401,6 +413,8 @@ namespace
 				{&m_actions.right_grip, "right_grip", XR_ACTION_TYPE_FLOAT_INPUT, "/user/hand/right/input/squeeze/value"},
 				{&m_actions.left_stick, "left_stick", XR_ACTION_TYPE_VECTOR2F_INPUT, "/user/hand/left/input/thumbstick"},
 				{&m_actions.right_stick, "right_stick", XR_ACTION_TYPE_VECTOR2F_INPUT, "/user/hand/right/input/thumbstick"},
+				{&m_actions.left_haptic, "left_haptic", XR_ACTION_TYPE_VIBRATION_OUTPUT, "/user/hand/left/output/haptic"},
+				{&m_actions.right_haptic, "right_haptic", XR_ACTION_TYPE_VIBRATION_OUTPUT, "/user/hand/right/output/haptic"},
 			};
 
 			std::vector<XrActionSuggestedBinding> bindings;
@@ -472,6 +486,12 @@ namespace
 			// already in flight fails cleanly rather than touching freed memory.
 			if (m_window_handed_over)
 			{
+				ArmsX2Xr::SetRumbleSink(nullptr);
+				// The emulator only reports rumble on change; a value left behind here would start the
+				// next session vibrating until the game happened to change it.
+				s_rumble_large.store(0.0f, std::memory_order_relaxed);
+				s_rumble_small.store(0.0f, std::memory_order_relaxed);
+				StopHaptics();
 				ArmsX2Xr::SetStereo(false, 0.0f, 0.0f);
 				ArmsX2Xr::SetRenderWindow(nullptr, 0, 0, 0.0f);
 				m_window_handed_over = false;
@@ -554,6 +574,7 @@ namespace
 					if (!m_window_handed_over)
 					{
 						ArmsX2Xr::SetStereo(true, m_stereo_separation, m_stereo_convergence);
+						ArmsX2Xr::SetRumbleSink(&OnPadRumble);
 						ArmsX2Xr::SetRenderWindow(m_screen_window, kSurfaceWidthPx, kScreenHeightPx, m_refresh_hz);
 						m_window_handed_over = true;
 					}
@@ -578,7 +599,10 @@ namespace
 			{
 				m_focused = focused;
 				if (!focused)
+				{
 					ReleaseInput();
+					StopHaptics();
+				}
 				jvalue arg;
 				arg.z = focused ? JNI_TRUE : JNI_FALSE;
 				CallActivity(env, "onXrFocusChanged", "(Z)V", &arg);
@@ -670,7 +694,10 @@ namespace
 				return;
 
 			if (m_focused)
+			{
 				UpdateInput(env);
+				UpdateHaptics();
+			}
 
 			PollStereoTuning();
 
@@ -836,6 +863,65 @@ namespace
 				RequestExit(env);
 		}
 
+		// PS2 rumble -> Touch haptics. A DualShock 2 has both motors in one body, so you feel both in
+		// both hands; with two controllers each one takes the stronger of "its" motor and half of the
+		// other -- the large (heavy) motor leans left, the small (buzz) motor right, like the grips.
+		// Re-applied a few times a second while it lasts: an OpenXR vibration has a finite duration,
+		// and a game holds rumble on for as long as it likes.
+		void UpdateHaptics()
+		{
+			const float large = s_rumble_large.load(std::memory_order_relaxed);
+			const float small = s_rumble_small.load(std::memory_order_relaxed);
+			const float amplitudes[2] = {std::max(large, 0.5f * small), std::max(small, 0.5f * large)};
+			const XrAction actions[2] = {m_actions.left_haptic, m_actions.right_haptic};
+			const auto now = std::chrono::steady_clock::now();
+
+			for (int hand = 0; hand < 2; hand++)
+			{
+				const float amplitude = std::clamp(amplitudes[hand], 0.0f, 1.0f);
+				XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};
+				info.action = actions[hand];
+
+				if (amplitude < 0.02f)
+				{
+					if (m_haptic_amplitude[hand] > 0.0f)
+						xrStopHapticFeedback(m_session, &info);
+					m_haptic_amplitude[hand] = 0.0f;
+					continue;
+				}
+
+				const bool changed = std::fabs(amplitude - m_haptic_amplitude[hand]) >= 0.05f;
+				const bool expiring = (now - m_haptic_applied_at[hand]) >= kHapticRefresh;
+				if (!changed && !expiring)
+					continue;
+
+				XrHapticVibration vibration{XR_TYPE_HAPTIC_VIBRATION};
+				// XrDuration is in NANOseconds.
+				vibration.duration = std::chrono::duration_cast<std::chrono::nanoseconds>(kHapticPulse).count();
+				vibration.frequency = XR_FREQUENCY_UNSPECIFIED;
+				vibration.amplitude = amplitude;
+				xrApplyHapticFeedback(m_session, &info, reinterpret_cast<const XrHapticBaseHeader*>(&vibration));
+				m_haptic_amplitude[hand] = amplitude;
+				m_haptic_applied_at[hand] = now;
+			}
+		}
+
+		void StopHaptics()
+		{
+			if (m_session == XR_NULL_HANDLE)
+				return;
+			const XrAction actions[2] = {m_actions.left_haptic, m_actions.right_haptic};
+			for (int hand = 0; hand < 2; hand++)
+			{
+				if (m_haptic_amplitude[hand] <= 0.0f || actions[hand] == XR_NULL_HANDLE)
+					continue;
+				XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};
+				info.action = actions[hand];
+				xrStopHapticFeedback(m_session, &info);
+				m_haptic_amplitude[hand] = 0.0f;
+			}
+		}
+
 		// Only changes are sent. A Bluetooth pad forwarded through the activity drives the same
 		// port, and re-sending an idle Touch state every frame would keep releasing its buttons.
 		void SendPad(const PadState& pad)
@@ -924,6 +1010,12 @@ namespace
 		bool m_curved = true;
 		bool m_reproject = true;
 		bool m_screen_placed = false;
+
+		// Pulses outlast the refresh, so sustained rumble has no gaps between re-applies.
+		static constexpr std::chrono::milliseconds kHapticPulse{300};
+		static constexpr std::chrono::milliseconds kHapticRefresh{200};
+		float m_haptic_amplitude[2] = {0.0f, 0.0f};
+		std::chrono::steady_clock::time_point m_haptic_applied_at[2] = {};
 
 		QuestPadMapper m_mapper;
 		PadState m_sent;
