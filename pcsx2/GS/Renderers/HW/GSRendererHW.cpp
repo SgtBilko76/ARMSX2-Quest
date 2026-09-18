@@ -50,6 +50,8 @@ void GSRendererHW::SetTCOffset()
 
 GSRendererHW::~GSRendererHW()
 {
+	GSStereo::ReleaseDepthSnapshot();
+
 	g_texture_cache.reset();
 }
 
@@ -175,12 +177,21 @@ GSTexture* GSRendererHW::GetStereoDepthTexture()
 	// One frame only: a stale depth buffer would freeze the scene's shape while the image moves.
 	m_stereo_depth_area = 0;
 	if (area <= 0)
+	{
+		GSStereo::TakeDepthSnapshot();
 		return nullptr;
+	}
 
 	// By address, not by a pointer kept since the draw: the texture cache is free to evict or
 	// resize the target in between, and a dangling one would be presented as garbage depth.
 	GSTextureCache::Target* t = g_texture_cache->GetTargetWithSharedBits(m_stereo_depth_bp, m_stereo_depth_psm);
-	return (t && t->m_type == GSTextureCache::DepthStencil) ? t->m_texture : nullptr;
+	// Consumed whether or not it is needed, so a rescue can never leak into a later frame.
+	GSTexture* const rescued = GSStereo::TakeDepthSnapshot();
+	if (t && t->m_type == GSTextureCache::DepthStencil)
+		return t->m_texture;
+	// The target is gone by present time (GT4 reuses its memory as a colour target), but its depth
+	// was copied on the way out.
+	return rescued;
 }
 
 GSTexture* GSRendererHW::GetOutput(int i, float& scale, int& y_offset)
@@ -4011,6 +4022,7 @@ void GSRendererHW::Draw()
 				m_stereo_depth_area = stereo_area;
 				m_stereo_depth_bp = ZBUF_TEX0.TBP0;
 				m_stereo_depth_psm = ZBUF_TEX0.PSM;
+				GSStereo::SetRescueTarget(ZBUF_TEX0.TBP0);
 			}
 		}
 
@@ -4668,6 +4680,7 @@ void GSRendererHW::Draw()
 				m_stereo_depth_area = stereo_area;
 				m_stereo_depth_bp = ZBUF_TEX0.TBP0;
 				m_stereo_depth_psm = ZBUF_TEX0.PSM;
+				GSStereo::SetRescueTarget(ZBUF_TEX0.TBP0);
 			}
 		}
 

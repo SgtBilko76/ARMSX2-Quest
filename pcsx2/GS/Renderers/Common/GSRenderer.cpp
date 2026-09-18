@@ -807,6 +807,58 @@ namespace GSStereo
 	std::atomic<float> separation{0.004f};
 	std::atomic<float> convergence{0.5f};
 	std::atomic<bool> reproject{true};
+
+	static constexpr u32 NO_RESCUE_TARGET = ~0u;
+	static u32 s_rescue_bp = NO_RESCUE_TARGET;
+	static GSTexture* s_depth_snapshot = nullptr;
+	static bool s_depth_snapshot_this_frame = false;
+
+	void SetRescueTarget(u32 bp)
+	{
+		s_rescue_bp = bp;
+	}
+
+	void OnDepthTargetDestroyed(u32 bp, GSTexture* texture)
+	{
+		if (bp != s_rescue_bp || !texture || !g_gs_device || !enabled.load(std::memory_order_relaxed))
+			return;
+
+		const GSVector2i size = texture->GetSize();
+		if (s_depth_snapshot && s_depth_snapshot->GetSize() != size)
+		{
+			g_gs_device->Recycle(s_depth_snapshot);
+			s_depth_snapshot = nullptr;
+		}
+		if (!s_depth_snapshot)
+		{
+			s_depth_snapshot = g_gs_device->CreateDepthStencil(size.x, size.y, false);
+			if (!s_depth_snapshot)
+				return;
+		}
+		// A GPU copy, queued ahead of the Recycle that follows this call in ~Target, so it reads
+		// the finished scene depth before the texture can be reused.
+		g_gs_device->CopyRect(texture, s_depth_snapshot, GSVector4i(0, 0, size.x, size.y), 0, 0);
+		s_depth_snapshot_this_frame = true;
+	}
+
+	GSTexture* TakeDepthSnapshot()
+	{
+		GSTexture* const snapshot = s_depth_snapshot_this_frame ? s_depth_snapshot : nullptr;
+		s_depth_snapshot_this_frame = false;
+		s_rescue_bp = NO_RESCUE_TARGET;
+		return snapshot;
+	}
+
+	void ReleaseDepthSnapshot()
+	{
+		// Stop rescuing first: targets destroyed after this (renderer teardown) must not
+		// recreate the snapshot behind our back.
+		s_rescue_bp = NO_RESCUE_TARGET;
+		s_depth_snapshot_this_frame = false;
+		if (s_depth_snapshot && g_gs_device)
+			g_gs_device->Recycle(s_depth_snapshot);
+		s_depth_snapshot = nullptr;
+	}
 } // namespace GSStereo
 
 bool GSRenderer::CalculateStereoDrawRects(const GSVector4i& src_rect, const GSVector2i& src_size,
@@ -1179,6 +1231,30 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 				GSTexture* stereo_depth = GetStereoDepthTexture();
 				if (stereo_depth && GSStereo::reproject.load(std::memory_order_relaxed))
 					stereo_packed = g_gs_device->PrepareStereoFrame(current, stereo_depth);
+
+				// How often frames actually get depth, logged when that CHANGES (none / some / all per
+				// ~5 s window). A game can look flat because it never offers a usable depth buffer --
+				// GT4 looked flat until its destroyed depth target was rescued (GSStereo) -- and this
+				// line is how to tell from a log, without a debug build.
+				static u32 stereo_frames = 0;
+				static u32 stereo_frames_with_depth = 0;
+				static int stereo_last_state = -1;
+				static Common::Timer::Value stereo_report_at = 0;
+				stereo_frames++;
+				stereo_frames_with_depth += stereo_packed ? 1 : 0;
+				const Common::Timer::Value stereo_now = Common::Timer::GetCurrentValue();
+				if (Common::Timer::ConvertValueToSeconds(stereo_now - stereo_report_at) >= 5.0)
+				{
+					const int state = (stereo_frames_with_depth == 0) ? 0 : (stereo_frames_with_depth == stereo_frames) ? 2 : 1;
+					if (state != stereo_last_state)
+					{
+						Console.WriteLnFmt("GS: Stereo: {} of {} frames reprojected with depth", stereo_frames_with_depth, stereo_frames);
+						stereo_last_state = state;
+					}
+					stereo_frames = 0;
+					stereo_frames_with_depth = 0;
+					stereo_report_at = stereo_now;
+				}
 			}
 		}
 

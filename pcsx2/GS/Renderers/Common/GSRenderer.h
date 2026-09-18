@@ -25,6 +25,17 @@ namespace GSStereo
 	/// When false, frames still go to both eyes but without the depth reprojection -- flat, and
 	/// without its extra full-screen passes. For isolating what the 3D costs.
 	extern std::atomic<bool> reproject;
+
+	// Depth rescue, GS thread only. Some games are done with their depth buffer before the frame
+	// is presented -- GT4 reuses its memory as a colour target for post effects, and the texture
+	// cache then destroys the depth target. The HW renderer names the frame's main depth target
+	// with SetRescueTarget; if the cache destroys that target, OnDepthTargetDestroyed copies it
+	// first, and TakeDepthSnapshot hands the copy to the present.
+	void SetRescueTarget(u32 bp);
+	void OnDepthTargetDestroyed(u32 bp, GSTexture* texture);
+	/// This frame's rescued depth, or null. Consumes it either way.
+	GSTexture* TakeDepthSnapshot();
+	void ReleaseDepthSnapshot();
 } // namespace GSStereo
 
 class GSRenderer : public GSState

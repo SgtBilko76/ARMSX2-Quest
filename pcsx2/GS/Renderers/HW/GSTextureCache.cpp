@@ -8212,6 +8212,10 @@ GSTextureCache::Target::~Target()
 
 	if (m_texture)
 	{
+		// Quest VR stereo: last chance to keep the frame's scene depth (see GSStereo).
+		if (m_type == DepthStencil)
+			GSStereo::OnDepthTargetDestroyed(m_TEX0.TBP0, m_texture);
+
 		g_texture_cache->m_target_memory_usage -= m_texture->GetMemUsage();
 		g_gs_device->Recycle(m_texture);
 	}
