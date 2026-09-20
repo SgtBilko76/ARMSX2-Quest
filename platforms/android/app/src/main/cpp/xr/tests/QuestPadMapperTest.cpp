@@ -75,41 +75,44 @@ int main()
 		CHECK(m.Update(in, 0.8).pad.Get(PAD_START) == 0.0f);
 	}
 
-	// Menu + A = Select, no Cross, no Start; A stays Select until released.
+	// Menu long press = Select, on release; a tap is Start and never both.
 	{
 		QuestPadMapper m;
 		ControllerInput in;
 		in.menu = true;
 		m.Update(in, 0);
-		in.a = true;
-		auto o = m.Update(in, 0.05);
-		CHECK(o.pad.Get(PAD_SELECT) == 1.0f);
-		CHECK(o.pad.Get(PAD_CROSS) == 0.0f);
+		CHECK(m.Update(in, 0.8).pad.Get(PAD_SELECT) == 0.0f); // not while still held
 		in.menu = false;
-		o = m.Update(in, 0.1);
-		CHECK(o.pad.Get(PAD_START) == 0.0f);
-		CHECK(o.pad.Get(PAD_CROSS) == 0.0f);
+		auto o = m.Update(in, 0.9);
 		CHECK(o.pad.Get(PAD_SELECT) == 1.0f);
-		in.a = false;
-		o = m.Update(in, 0.15);
-		CHECK(o.pad.Get(PAD_SELECT) == 0.0f);
-		in.a = true;
-		o = m.Update(in, 0.2);
-		CHECK(o.pad.Get(PAD_CROSS) == 1.0f);
+		CHECK(o.pad.Get(PAD_START) == 0.0f);
+		CHECK(m.Update(in, 1.1).pad.Get(PAD_SELECT) == 0.0f); // pulse ends
 	}
-
-	// A held before Menu stays Cross.
+	// A long press that used a chord fires neither Start nor Select.
 	{
 		QuestPadMapper m;
 		ControllerInput in;
-		in.a = true;
-		m.Update(in, 0);
 		in.menu = true;
+		m.Update(in, 0);
+		in.b = true;
+		m.Update(in, 0.1);
+		in.b = false;
+		in.menu = false;
+		auto o = m.Update(in, 0.9);
+		CHECK(o.pad.Get(PAD_SELECT) == 0.0f);
+		CHECK(o.pad.Get(PAD_START) == 0.0f);
+	}
+	// A is Cross even while Menu is held (it is no longer a chord partner).
+	{
+		QuestPadMapper m;
+		ControllerInput in;
+		in.menu = true;
+		m.Update(in, 0);
+		in.a = true;
 		auto o = m.Update(in, 0.05);
 		CHECK(o.pad.Get(PAD_CROSS) == 1.0f);
 		CHECK(o.pad.Get(PAD_SELECT) == 0.0f);
 	}
-
 	// Menu + right stick = D-pad, right analog silent; the chord suppresses Start.
 	{
 		QuestPadMapper m;

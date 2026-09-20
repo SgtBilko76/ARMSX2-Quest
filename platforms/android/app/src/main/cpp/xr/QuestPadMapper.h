@@ -12,8 +12,8 @@
 //   Stick clicks           L3 / R3
 //   Sticks                 left / right analog; a hard push on the left stick is the D-pad
 //   Menu tap               Start
+//   Menu long press        Select
 //   Menu held + right stick    D-pad
-//   Menu held + A              Select
 //   Menu held + B              left stick: analog + D-pad on hard push (default), or analog only
 //   Menu held + right trigger  recenter the screen
 //   Menu held + right grip     leave VR (back to the panel and the pause menu)
@@ -104,9 +104,10 @@ namespace ArmsX2Xr
 		// run of presses that skips menu entries.
 		static constexpr float kStickDpadPress = 0.75f;
 		static constexpr float kStickDpadRelease = 0.55f;
+		// Menu tap = Start, Menu long press = Select. Both are decided on RELEASE, since until then a
+		// press could still turn into a chord (which fires neither).
 		static constexpr double kMenuTapSeconds = 0.5;
-		// Start is sent on Menu RELEASE (only then is it known not to be a chord), so it has to be
-		// held long enough for the game to poll it at least a few times.
+		// The button is sent for a moment after release, long enough for the game to poll it.
 		static constexpr double kStartPulseSeconds = 0.1;
 
 		MapperOutput Update(const ControllerInput& in, double now)
@@ -122,8 +123,11 @@ namespace ArmsX2Xr
 			else if (!in.menu && m_menu_down)
 			{
 				m_menu_down = false;
-				if (!m_menu_chorded && now - m_menu_pressed_at < kMenuTapSeconds)
-					m_start_until = now + kStartPulseSeconds;
+				if (!m_menu_chorded)
+				{
+					double& until = (now - m_menu_pressed_at < kMenuTapSeconds) ? m_start_until : m_select_until;
+					until = now + kStartPulseSeconds;
+				}
 			}
 			const bool shift = m_menu_down;
 
@@ -131,9 +135,7 @@ namespace ArmsX2Xr
 			const bool rg_down = Hysteresis(m_rg_down, in.right_grip);
 
 			// A button pressed while Menu is held belongs to the chord until it is released, even
-			// if Menu is let go first — otherwise releasing Menu early would fire Cross/Circle/R1/R2.
-			if (Claim(m_a_claimed, in.a, m_prev_a, shift))
-				m_menu_chorded = true;
+			// if Menu is let go first — otherwise releasing Menu early would fire Circle/R1/R2.
 			if (Claim(m_b_claimed, in.b, m_prev_b, shift))
 			{
 				m_menu_chorded = true;
@@ -151,8 +153,8 @@ namespace ArmsX2Xr
 			}
 
 			PadState& pad = out.pad;
-			pad.Set(PAD_CROSS, (in.a && !m_a_claimed) ? 1.0f : 0.0f);
-			pad.Set(PAD_SELECT, m_a_claimed ? 1.0f : 0.0f);
+			pad.Set(PAD_CROSS, in.a ? 1.0f : 0.0f);
+			pad.Set(PAD_SELECT, now < m_select_until ? 1.0f : 0.0f);
 			pad.Set(PAD_CIRCLE, (in.b && !m_b_claimed) ? 1.0f : 0.0f);
 			pad.Set(PAD_SQUARE, in.x ? 1.0f : 0.0f);
 			pad.Set(PAD_TRIANGLE, in.y ? 1.0f : 0.0f);
@@ -289,9 +291,10 @@ namespace ArmsX2Xr
 		bool m_menu_chorded = false;
 		double m_menu_pressed_at = 0.0;
 		double m_start_until = -1.0;
+		double m_select_until = -1.0;
 
 		bool m_rt_down = false, m_rg_down = false, m_lg_down = false;
-		bool m_prev_a = false, m_prev_b = false, m_prev_rt = false, m_prev_rg = false;
-		bool m_a_claimed = false, m_b_claimed = false, m_rt_claimed = false, m_rg_claimed = false;
+		bool m_prev_b = false, m_prev_rt = false, m_prev_rg = false;
+		bool m_b_claimed = false, m_rt_claimed = false, m_rg_claimed = false;
 	};
 } // namespace ArmsX2Xr
