@@ -110,10 +110,10 @@ struct EmulationOnlyGameView: View {
     @ViewBuilder
     var body: some View {
         if appState.emulationOnlyPresentation == .minimal {
-            MetalGameView()
+            PhoneGameSurface()
                 .ignoresSafeArea()
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Game display")
+                .accessibilityLabel(Text("Game display"))
                 .accessibilityAddTraits(.isImage)
                 .persistentSystemOverlays(.hidden)
                 .onAppear(perform: preparePresentation)
@@ -169,9 +169,9 @@ struct EmulationOnlyGameView: View {
     }
 
     private var accessibleMetalSurface: some View {
-        MetalGameView()
+        PhoneGameSurface()
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Game display")
+            .accessibilityLabel(Text("Game display"))
             .accessibilityAddTraits(.isImage)
     }
 
@@ -275,10 +275,7 @@ struct GameScreenView: View {
     private static let shaderChainSupported = ARMSX2Bridge.isShaderChainSupported()
 
     private var displaySafeAreaInsets: UIEdgeInsets {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first?.windows
-            .first?.safeAreaInsets ?? .zero
+        UIApplication.shared.appWindowScene?.windows.first?.safeAreaInsets ?? .zero
     }
 
     @ViewBuilder
@@ -352,12 +349,12 @@ struct GameScreenView: View {
                 if isLandscape {
                     // Landscape: full-screen layout so pad coordinates match the layout editor.
                     ZStack {
-                        MetalGameView()
+                        PhoneGameSurface()
                             .onTapGesture { revealMenuButtonBriefly() }
                             .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("Game display")
+                            .accessibilityLabel(Text("Game display"))
                             .accessibilityAddTraits(.isImage)
-                            .accessibilityHint("VoiceOver image recognition can read on-screen text.")
+                            .accessibilityHint(Text("VoiceOver image recognition can read on-screen text."))
                             .overlay { menuRevealTapCatcher }
                         AccessibilityHUDMirror()
                         if effectiveVirtualPadVisible {
@@ -383,14 +380,14 @@ struct GameScreenView: View {
                         // The deck ignores the bottom inset, so it runs to the foot of the window.
                         let deckHeight = screen.height - geo.safeAreaInsets.top
                         let gameHeight = min(geo.size.width * 3 / 4, deckHeight * 0.6)
-                        MetalGameView()
+                        PhoneGameSurface()
                             .frame(height: gameHeight)
                             .clipped()
                             .onTapGesture { revealMenuButtonBriefly() }
                             .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("Game display")
+                            .accessibilityLabel(Text("Game display"))
                             .accessibilityAddTraits(.isImage)
-                            .accessibilityHint("VoiceOver image recognition can read on-screen text.")
+                            .accessibilityHint(Text("VoiceOver image recognition can read on-screen text."))
                             .overlay {
                                 ZStack {
                                     menuRevealTapCatcher
@@ -454,8 +451,7 @@ struct GameScreenView: View {
                 .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: childPresentedBinding(.shaders)) {
-            // Large only: this panel pushes a searchable browser and grows a variable-length
-            // parameter list, and a medium detent under a search keyboard shows almost nothing.
+            // Large only: a medium detent leaves little room for preset search and parameters.
             ShaderControlPanel(settings: settings)
                 .presentationDetents([.large])
         }
@@ -1116,7 +1112,7 @@ struct GameScreenView: View {
     }
 
     private func gameNameMatchingRuntimeIdentity() -> String? {
-        let identity = normalizedRuntimeIdentity(ARMSX2Bridge.compatibilityIdentityForCurrentGame())
+        let identity = normalizedRuntimeIdentity(ARMSX2Bridge.currentDiscIdentity())
         guard !identity.isEmpty else {
             return nil
         }
@@ -1167,7 +1163,7 @@ struct GameScreenView: View {
             bootPath: nil,
             coverURL: nil,
             coverSignature: nil,
-            metadata: serial.isEmpty ? [:] : ["serial": serial],
+            metadata: ["serial": serial, "crc": (info["crc"] as? String) ?? ""].filter { !$0.value.isEmpty },
             size: 0,
             isFavorite: false
         )
@@ -1412,12 +1408,12 @@ struct GameScreenView: View {
     }
 
     private func runtimePadLayoutIdentityForCurrentGame() -> PadLayoutGameIdentity? {
-        guard let info = ARMSX2Bridge.gameSettingsForCurrentGame() else {
+        guard let info = ARMSX2Bridge.perGameIdentityForCurrentGame() else {
             return nil
         }
         return PadLayoutGameIdentity(
-            serial: info["serial"] as? String,
-            crc: info["crc"] as? String
+            serial: info["serial"],
+            crc: info["crc"]
         )
     }
 
@@ -1925,15 +1921,17 @@ private struct SpeedControlPanel: View {
 
 // MARK: - Shader Control Panel
 
-/// The settings tree's shader section, hosted for the pause card. Both settings live in
-/// `EmuCore/GS`, so `commit` already coalesces the graphics apply and this panel writes none.
+/// The Settings shader section in the pause card. Both settings are in `EmuCore/GS`, so
+/// `commit` applies them and the panel applies nothing itself.
 private struct ShaderControlPanel: View {
     @Bindable var settings: SettingsStore
     @Environment(\.dismiss) private var dismiss
+    @State private var ownShader = false
 
     var body: some View {
         NavigationStack {
             Form {
+                if ownShader { Section { Text(settings.localized(Self.ownShaderNote)).foregroundStyle(.orange) } }
                 ShaderChainSection(
                     enabled: $settings.shaderChainEnabled,
                     presetRef: $settings.shaderChainPresetRef,
@@ -1942,6 +1940,7 @@ private struct ShaderControlPanel: View {
             }
             .navigationTitle(settings.localized("Shaders"))
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear { ownShader = PerGameShaderSelection.loadedChain(useCurrent: true, iso: "") != -1 }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(settings.localized("Done")) {
@@ -1951,6 +1950,8 @@ private struct ShaderControlPanel: View {
             }
         }
     }
+
+    static let ownShaderNote = "This game has its own shader setting, so Preset and the Shaders switch here don't change it. Change it under This Game > Per-Game Settings > Graphics."
 }
 
 // MARK: - Save State Slot Row

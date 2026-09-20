@@ -825,6 +825,11 @@ struct alignas(16) GSHWDrawConfig
 				// ROVs
 				u32 rov_color : 1;
 				PS_ROV_DEPTH rov_depth : 2;
+
+				// Alpha stencil counter drawn by the blend unit (GSFastStencilShadow.h): the shader
+				// writes the per-triangle alpha step to both outputs instead of a colour, for a blend
+				// of source DST_ALPHA and destination SRC1_ALPHA. Reads nothing.
+				u32 stencil_counter : 1;
 			};
 
 			struct
@@ -1488,6 +1493,7 @@ public:
 		bool texture_barrier      : 1; ///< Supports sampling rt and hopefully texture barrier
 		bool multidraw_fb_copy    : 1; ///< Replacement for texture barrier.
 		bool cheap_rt_feedback_read : 1; ///< A feedback read costs nothing structural — no render-pass break, no tile flush — so the renderer may take one on a draw that did not need it. ⚠️ `!texture_barrier` is NOT a substitute: it is equally true of every driver on the RT-copy feedback workaround, where the read is the most expensive one we have.
+		bool fast_stencil_shadow  : 1; ///< The alpha stencil counter (flat triangles storing their own pixel's alpha times 127/128 or 130/128) is drawn by one dual-source blend instead of a render-target read, and the hardware renderer stops auto-flush from splitting it. Set by Vulkan only, when texture barriers are off, so that each read would be a pass break plus a copy, and dual-source blending exists. See GSFastStencilShadow.h. ⚠️ Never infer it from `!texture_barrier`: D3D11 runs without barriers too, with cheap copies and no shader for it.
 		bool provoking_vertex_last: 1; ///< Supports using the last vertex in a primitive as the value for flat shading.
 		bool point_expand         : 1; ///< Supports point expansion in hardware.
 		bool line_expand          : 1; ///< Supports line expansion in hardware.
@@ -1562,8 +1568,7 @@ protected:
 	// SetRuntimeGPUProfile (Vulkan, Metal, DX12 — none of them did) silently identified as Adreno,
 	// and so did desktop OpenGL on anything not-Mali. That made IsAdrenoGPUProfile() fire
 	// Adreno-only workarounds on Apple Silicon, and made IsMaliGPUProfile() permanently false under
-	// Vulkan — which quietly disabled the Tekken 5 MediaTek-Mali GameDB fix on our default renderer.
-	// Unknown means "no vendor quirks", which is the only safe thing to assume before detection.
+	// Vulkan. Unknown means "no vendor quirks", which is the only safe thing to assume before detection.
 	RuntimeGpuProfile m_runtime_gpu_profile = RuntimeGpuProfile::Unknown;
 	// Per-vendor mobile GPU identity + GS tuning (pool sizes / ages / constrained), resolved from the
 	// GPU-profile system (sashkinbro/EmuCoreX). Drives texture/target pool sizing on Android below.
@@ -1575,10 +1580,6 @@ protected:
 	// miscompiles shaders (see GSGPUDriverProfile.cpp). Empty/conservative until a backend
 	// resolves it, so a device with no matching rule behaves exactly as it did before.
 	MobileDriverProfile m_mobile_driver_profile;
-	// Android: true when the SoC is MediaTek (Dimensity/Helio). Hoisted from GSDeviceVK
-	// so both backends + GS.cpp Android GameDB overrides can read it. Set during device
-	// open from the resolved GPU profile.
-	bool m_is_mediatek_soc = false;
 
 	struct
 	{
@@ -1630,8 +1631,7 @@ protected:
 	GSTexture* m_mad = nullptr;
 	GSTexture* m_target_tmp = nullptr;
 	GSTexture* m_current = nullptr;
-	/// Whether a chain is loaded in the backend, so ApplyShaderChain can free it on the
-	/// frame the player turns shaders off rather than polling for it.
+	/// Whether the backend holds a chain, so ApplyShaderChain knows there is one to free.
 	bool m_shader_chain_loaded = false;
 	GSTexture* m_cas = nullptr;
 	GSTexture* m_mfx_output = nullptr; ///< MetalFX spatial upscale destination (Metal backend).
@@ -1670,10 +1670,8 @@ protected:
 	/// the Vulkan/OpenGL devices override it, everything else keeps the no-op.
 	virtual bool DoApplyShaderChain(GSTexture* sTex, GSTexture* dTex) { return false; }
 
-	/// Free whatever the chain is holding. A loaded chain owns a render target and a
-	/// pipeline per pass and the collection runs to forty of them, so leaving it resident
-	/// after the player turns shaders off is the memory that matters on a handheld. Same
-	/// override rule as above: only the librashader-capable backends implement it.
+	/// Frees what the chain holds, a render target and a pipeline per pass. Only the
+	/// librashader backends implement it.
 	virtual void ReleaseShaderChain() {}
 
 	/// Generation of the parameter-override store, bumped on every SetShaderChainParams.
@@ -1686,6 +1684,12 @@ protected:
 	/// (and leaving [out] alone) when the store holds another preset's values or none at
 	/// all. Takes the lock, so call it only once the generation says something changed.
 	static bool GetShaderChainParams(const std::string& preset, std::vector<std::pair<std::string, float>>* out);
+
+	/// Bumped by RetryShaderChain; a backend that latched a failed preset tries it again once it moves.
+	static u64 GetShaderChainRetry();
+
+	/// Records why the chain built for [preset] failed; an empty preset clears it.
+	static void SetShaderChainError(std::string preset, std::string message);
 
 	/// Resolves CAS shader includes for the specified source.
 	static bool GetCASShaderSource(std::string* source);
@@ -1788,6 +1792,12 @@ public:
 	/// same-named parameters.
 	static void SetShaderChainParams(std::string preset, std::vector<std::pair<std::string, float>> params);
 
+	/// Asks the backend to try a preset that failed to load once more.
+	static void RetryShaderChain();
+
+	/// Copies librashader's message into [message] when the last chain built for [preset] failed.
+	static bool GetShaderChainError(const std::string& preset, std::string* message);
+
 	/// Parses the configured fullscreen mode into its components (width * height @ refresh Hz)
 	static bool GetRequestedExclusiveFullscreenMode(u32* width, u32* height, float* refresh_rate);
 
@@ -1828,8 +1838,6 @@ public:
 	}
 	__fi bool IsConstrainedMobileGPUProfile() const { return m_mobile_gs_tuning.constrained; }
 	__fi RuntimeGpuProfile GetRuntimeGPUProfile() const { return m_runtime_gpu_profile; }
-	__fi void SetMediaTekSoC(bool v) { m_is_mediatek_soc = v; }
-	__fi bool IsMediaTekSoC() const { return m_is_mediatek_soc; }
 	__fi bool IsMaliGPUProfile() const { return (m_runtime_gpu_profile == RuntimeGpuProfile::Mali); }
 	__fi bool IsAdrenoGPUProfile() const { return (m_runtime_gpu_profile == RuntimeGpuProfile::Adreno); }
 	__fi bool IsPowerVRGPUProfile() const { return (m_runtime_gpu_profile == RuntimeGpuProfile::PowerVR); }

@@ -38,6 +38,7 @@ namespace
 	constexpr u64 kLibretroRetireFrames = 6;
 } // namespace
 #include "GS/Renderers/Common/GSDevice.h"
+#include "GS/Renderers/Common/GSFastStencilShadow.h"
 #include "GS/Renderers/Common/GSFeedbackLoopCarryPolicy.h"
 #include "GS/Renderers/Common/GSFramebufferFetchPolicy.h"
 
@@ -3733,20 +3734,12 @@ bool GSDeviceVK::CheckFeatures()
 		driver_context);
 	SetMobileDriverProfile(mobile_profile.driver);
 #if defined(__ANDROID__)
-	// MediaTek (Dimensity/Helio) Mali Vulkan stacks return zero/stale destination color
-	// through ROAA (black / missing textures) across GPU generations, so detect the SoC
-	// here and disable fbfetch below. Ported from sashkinbro/EmuCoreX. Detection reads the
-	// ro.soc.* props already folded into the profile hints (no new JNI needed).
-	//
 	// ★ Vulkan resolved mobile_profile and pushed every OTHER piece of it into the device
-	// (MediaTek SoC, GPU identity, GS tuning) but never the runtime profile itself, so
+	// (GPU identity, GS tuning) but never the runtime profile itself, so
 	// IsMaliGPUProfile()/IsAdrenoGPUProfile() answered from the default for the entire Vulkan
-	// lifetime. Consequence: ApplyAndroidGameDBOverrides()'s `IsMaliGPUProfile() && IsMediaTekSoC()`
-	// gate could never pass, so the Tekken 5 duplicated-framebuffer fix was dead on the renderer we
-	// default to on Android, and the profile printed in VK logs was whatever the default happened
-	// to be rather than the detected GPU.
+	// lifetime, and the profile printed in VK logs was whatever the default happened to be
+	// rather than the detected GPU.
 	SetRuntimeGPUProfile(mobile_profile.runtime_profile);
-	SetMediaTekSoC(mobile_profile.is_mediatek_soc);
 	force_xclipse_profile = (mobile_profile.override_mode == GpuProfileOverride::Xclipse) ||
 		(mobile_profile.runtime_profile == RuntimeGpuProfile::Xclipse);
 	// Per-vendor GS tuning (pool sizes/ages + constrained) — drives GSDevice pool sizing above.
@@ -4121,6 +4114,13 @@ bool GSDeviceVK::CheckFeatures()
 	// by the time this reads it.
 	m_features.broken_blend_constant = GetMobileDriverProfile().HasBug(DriverBug::BrokenBlendConstant);
 
+	// The alpha stencil counter through the blend unit (GSFastStencilShadow.h). Decided here because
+	// both inputs are final by now: texture_barrier after the RT-copy workaround above, and
+	// dual_source_blend just above. With barriers off every frame read on this backend is a pass break
+	// plus a copy, which is the cost the blend removes; today that is exactly the Adreno parts.
+	m_features.fast_stencil_shadow =
+		GSFastStencilShadow::DeviceQualifies(GetRenderAPI(), m_features.texture_barrier, m_features.dual_source_blend);
+
 	// Mali-G57 r13p0-class drivers can expose alternating/stale FastMAD history banks instead of the
 	// reconstructed frame; GSRenderer::Merge falls those back to weave+blend. Ported from sashkinbro/EmuCoreX.
 	m_features.broken_mad_deinterlace = is_mali_g57;
@@ -4171,7 +4171,7 @@ bool GSDeviceVK::CheckFeatures()
 	// slideshow). ROAA=yes but fbfetch=NO on Mali means the barrier path is active. See the
 	// Mali driver-support deep dive.
 	Console.WriteLn("VK: GPU '%s' vendor=0x%04X driver='%s' (%s) | ROAA=%s fbfetch=%s texbarrier=%s "
-					"inpAttFB=%s dualSrc=%s blendConst=%s testSampleDepth=%s madFallback=%s pushdesc=%s "
+					"inpAttFB=%s dualSrc=%s blendConst=%s fastShadow=%s testSampleDepth=%s madFallback=%s pushdesc=%s "
 					"streamRings=%s(type %u)",
 		m_device_properties.deviceName,
 		m_device_properties.vendorID,
@@ -4186,6 +4186,7 @@ bool GSDeviceVK::CheckFeatures()
 		(m_features.texture_barrier && !UseFeedbackLoopLayout()) ? "yes" : "NO",
 		m_features.dual_source_blend ? "yes" : "NO(sw-blend-fallback)",
 		m_features.broken_blend_constant ? "BROKEN(afix-via-src1)" : "ok",
+		m_features.fast_stencil_shadow ? "yes(blend)" : "NO(rt-read)",
 		m_features.test_and_sample_depth ? "on" : "off",
 		m_features.broken_mad_deinterlace ? "weave+blend(G57)" : "motion-adaptive",
 		m_use_push_descriptors ? "on" : "off",
@@ -7498,6 +7499,7 @@ VkShaderModule GSDeviceVK::GetTFXFragmentShader(const GSHWDrawConfig::PSSelector
 	AddMacro(ss, "PS_NO_COLOR1", sel.no_color1);
 	AddMacro(ss, "PS_BLEND_FACTOR_IN_ALPHA", sel.blend_factor_in_alpha);
 	AddMacro(ss, "PS_AF_IN_SRC1", sel.af_in_src1);
+	AddMacro(ss, "PS_STENCIL_COUNTER", sel.stencil_counter);
 	AddMacro(ss, "PS_ZTST", sel.ztst);
 	AddMacro(ss, "PS_AA1", static_cast<u32>(sel.aa1));
 	AddMacro(ss, "PS_ABE", sel.abe);

@@ -581,12 +581,23 @@ public:
 	bool m_nativeres = false;
 	bool m_mipmap = false;
 	bool m_texflush_flag = false;
+	// This engine draws the alpha stencil counter through the blend unit, so IsAutoFlushDraw leaves the
+	// counter unsplit (GSFastStencilShadow.h). Engine identity, never a config key: only GSRendererHW's
+	// constructor sets it, from its device's fast_stencil_shadow bit, and the software engine keeps
+	// splitting at whatever level its own key gives. A member because the predicate runs per primitive.
+	bool m_unsplit_stencil_counter = false;
 	bool m_isPackedUV_HackFlag = false;
 	bool m_channel_shuffle = false;
 	bool m_using_temp_z = false;
 	bool m_temp_z_full_copy = false;
 	bool m_in_target_draw = false;
 	bool m_channel_shuffle_finish = false;
+	// What GetAutoFlushLevel() answered when ResetHandlers last armed the parse
+	// handlers. Read by IsAutoFlushDraw, so the predicate and the handler table are
+	// decided by one value at one moment; reading the virtual per primitive would be
+	// a call on the vertex path, and reading GSConfig would put the two back out of
+	// step. Lands in the padding after the bool run above, so no member moves.
+	GSHWAutoFlushLevel m_autoflush_level = GSHWAutoFlushLevel::Disabled;
 
 	u32 m_target_offset = 0;
 	u8 m_scanmask_used = 0;

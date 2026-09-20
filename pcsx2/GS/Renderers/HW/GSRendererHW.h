@@ -253,6 +253,7 @@ private:
 		bool& target_region, GSVector2i& unscaled_size, float& scale, GSDevice::RecycledTexture& src_copy);
 	bool CanUseTexIsFB(const GSTextureCache::Target* rt, const GSTextureCache::Source* tex,
 		const TextureMinMaxResult& tmm);
+	bool IsFastStencilShadowDraw() const;
 
 	void EmulateZbuffer(const GSTextureCache::Target* ds);
 	void EmulateAA1();
@@ -333,6 +334,9 @@ private:
 
 	bool m_process_texture = false;
 	bool m_downscale_source = false;
+	// This draw is an alpha stencil counter going through the blend unit (GSFastStencilShadow.h).
+	// Decided in Draw() before the texture lookup, read by DrawPrims().
+	bool m_fast_stencil_shadow = false;
 
 	TextureShuffleInfo m_texture_shuffle;
 
@@ -410,6 +414,7 @@ public:
 	void Lines2Sprites();
 	bool VerifyIndices();
 	void ExpandLineIndices();
+	bool LinesToPixelRuns();
 	GSVector4 RealignTargetTextureCoordinate(const GSTextureCache::Source* tex);
 	GSVector4i ComputeBoundingBoxRT(const GSVector2i& rtsize, float rtscale);
 	GSVector4i ComputeBoundingBoxTex(const GSVector2i& texsize, const GSVector4i& coverage, const GSVector4i& region, float texscale);

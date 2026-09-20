@@ -3,13 +3,12 @@
 
 import SwiftUI
 
-private struct ShaderBrowserContents: Sendable {
-    let listing: ShaderPresetListing
-    let passes: [String: Int]
-
-    static let empty = ShaderBrowserContents(listing: .empty, passes: [:])
+/// A constant id, so a re-running host body keeps the browser's search field and keyboard.
+struct ShaderPresetBrowserRequest: Identifiable {
+    let id = "shader-preset-browser"
 }
 
+/// The host closes its sheet in onSelect, since an outer folder's dismiss is ignored under an inner one.
 struct ShaderPresetBrowserView: View {
     let title: String
     let folder: ShaderPresetFolder?
@@ -17,10 +16,10 @@ struct ShaderPresetBrowserView: View {
     let localized: @MainActor (String) -> String
     let onSelect: @MainActor (String) -> Void
 
-    @Environment(\.dismiss) private var dismiss
-    @State private var contents = ShaderBrowserContents.empty
+    @State private var listing = ShaderPresetListing.empty
     @State private var scanned = false
     @State private var searchText = ""
+    @State private var pendingDelete: (name: String, url: URL)?
 
     var body: some View {
         List {
@@ -36,16 +35,21 @@ struct ShaderPresetBrowserView: View {
                 } label: {
                     Label(child.name, systemImage: "folder")
                 }
+                .swipeActions(edge: .trailing) {
+                    deleteAction(child.name, folder == nil ? ShaderPresetLibrary.deletableURL(for: child) : nil)
+                }
             }
 
             ForEach(presets) { preset in
                 Button {
                     onSelect(preset.token)
-                    dismiss()
                 } label: {
                     presetRow(preset)
                 }
                 .buttonStyle(.plain)
+                .swipeActions(edge: .trailing) {
+                    deleteAction(preset.name, ShaderPresetLibrary.deletableURL(for: preset))
+                }
             }
 
             if scanned && folders.isEmpty && presets.isEmpty {
@@ -61,41 +65,43 @@ struct ShaderPresetBrowserView: View {
             placement: .navigationBarDrawer(displayMode: .always),
             prompt: localized("Search this folder")
         )
-        // Rescanned on every appearance: packs land in Documents through the Files app
-        // while ARMSX2 is running, so a tree held across presentations goes stale.
+        .confirmationDialog(
+            String(format: localized("Delete %@?"), pendingDelete?.name ?? ""),
+            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button(localized("Delete"), role: .destructive) { deletePending() }
+            Button(localized("Cancel"), role: .cancel) { pendingDelete = nil }
+        } message: {
+            if pendingDelete?.url.hasDirectoryPath == true {
+                Text(localized("Presets saved from it stop working."))
+            }
+        }
+        // Rescanned on every appearance, since packs can arrive through the Files app while the app runs.
         .onAppear { Task { await rescan() } }
     }
 
     private var folders: [ShaderPresetFolder] {
-        guard !searchText.isEmpty else { return contents.listing.folders }
-        return contents.listing.folders.filter { $0.name.localizedStandardContains(searchText) }
+        guard !searchText.isEmpty else { return listing.folders }
+        return listing.folders.filter { $0.name.localizedStandardContains(searchText) }
     }
 
     private var presets: [ShaderPresetFile] {
-        guard !searchText.isEmpty else { return contents.listing.presets }
-        return contents.listing.presets.filter { $0.name.localizedStandardContains(searchText) }
+        guard !searchText.isEmpty else { return listing.presets }
+        return listing.presets.filter { $0.name.localizedStandardContains(searchText) }
     }
 
     private var emptyMessage: String {
         if !searchText.isEmpty {
             return localized("Nothing here matches that search.")
         }
-        return localized("No presets here yet. Shader packs belong in Documents/shaders, or arrive through Install Shader Pack.")
+        return localized("Nothing saved yet. Presets you save under Parameters show up here.")
     }
 
     @ViewBuilder
     private func presetRow(_ preset: ShaderPresetFile) -> some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(preset.name)
-                // Reported and nothing else. A pass count does not predict what a preset
-                // costs, so it never orders, groups, filters or badges a row.
-                if let passes = contents.passes[preset.token] {
-                    Text(passLabel(passes))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            Text(preset.name)
             Spacer()
             if preset.token == selectedToken {
                 Image(systemName: "checkmark").foregroundStyle(.tint)
@@ -104,22 +110,31 @@ struct ShaderPresetBrowserView: View {
         .contentShape(Rectangle())
     }
 
-    private func passLabel(_ count: Int) -> String {
-        count == 1 ? localized("1 pass") : "\(count) " + localized("passes")
+    @ViewBuilder
+    private func deleteAction(_ name: String, _ url: URL?) -> some View {
+        if let url {
+            Button(role: .destructive) {
+                pendingDelete = (name, url)
+            } label: {
+                Label(localized("Delete"), systemImage: "trash")
+            }
+        }
+    }
+
+    private func deletePending() {
+        guard let url = pendingDelete?.url else { return }
+        pendingDelete = nil
+        Task {
+            _ = await Task.detached { try? FileManager.default.removeItem(at: url) }.value
+            await rescan()
+        }
     }
 
     private func rescan() async {
         let target = folder
-        let scan = await Task.detached(priority: .userInitiated) { () -> ShaderBrowserContents in
-            let library = ShaderPresetLibrary()
-            let listing = target.map { library.listing(at: $0) } ?? library.scan()
-            var passes: [String: Int] = [:]
-            for preset in listing.presets {
-                passes[preset.token] = library.passCount(for: preset.url)
-            }
-            return ShaderBrowserContents(listing: listing, passes: passes)
+        listing = await Task.detached(priority: .userInitiated) { () -> ShaderPresetListing in
+            target.map { ShaderPresetLibrary.listing(at: $0) } ?? ShaderPresetLibrary.scan()
         }.value
-        contents = scan
         scanned = true
     }
 }

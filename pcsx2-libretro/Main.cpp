@@ -44,9 +44,10 @@
 // VKEntryPoints.inl loses PFN_vkCreateMetalSurfaceEXT / the Xlib and Wayland
 // entry points with it. VKLoader.h is the header that sets all five platform
 // macros (and cleans up the Xlib ones afterwards), so it has to come first.
+#ifdef ENABLE_VULKAN
 #include "pcsx2/GS/Renderers/Vulkan/VKLoader.h"
-
 #include "libretro_vulkan.h"
+#endif
 
 #include "fmt/format.h"
 
@@ -68,8 +69,10 @@
 #include "pcsx2/Achievements.h"
 #include "pcsx2/CDVD/CDVDcommon.h"
 #include "pcsx2/GS.h"
+#ifdef ENABLE_VULKAN
 #include "pcsx2/GS/Renderers/Vulkan/GSDeviceVK.h"
 #include "pcsx2/GS/Renderers/Vulkan/VKLibretro.h"
+#endif
 #ifdef ENABLE_OPENGL
 #include "pcsx2/GS/Renderers/OpenGL/GLContextLibretro.h"
 #endif
@@ -905,10 +908,21 @@ static struct retro_core_option_v2_category kOptionCategories[] = {
 };
 
 static struct retro_core_option_v2_definition kOptionDefinitions[] = {
+	// Only the renderers this build has. USE_VULKAN and USE_OPENGL are both
+	// build options, and offering an API the core was not built with is a
+	// setting that can only end in a black screen.
 	{"armsx2_renderer", "GS Renderer (restart)", "GS Renderer (restart)",
 		"Vulkan renders the GS on the GPU. OpenGL does the same through the frontend's GL context, for devices with no usable Vulkan driver. Software renders on the CPU and presents through the same shared context.",
 		nullptr, "video",
+#if defined(ENABLE_VULKAN) && defined(ENABLE_OPENGL)
 		{{"Vulkan", nullptr}, {"OpenGL", nullptr}, {"Software", nullptr}, {nullptr, nullptr}}, "Vulkan"},
+#elif defined(ENABLE_VULKAN)
+		{{"Vulkan", nullptr}, {"Software", nullptr}, {nullptr, nullptr}}, "Vulkan"},
+#elif defined(ENABLE_OPENGL)
+		{{"OpenGL", nullptr}, {"Software", nullptr}, {nullptr, nullptr}}, "OpenGL"},
+#else
+		{{"Software", nullptr}, {nullptr, nullptr}}, "Software"},
+#endif
 	{"armsx2_upscale", "Internal Resolution", "Internal Resolution",
 		"Renders the PS2 output at a multiple of native resolution. The output canvas follows this size.",
 		nullptr, "video",
@@ -1021,7 +1035,15 @@ static struct retro_core_options_v2 kOptionsV2 = {kOptionCategories, kOptionDefi
 // Legacy fallback: first value doubles as the default. Non-const so the
 // BIOS entry can be pointed at the scanned list.
 static struct retro_variable kCoreVariables[] = {
+#if defined(ENABLE_VULKAN) && defined(ENABLE_OPENGL)
 	{"armsx2_renderer", "GS renderer (restart); Vulkan|OpenGL|Software"},
+#elif defined(ENABLE_VULKAN)
+	{"armsx2_renderer", "GS renderer (restart); Vulkan|Software"},
+#elif defined(ENABLE_OPENGL)
+	{"armsx2_renderer", "GS renderer (restart); OpenGL|Software"},
+#else
+	{"armsx2_renderer", "GS renderer (restart); Software"},
+#endif
 	{"armsx2_upscale", "Internal resolution; 1x|2x|3x|4x"},
 	{"armsx2_aspect_ratio", "Aspect ratio; Auto 4:3/3:2|4:3|16:9|Stretch"},
 	{"armsx2_deinterlacing", "Deinterlacing; Automatic|Off|Weave TFF|Weave BFF|Bob TFF|Bob BFF|Blend TFF|Blend BFF|Adaptive TFF|Adaptive BFF"},
@@ -1125,6 +1147,13 @@ static void ApplyCoreOptions(bool startup)
 			else if (!std::strcmp(var.value, "OpenGL"))
 				s_base_settings->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::OGL));
 #endif
+#ifdef ENABLE_VULKAN
+			else if (!std::strcmp(var.value, "Vulkan"))
+				s_base_settings->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::VK));
+#endif
+			// Anything else - including a config that still says Vulkan for a
+			// core built without it - is left alone, and the context request
+			// below settles it against what the frontend actually has.
 		}
 
 		var = {"armsx2_upscale", nullptr};
@@ -1332,7 +1361,7 @@ static void ApplyCoreOptions(bool startup)
 // the VKLibretro wraps, which capture the resulting VkDevice for the context
 // reply below.
 //////////////////////////////////////////////////////////////////////////
-
+#ifdef ENABLE_VULKAN
 static const VkApplicationInfo* GetVulkanApplicationInfo(void)
 {
 	static VkApplicationInfo app_info{VK_STRUCTURE_TYPE_APPLICATION_INFO};
@@ -1381,6 +1410,7 @@ static bool CreateVulkanDevice(retro_vulkan_context* context, VkInstance instanc
 	context->presentation_queue_family_index = context->queue_family_index;
 	return true;
 }
+#endif
 
 // The GL half of the same story. The frontend owns the context; the core only
 // needs its two callbacks - one to resolve entry points, one to ask which FBO
@@ -1440,16 +1470,22 @@ static void OnContextReset(void)
 		log_cb(RETRO_LOG_ERROR, "Failed to get Vulkan HW render interface.\n");
 		return;
 	}
+#ifdef ENABLE_VULKAN
 	VKLibretro::SetHWRenderInterface(iface);
 	VKLibretro::SetPacing(true);
+#endif
 	LibretroCore::s_context_ready.store(true, std::memory_order_release);
 }
 
 static void OnContextDestroy(void)
 {
+#ifdef ENABLE_VULKAN
 	VKLibretro::AbortPacing();
+#endif
 	LibretroCore::s_context_ready.store(false, std::memory_order_release);
+#ifdef ENABLE_VULKAN
 	VKLibretro::SetHWRenderInterface(nullptr);
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1645,8 +1681,12 @@ RETRO_API void retro_get_system_av_info(struct retro_system_av_info* info)
 	std::memset(info, 0, sizeof(*info));
 	info->geometry.base_width = LibretroCore::kFrameWidth;
 	info->geometry.base_height = LibretroCore::kFrameHeight;
+	info->geometry.max_width = LibretroCore::kFrameWidth;
+	info->geometry.max_height = LibretroCore::kFrameHeight;
+#ifdef ENABLE_VULKAN
 	info->geometry.max_width = VKLibretro::kMaxCanvasWidth;
 	info->geometry.max_height = VKLibretro::kMaxCanvasHeight;
+#endif
 	info->geometry.aspect_ratio = 4.0f / 3.0f;
 	info->timing.fps = 59.94;
 	info->timing.sample_rate = 48000.0;
@@ -1712,33 +1752,90 @@ RETRO_API bool retro_load_game(const struct retro_game_info* game)
 
 	s_shutdown_requested.store(false, std::memory_order_release);
 
-	// Which hardware context to ask for. The renderer option is read into the
-	// settings above; GL takes a different path from here, since it needs no
-	// device negotiation - the frontend simply makes a context current and
-	// hands the core an FBO to draw into.
+	// Which hardware context to ask for.
+	//
+	// Neither API is guaranteed to be there. A frontend can be built without
+	// Vulkan - RetroArch on webOS is, and answers "Requesting Vulkan context,
+	// but RetroArch is not compiled against Vulkan" - and this core can be
+	// built without one too, since USE_VULKAN and USE_OPENGL are both options.
+	// Asking for one API and giving up when it is refused is how a GL-only
+	// frontend ends up on Null GS: a black screen with a pause icon and no
+	// error that names the cause.
+	//
+	// So the answer is a list rather than one request: what the renderer option
+	// asked for, then whatever other hardware API this build actually has. The
+	// software renderer needs a context too - it presents through the same one
+	// - so it takes the same list and keeps its own renderer setting.
+	enum class HwApi
+	{
+		GL,
+		Vulkan,
+	};
+
+	const int renderer_setting = s_base_settings->GetIntValue("EmuCore/GS", "Renderer",
+		static_cast<int>(GSRendererType::Auto));
+	[[maybe_unused]] const bool asked_for_gl = (renderer_setting == static_cast<int>(GSRendererType::OGL));
+
+	HwApi candidates[2];
+	size_t candidate_count = 0;
 #ifdef ENABLE_OPENGL
-	const bool want_gl = (s_base_settings->GetIntValue("EmuCore/GS", "Renderer",
-							  static_cast<int>(GSRendererType::VK)) == static_cast<int>(GSRendererType::OGL));
-#else
-	const bool want_gl = false;
+	if (asked_for_gl)
+		candidates[candidate_count++] = HwApi::GL;
+#endif
+#ifdef ENABLE_VULKAN
+	candidates[candidate_count++] = HwApi::Vulkan;
+#endif
+#ifdef ENABLE_OPENGL
+	if (!asked_for_gl)
+		candidates[candidate_count++] = HwApi::GL;
 #endif
 
-	LibretroCore::s_hw_render_gl = want_gl;
+	LibretroCore::s_hw_render_gl = false;
+	LibretroCore::s_hw_render_vulkan = false;
+
 #ifdef ENABLE_OPENGL
-	if (want_gl)
-	{
+	const auto request_gl = [&]() -> bool {
 		s_gl_hw_render = {};
-#if defined(__ANDROID__)
-		// The only context type an Android frontend can give us.
-		s_gl_hw_render.context_type = RETRO_HW_CONTEXT_OPENGLES3;
-		s_gl_hw_render.version_major = 3;
-		s_gl_hw_render.version_minor = 2;
+		// The version handed to SET_HW_RENDER is what the frontend asks the
+		// driver for, not a floor it may exceed - RetroArch passes it straight
+		// through to the context creation call. Asking for the minimum gets
+		// exactly the minimum, and everything above it is then missing: on a
+		// core profile a driver is not even required to advertise the
+		// extensions that were promoted into core, so the capability checks
+		// come back empty as well. That is a blank screen with no error worth
+		// the name.
+		//
+		// So ask high and step down. The first one the frontend accepts is the
+		// one we get.
+		struct GLRequest
+		{
+			unsigned type;
+			unsigned major;
+			unsigned minor;
+		};
+#if defined(__ANDROID__) || defined(USE_GLES)
+		// RETRO_HW_CONTEXT_OPENGLES3 is ES 3.0 by definition and ignores the
+		// minor entirely - libretro.h says so in as many words. ES 3.1 and
+		// above have to go through RETRO_HW_CONTEXT_OPENGLES_VERSION, and
+		// GSDeviceOGL wants 3.1 for compute and 3.2 for geometry shaders, so
+		// asking the old way could only ever produce a 3.0 context that cannot
+		// run the renderer.
+		static constexpr GLRequest kRequests[] = {
+			{RETRO_HW_CONTEXT_OPENGLES_VERSION, 3, 2},
+			{RETRO_HW_CONTEXT_OPENGLES_VERSION, 3, 1},
+			{RETRO_HW_CONTEXT_OPENGLES3, 3, 0},
+		};
 #else
-		// GSDeviceOGL needs 3.3 at the very least, and uses 4.3/4.5 paths when
-		// the driver has them.
-		s_gl_hw_render.context_type = RETRO_HW_CONTEXT_OPENGL_CORE;
-		s_gl_hw_render.version_major = 3;
-		s_gl_hw_render.version_minor = 3;
+		// GSDeviceOGL needs 3.3 at the very least and uses the 4.3 and 4.5
+		// paths when the driver has them - which it only can if the context is
+		// one of those in the first place.
+		static constexpr GLRequest kRequests[] = {
+			{RETRO_HW_CONTEXT_OPENGL_CORE, 4, 6},
+			{RETRO_HW_CONTEXT_OPENGL_CORE, 4, 5},
+			{RETRO_HW_CONTEXT_OPENGL_CORE, 4, 4},
+			{RETRO_HW_CONTEXT_OPENGL_CORE, 4, 3},
+			{RETRO_HW_CONTEXT_OPENGL_CORE, 3, 3},
+		};
 #endif
 		s_gl_hw_render.context_reset = OnGLContextReset;
 		s_gl_hw_render.context_destroy = OnGLContextDestroy;
@@ -1754,22 +1851,36 @@ RETRO_API bool retro_load_game(const struct retro_game_info* game)
 		if (!environ_cb(RETRO_ENVIRONMENT_SET_HW_SHARED_CONTEXT, &shared_context))
 			log_cb(RETRO_LOG_WARN, "Frontend has no shared GL context; the GS thread may not be able to draw.\n");
 
-		if (!environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &s_gl_hw_render))
+		for (const GLRequest& request : kRequests)
 		{
-			log_cb(RETRO_LOG_ERROR, "Frontend refused a GL context; falling back to Null GS.\n");
-			LibretroCore::s_hw_render_gl = false;
-			auto lock = Host::GetSettingsLock();
-			s_base_settings->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::Null));
-			VMManager::Internal::LoadStartupSettings();
+			s_gl_hw_render.context_type = static_cast<retro_hw_context_type>(request.type);
+			s_gl_hw_render.version_major = request.major;
+			s_gl_hw_render.version_minor = request.minor;
+			if (environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &s_gl_hw_render))
+			{
+				log_cb(RETRO_LOG_INFO, "Asked the frontend for a %s %u.%u context.\n",
+					request.type == RETRO_HW_CONTEXT_OPENGL_CORE ? "GL core" : "GLES",
+					request.major, request.minor);
+				LibretroCore::s_hw_render_gl = true;
+				return true;
+			}
 		}
-	}
+
+		log_cb(RETRO_LOG_INFO, "Frontend refused every GL context this core can use.\n");
+		return false;
+	};
 #endif // ENABLE_OPENGL
-	// Vulkan HW render. The negotiation interface must be registered inside
-	// retro_load_game; the frontend invokes it while creating its Vulkan
-	// context, after this returns.
-	LibretroCore::s_hw_render_vulkan = !want_gl;
-	if (LibretroCore::s_hw_render_vulkan)
-	{
+#ifdef ENABLE_VULKAN
+	const auto request_vulkan = [&]() -> bool {
+		// Load the library first. A frontend that has Vulkan is no use if this
+		// machine has no driver to load, and finding that out after the context
+		// was accepted would leave nothing to fall back to.
+		Error vk_error;
+		if (!Vulkan::IsVulkanLibraryLoaded() && !Vulkan::LoadVulkanLibrary(&vk_error))
+		{
+			log_cb(RETRO_LOG_INFO, "No Vulkan library: %s\n", vk_error.GetDescription().c_str());
+			return false;
+		}
 		static struct retro_hw_render_callback hw_render = {};
 		hw_render.context_type = RETRO_HW_CONTEXT_VULKAN;
 		hw_render.version_major = 1;
@@ -1779,32 +1890,85 @@ RETRO_API bool retro_load_game(const struct retro_game_info* game)
 		hw_render.cache_context = true;
 		if (!environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
 		{
-			log_cb(RETRO_LOG_ERROR, "Frontend refused Vulkan HW context; falling back to Null GS.\n");
-			LibretroCore::s_hw_render_vulkan = false;
-			auto lock = Host::GetSettingsLock();
-			s_base_settings->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::Null));
-			VMManager::Internal::LoadStartupSettings();
+			log_cb(RETRO_LOG_INFO, "Frontend refused a Vulkan context.\n");
+			return false;
 		}
-		else
-		{
-			static const struct retro_hw_render_context_negotiation_interface_vulkan neg_iface = {
-				RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN,
-				RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN_VERSION,
-				GetVulkanApplicationInfo,
-				CreateVulkanDevice,
-				nullptr, // destroy_device
-			};
-			environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE, (void*)&neg_iface);
 
-			Error vk_error;
-			if (!Vulkan::IsVulkanLibraryLoaded() && !Vulkan::LoadVulkanLibrary(&vk_error))
-			{
-				log_cb(RETRO_LOG_ERROR, "LoadVulkanLibrary: %s\n", vk_error.GetDescription().c_str());
-				return false;
-			}
-			VKLibretro::InstallWraps();
-			VKLibretro::Active = true;
+		// The negotiation interface must be registered inside retro_load_game;
+		// the frontend invokes it while creating its Vulkan context, after this
+		// returns.
+		static const struct retro_hw_render_context_negotiation_interface_vulkan neg_iface = {
+			RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN,
+			RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN_VERSION,
+			GetVulkanApplicationInfo,
+			CreateVulkanDevice,
+			nullptr, // destroy_device
+		};
+		environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE, (void*)&neg_iface);
+
+		VKLibretro::InstallWraps();
+		VKLibretro::Active = true;
+		LibretroCore::s_hw_render_vulkan = true;
+		return true;
+	};
+#endif // ENABLE_VULKAN
+
+	bool have_context = false;
+	for (size_t i = 0; i < candidate_count && !have_context; ++i)
+	{
+		switch (candidates[i])
+		{
+#ifdef ENABLE_OPENGL
+		case HwApi::GL:
+			have_context = request_gl();
+			break;
+#endif
+#ifdef ENABLE_VULKAN
+		case HwApi::Vulkan:
+			have_context = request_vulkan();
+			break;
+#endif
+		default:
+			break;
 		}
+	}
+
+	// The renderer setting has to name the API that was actually granted, or
+	// the GS would open a device for one and draw into the other's context.
+	// Software keeps its own setting: it draws on the CPU and only presents
+	// through whichever context this ended up with.
+	const bool software = (renderer_setting == static_cast<int>(GSRendererType::SW));
+	GSRendererType granted = GSRendererType::Null;
+	if (have_context)
+	{
+		if (LibretroCore::s_hw_render_gl)
+			granted = GSRendererType::OGL;
+		else
+			granted = GSRendererType::VK;
+	}
+	else
+	{
+		log_cb(RETRO_LOG_ERROR,
+			"No hardware context this core can use; falling back to Null GS. Nothing will be drawn.\n");
+	}
+
+	if (!software && granted != static_cast<GSRendererType>(renderer_setting))
+	{
+		if (have_context)
+		{
+			log_cb(RETRO_LOG_WARN, "Renderer was set to %s, but the frontend gave a %s context; using that instead.\n",
+				renderer_setting == static_cast<int>(GSRendererType::OGL) ? "OpenGL" : "Vulkan",
+				granted == GSRendererType::OGL ? "GL" : "Vulkan");
+		}
+		auto lock = Host::GetSettingsLock();
+		s_base_settings->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(granted));
+		VMManager::Internal::LoadStartupSettings();
+	}
+	else if (software && !have_context)
+	{
+		auto lock = Host::GetSettingsLock();
+		s_base_settings->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::Null));
+		VMManager::Internal::LoadStartupSettings();
 	}
 
 	SysMemory::ReserveMemory();
@@ -1831,6 +1995,7 @@ RETRO_API void retro_unload_game(void)
 	// The frontend replays the last set_image indefinitely (menu background,
 	// duped frames) — retract it and wait for the GPU before the VM teardown
 	// below destroys the textures it points at.
+#ifdef ENABLE_VULKAN
 	if (auto* vulkan = static_cast<retro_hw_render_interface_vulkan*>(VKLibretro::GetHWRenderInterface()))
 	{
 		vulkan->set_image(vulkan->handle, nullptr, 0, nullptr, vulkan->queue_index);
@@ -1838,6 +2003,7 @@ RETRO_API void retro_unload_game(void)
 	}
 
 	VKLibretro::AbortPacing(); // GS thread may be parked in PublishFrame
+#endif
 	s_shutdown_requested.store(true, std::memory_order_release);
 	if (VMManager::HasValidVM())
 		VMManager::SetState(VMState::Stopping);
@@ -1851,8 +2017,10 @@ RETRO_API void retro_unload_game(void)
 	s_disk_images.clear();
 	s_disk_index = 0;
 	s_disk_ejected = false;
+#ifdef ENABLE_VULKAN
 	VKLibretro::Shutdown();
 	VKLibretro::Active = false;
+#endif
 	LibretroCore::s_context_ready.store(false, std::memory_order_release);
 	LibretroCore::s_cpu_thread_initialized.store(false, std::memory_order_release);
 }
@@ -1916,6 +2084,7 @@ RETRO_API void retro_run(void)
 		}
 	}
 
+#ifdef ENABLE_VULKAN
 	if (LibretroCore::s_hw_render_vulkan)
 	{
 		// A frontend reads the picture size from this callback on every frame,
@@ -1971,7 +2140,9 @@ RETRO_API void retro_run(void)
 			video_cb(nullptr, last_frame_width, last_frame_height, 0);
 		}
 	}
-	else if (LibretroCore::s_hw_render_gl)
+	else
+#endif
+	if (LibretroCore::s_hw_render_gl)
 	{
 		// GL needs no frame handover of its own: GSDeviceOGL has already drawn
 		// into the FBO the frontend named through get_current_framebuffer, so
@@ -2046,7 +2217,9 @@ RETRO_API bool retro_serialize(void* data, size_t size)
 	// Pacing must be off while retro_run isn't being called, or the GS
 	// thread stays parked in PublishFrame and the state freeze (which needs
 	// the GS thread to respond) deadlocks.
+#ifdef ENABLE_VULKAN
 	VKLibretro::SetPacing(false);
+#endif
 
 	std::vector<u8> buffer;
 	bool ok = false;
@@ -2065,8 +2238,10 @@ RETRO_API bool retro_serialize(void* data, size_t size)
 			Console.ErrorFmt("retro_serialize: ZipToBuffer failed: {}", error.GetDescription());
 	}, true);
 
+#ifdef ENABLE_VULKAN
 	if (LibretroCore::s_context_ready.load(std::memory_order_acquire))
 		VKLibretro::SetPacing(true);
+#endif
 
 	if (!ok || sizeof(u64) + buffer.size() > size)
 	{
@@ -2094,7 +2269,9 @@ RETRO_API bool retro_unserialize(const void* data, size_t size)
 	if (zip_size == 0 || zip_size > size - sizeof(u64))
 		return false;
 
+#ifdef ENABLE_VULKAN
 	VKLibretro::SetPacing(false);
+#endif
 
 	bool ok = false;
 	const u8* zip_data = static_cast<const u8*>(data) + sizeof(u64);
@@ -2107,8 +2284,10 @@ RETRO_API bool retro_unserialize(const void* data, size_t size)
 			Console.ErrorFmt("retro_unserialize failed: {}", error.GetDescription());
 	}, true);
 
+#ifdef ENABLE_VULKAN
 	if (LibretroCore::s_context_ready.load(std::memory_order_acquire))
 		VKLibretro::SetPacing(true);
+#endif
 
 	return ok;
 }

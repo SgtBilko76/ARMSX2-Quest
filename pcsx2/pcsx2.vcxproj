@@ -824,8 +824,13 @@
     <ClInclude Include="GS\Renderers\Null\GSDeviceNone.h" />
     <ClInclude Include="GS\Renderers\SW\GSRendererSW.h" />
     <ClInclude Include="GS\Renderers\SW\GSBlockWalk.h" />
+    <ClInclude Include="GS\Renderers\SW\GSColourWalk.h" />
+    <ClInclude Include="GS\Renderers\SW\GSCoordinateLag.h" />
+    <ClInclude Include="GS\Renderers\SW\GSCoordinateWalk.h" />
     <ClInclude Include="GS\Renderers\SW\GSDepthWalk.h" />
+    <ClInclude Include="GS\Renderers\SW\GSLevelOfDetail.h" />
     <ClInclude Include="GS\Renderers\SW\GSScanlineEnvironment.h" />
+    <ClInclude Include="GS\Renderers\SW\GSVertexQDivide.h" />
     <ClInclude Include="GS\Renderers\SW\GSSetupPrimCodeGenerator.all.h">
       <ExcludedFromBuild Condition="'$(Platform)'!='x64'">true</ExcludedFromBuild>
     </ClInclude>
@@ -853,11 +858,13 @@
     <ClInclude Include="GS\Renderers\HW\GSDepthCoverage.h" />
     <ClInclude Include="GS\Renderers\HW\GSDrawAlphaMask.h" />
     <ClInclude Include="GS\Renderers\HW\GSDrawLog.h" />
+    <ClInclude Include="GS\Renderers\HW\GSLineWalk.h" />
     <ClInclude Include="GS\Renderers\HW\GSSpriteEdgeSnap.h" />
     <ClInclude Include="GS\Renderers\SW\GSVertexSW.h" />
     <ClInclude Include="GS\Renderers\Common\GSVertexTrace.h" />
     <ClInclude Include="GS\Renderers\Common\GSFeedbackLoopCarryPolicy.h" />
     <ClInclude Include="GS\Renderers\Common\GSBlendConstantPolicy.h" />
+    <ClInclude Include="GS\Renderers\Common\GSFastStencilShadow.h" />
     <ClInclude Include="GS\Renderers\Common\GSFramebufferFetchPolicy.h" />
     <ClInclude Include="GS\Renderers\Common\GSInterlaceModePolicy.h" />
     <ClInclude Include="GS\Renderers\Common\GSPassScheduler.h" />

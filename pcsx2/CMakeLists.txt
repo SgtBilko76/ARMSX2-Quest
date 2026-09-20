@@ -586,6 +586,7 @@ set(pcsx2GSHeaders
 	GS/Renderers/Common/GSDevice.h
 	GS/Renderers/Common/GSDirtyRect.h
 	GS/Renderers/Common/GSFastList.h
+	GS/Renderers/Common/GSFastStencilShadow.h
 	GS/Renderers/Common/GSFeedbackLoopCarryPolicy.h
 	GS/Renderers/Common/GSFramebufferFetchPolicy.h
 	GS/Renderers/Common/GSFunctionMap.h
@@ -611,19 +612,25 @@ set(pcsx2GSHeaders
 	GS/Renderers/HW/GSDrawAlphaMask.h
 	GS/Renderers/HW/GSDrawLog.h
 	GS/Renderers/HW/GSHwHack.h
+	GS/Renderers/HW/GSLineWalk.h
 	GS/Renderers/HW/GSRendererHW.h
 	GS/Renderers/HW/GSSpriteEdgeSnap.h
 	GS/Renderers/HW/GSTextureCache.h
 	GS/Renderers/HW/GSTextureReplacements.h
 	GS/Renderers/HW/GSVertexHW.h
 	GS/Renderers/SW/GSBlockWalk.h
+	GS/Renderers/SW/GSColourWalk.h
+	GS/Renderers/SW/GSCoordinateLag.h
+	GS/Renderers/SW/GSCoordinateWalk.h
 	GS/Renderers/SW/GSDepthWalk.h
+	GS/Renderers/SW/GSLevelOfDetail.h
 	GS/Renderers/SW/GSDrawScanlineCodeGenerator.all.h
 	GS/Renderers/SW/GSDrawScanline.h
 	GS/Renderers/SW/GSNewCodeGenerator.h
 	GS/Renderers/SW/GSRasterizer.h
 	GS/Renderers/SW/GSRendererSW.h
 	GS/Renderers/SW/GSScanlineEnvironment.h
+	GS/Renderers/SW/GSVertexQDivide.h
 	GS/Renderers/SW/GSSetupPrimCodeGenerator.all.h
 	GS/Renderers/SW/GSSwTextureDirty.h
 	GS/Renderers/SW/GSTextureCacheSW.h

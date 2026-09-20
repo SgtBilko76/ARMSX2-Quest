@@ -14,7 +14,7 @@ struct PerGameShaderSection: View {
 
     var body: some View {
         Section {
-            Picker(settings.localized("Shader Chain"), selection: $chain) {
+            Picker(settings.localized("Shaders"), selection: $chain) {
                 Text(settings.localized("Use Global")).tag(-1)
                 Text(settings.localized("Off")).tag(0)
                 Text(settings.localized("On")).tag(1)
@@ -28,8 +28,14 @@ struct PerGameShaderSection: View {
                         Spacer()
                         Text(presetName)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.tertiary)
                     }
                 }
+                .tint(.primary)
                 .disabled(!enabled)
 
                 if !presetRef.isEmpty {
@@ -44,19 +50,11 @@ struct PerGameShaderSection: View {
         } header: {
             Text(settings.localized("Shaders"))
         } footer: {
-            Text(settings.localized("A game with no shader of its own uses the global chain. Off means no shader for this game even while the global chain is running. Parameter values belong to the preset and not to the game, so two games on the same preset share them."))
+            Text(settings.localized("Use Global follows the Shaders page. Off turns shaders off for this game only. Slider values belong to the preset, so games on the same preset share them."))
         }
     }
 
-    /// The tail of the token, which is the file name a player picked it by. Four lines the global
-    /// section also carries, copied rather than shared so its fenced initializer stays shut.
     private var presetName: String {
-        guard let separator = presetRef.firstIndex(of: ShaderPresetLibrary.markerSeparator) else {
-            return settings.localized("None")
-        }
-        let relative = presetRef[presetRef.index(after: separator)...]
-        let name = URL(fileURLWithPath: String(relative))
-            .deletingPathExtension().lastPathComponent
-        return name.isEmpty ? settings.localized("None") : name
+        ShaderPresetLibrary.displayName(for: presetRef) ?? settings.localized("None")
     }
 }

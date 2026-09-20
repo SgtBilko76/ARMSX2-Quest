@@ -5,9 +5,11 @@
 #include "GS/Renderers/HW/GSHwHack.h"
 #include "GS/Renderers/HW/GSDepthCoverage.h"
 #include "GS/Renderers/HW/GSDrawLog.h"
+#include "GS/Renderers/HW/GSLineWalk.h"
 #include "GS/Renderers/HW/GSSpriteEdgeSnap.h"
 #include "GS/Renderers/HW/GSTextureReplacements.h"
 #include "GS/Renderers/Common/GSBlendConstantPolicy.h"
+#include "GS/Renderers/Common/GSFastStencilShadow.h"
 #include "GS/Renderers/Common/GSFramebufferFetchPolicy.h"
 #include "GS/Renderers/Common/GSSelfReadCopyPolicy.h"
 #include "GS/GSGL.h"
@@ -39,6 +41,12 @@ GSRendererHW::GSRendererHW()
 	memset(static_cast<void*>(&m_conf), 0, sizeof(m_conf));
 
 	ResetStates();
+
+	// Engine identity for GSState::IsAutoFlushDraw: this renderer draws the alpha stencil counter
+	// through the blend unit when its device can. Read once. A device recreated under a live renderer
+	// is the same GPU after a loss, and every setting that changes device features recreates the
+	// renderer as well.
+	m_unsplit_stencil_counter = g_gs_device->Features().fast_stencil_shadow;
 }
 
 void GSRendererHW::SetTCOffset()
@@ -373,6 +381,249 @@ void GSRendererHW::ExpandLineIndices()
 	}
 }
 
+namespace
+{
+	/// floor(num / den), either sign of either.
+	s64 LineFloorDiv(s64 num, s64 den)
+	{
+		if (den < 0)
+		{
+			num = -num;
+			den = -den;
+		}
+		return (num >= 0) ? (num / den) : -((-num + den - 1) / den);
+	}
+
+	/// Four 8-bit channels packed in a u32, each taken k/den of the way from a to b, floored and
+	/// clamped. Used for RGBA and for FOG.
+	u32 LineGradient8(u32 a, u32 b, s64 k, s64 den)
+	{
+		u32 out = 0;
+		for (int shift = 0; shift < 32; shift += 8)
+		{
+			const s64 ca = (a >> shift) & 0xFF;
+			const s64 cb = (b >> shift) & 0xFF;
+			const s64 c = std::clamp<s64>(ca + LineFloorDiv((cb - ca) * k, den), 0, 255);
+			out |= static_cast<u32>(c) << shift;
+		}
+		return out;
+	}
+
+	float LineLerp(float a, float b, double t)
+	{
+		return static_cast<float>(a + (static_cast<double>(b) - a) * t);
+	}
+
+	template <typename T>
+	T LineLerpRound(T a, T b, double t, double max)
+	{
+		const double v = a + (static_cast<double>(b) - a) * t;
+		return static_cast<T>(std::clamp(std::round(v), 0.0, max));
+	}
+} // namespace
+
+bool GSRendererHW::LinesToPixelRuns()
+{
+	// Draws every line as rectangles over exactly the pixels the GS lights (GSLineWalk.h), one
+	// rectangle per run of pixels that share a minor coordinate, a colour and a fog value. Drawn as
+	// triangles in the same corner-sampled space as sprites, each native pixel becomes a whole block
+	// of device pixels at any scale. GPU lines cannot give that: the single-pixel rule differs by
+	// driver, a wide or vertex-expanded line is centred on the coordinate rather than on the pixel
+	// the GS lights, and none of them drop the last pixel the way the GS does.
+	//
+	// Colour and fog are flat within a run, taken from the exact gradient at the pixel and floored,
+	// as the software scanline stores them. Depth and texture coordinates are the line's values at
+	// each rectangle corner's own position. The vertex offset puts a device pixel centre on the GS
+	// coordinate of its top-left corner, so at native resolution pixel i samples the line at i,
+	// which is where the software renderer evaluates it.
+	//
+	// Returns false with the draw untouched when the rectangles would not fit 16-bit indices, when
+	// nothing would be drawn, or when a group in the full-barrier draw list would end up empty.
+
+	const u32 line_count = m_index->tail / 2;
+	const int ofx = m_context->XYOFFSET.OFX;
+	const int ofy = m_context->XYOFFSET.OFY;
+
+	// Corners go back into the vertex buffer as absolute 16-bit positions. Pixels whose corners
+	// would not fit are dropped; they are thousands of pixels outside any target.
+	const int min_x = -(ofx >> 4);
+	const int max_x = ((0xFFFF - ofx) >> 4) - 1;
+	const int min_y = -(ofy >> 4);
+	const int max_y = ((0xFFFF - ofy) >> 4) - 1;
+
+	const bool flat = !m_conf.vs.iip;
+	const bool fog = PRIM->FGE;
+
+	// Calls run(v0, v1, step_x, m0, dm, lo, hi, minor, rgba, fog) for each run of one line, after
+	// clipping to the representable range. lo/hi are the run's end pixels on the major axis.
+	const auto walk_runs = [&](const GSVertex& v0, const GSVertex& v1, auto&& run) {
+		const int x0 = v0.XYZ.X - ofx;
+		const int y0 = v0.XYZ.Y - ofy;
+		const int x1 = v1.XYZ.X - ofx;
+		const int y1 = v1.XYZ.Y - ofy;
+		const bool step_x = GSLineWalk::Abs(x1 - x0) >= GSLineWalk::Abs(y1 - y0);
+		const int m0 = step_x ? x0 : y0;
+		const int dm = step_x ? (x1 - x0) : (y1 - y0);
+		const bool colour_varies = !flat && v0.RGBAQ.U32[0] != v1.RGBAQ.U32[0];
+		const bool fog_varies = fog && v0.FOG != v1.FOG;
+		const int major_min = step_x ? min_x : min_y;
+		const int major_max = step_x ? max_x : max_y;
+		const int minor_min = step_x ? min_y : min_x;
+		const int minor_max = step_x ? max_y : max_x;
+
+		bool open = false;
+		int lo = 0, hi = 0, minor = 0;
+		u32 rgba = 0, f = 0;
+
+		const auto close = [&]() {
+			if (!open || minor < minor_min || minor > minor_max)
+				return;
+			const int clo = std::max(lo, major_min);
+			const int chi = std::min(hi, major_max);
+			if (clo <= chi)
+				run(v0, v1, step_x, m0, dm, clo, chi, minor, rgba, f);
+		};
+
+		GSLineWalk::Walk(x0, y0, x1, y1, [&](int x, int y) {
+			const int m = step_x ? x : y;
+			const int n = step_x ? y : x;
+			// dm is never zero here: a zero-length line lights nothing.
+			const s64 k = static_cast<s64>(m) * 16 - m0;
+			const u32 c = colour_varies ? LineGradient8(v0.RGBAQ.U32[0], v1.RGBAQ.U32[0], k, dm) : v1.RGBAQ.U32[0];
+			const u32 fg = fog_varies ? LineGradient8(v0.FOG, v1.FOG, k, dm) : v1.FOG;
+			if (open && n == minor && c == rgba && fg == f)
+			{
+				lo = std::min(lo, m);
+				hi = std::max(hi, m);
+				return;
+			}
+			close();
+			open = true;
+			lo = hi = m;
+			minor = n;
+			rgba = c;
+			f = fg;
+		});
+		close();
+	};
+
+	// The full-barrier draw list counts primitives per group. Each group's line count becomes its
+	// rectangle count, so the backend's count * indices_per_prim still lands on group boundaries.
+	const bool remap_drawlist = m_conf.drawlist != nullptr && !m_drawlist.empty();
+
+	// Pass 1: count, and refuse the cases the draw cannot take.
+	u32 total = 0;
+	{
+		size_t group = 0;
+		size_t group_left = remap_drawlist ? m_drawlist[0] : 0;
+		u32 group_quads = 0;
+		for (u32 i = 0; i < line_count; i++)
+		{
+			const GSVertex& v0 = m_vertex->buff[m_index->buff[i * 2]];
+			const GSVertex& v1 = m_vertex->buff[m_index->buff[i * 2 + 1]];
+			u32 quads = 0;
+			walk_runs(v0, v1, [&](auto&&...) { quads++; });
+			total += quads;
+
+			if (remap_drawlist && group < m_drawlist.size())
+			{
+				group_quads += quads;
+				if (--group_left == 0)
+				{
+					if (group_quads == 0)
+						return false;
+					group_quads = 0;
+					if (++group < m_drawlist.size())
+						group_left = m_drawlist[group];
+				}
+			}
+		}
+	}
+
+	if (total == 0 || total > 0x10000 / 4)
+		return false;
+
+	while (total * 4 > m_vertex->maxcount)
+		GrowVertexBuffer();
+
+	// Pass 2: write the rectangles into the copy buffer, reading the lines through the index buffer,
+	// then swap. The indices are rewritten last since the lines are read through them.
+	u32 written = 0;
+	{
+		GSVertex* const dst = m_vertex->buff_copy;
+		size_t group = 0;
+		size_t group_left = remap_drawlist ? m_drawlist[0] : 0;
+		u32 group_quads = 0;
+
+		const auto emit = [&](const GSVertex& v0, const GSVertex& v1, bool step_x, int m0, int dm, int lo, int hi,
+							  int minor, u32 rgba, u32 f) {
+			const int major_of = step_x ? ofx : ofy;
+			const int minor_of = step_x ? ofy : ofx;
+			const int major_edge[2] = {lo * 16 + major_of, (hi + 1) * 16 + major_of};
+			const int minor_edge[2] = {minor * 16 + minor_of, (minor + 1) * 16 + minor_of};
+			const double t[2] = {static_cast<double>(lo * 16 - m0) / dm, static_cast<double>((hi + 1) * 16 - m0) / dm};
+
+			GSVertex* const q = &dst[written * 4];
+			for (int corner = 0; corner < 4; corner++)
+			{
+				const int a = corner & 1; // major edge
+				const int b = corner >> 1; // minor edge
+				GSVertex& v = q[corner];
+				v = v1;
+				v.XYZ.X = static_cast<u16>(step_x ? major_edge[a] : minor_edge[b]);
+				v.XYZ.Y = static_cast<u16>(step_x ? minor_edge[b] : major_edge[a]);
+				v.XYZ.Z = LineLerpRound<u32>(v0.XYZ.Z, v1.XYZ.Z, t[a], 4294967295.0);
+				v.RGBAQ.U32[0] = rgba;
+				v.RGBAQ.Q = LineLerp(v0.RGBAQ.Q, v1.RGBAQ.Q, t[a]);
+				v.ST.S = LineLerp(v0.ST.S, v1.ST.S, t[a]);
+				v.ST.T = LineLerp(v0.ST.T, v1.ST.T, t[a]);
+				v.U = LineLerpRound<u16>(v0.U, v1.U, t[a], 65535.0);
+				v.V = LineLerpRound<u16>(v0.V, v1.V, t[a], 65535.0);
+				v.FOG = f;
+			}
+			written++;
+		};
+
+		for (u32 i = 0; i < line_count; i++)
+		{
+			const GSVertex& v0 = m_vertex->buff[m_index->buff[i * 2]];
+			const GSVertex& v1 = m_vertex->buff[m_index->buff[i * 2 + 1]];
+			const u32 before = written;
+			walk_runs(v0, v1, emit);
+
+			if (remap_drawlist && group < m_drawlist.size())
+			{
+				group_quads += written - before;
+				if (--group_left == 0)
+				{
+					m_drawlist[group] = group_quads;
+					group_quads = 0;
+					if (++group < m_drawlist.size())
+						group_left = m_drawlist[group];
+				}
+			}
+		}
+	}
+	pxAssert(written == total);
+
+	std::swap(m_vertex->buff, m_vertex->buff_copy);
+	m_vertex->head = m_vertex->tail = m_vertex->next = written * 4;
+
+	u16* index = m_index->buff;
+	for (u32 i = 0; i < written; i++, index += 6)
+	{
+		const u16 base = static_cast<u16>(i * 4);
+		index[0] = base;
+		index[1] = base + 1;
+		index[2] = base + 2;
+		index[3] = base + 1;
+		index[4] = base + 2;
+		index[5] = base + 3;
+	}
+	m_index->tail = written * 6;
+	return true;
+}
+
 template<u32 primclass, bool fst>
 GSRendererHW::TextureShuffleInfo GSRendererHW::DetectTextureShuffleImpl()
 {
@@ -651,7 +902,11 @@ GSRendererHW::TextureShuffleInfo GSRendererHW::DetectTextureShuffleImpl()
 		}
 		else
 		{
-			pxFail("Impossible.");
+			// A shuffle writes whole 8 pixel column groups, so an 8 pixel strip has to start
+			// on one. When it doesn't, the draw only looked like a shuffle to the heuristics
+			// above -- there is no channel pair to mask here, so take it as an ordinary draw.
+			GL_INS("Not a shuffle (8 pixel strip not aligned to a column group).");
+			return { TextureShuffleType::None, TextureShuffleChannels_None };
 		}
 	}
 
@@ -1422,7 +1677,10 @@ GSVector4 GSRendererHW::RealignTargetTextureCoordinate(const GSTextureCache::Sou
 
 GSVector4i GSRendererHW::ComputeBoundingBoxRT(const GSVector2i& rtsize, float rtscale)
 {
-	const GSVector4 offset = IsCoverageAlphaSupported() ? GSVector4(-2.0f, 2.0f) : GSVector4(-1.0f, 1.0f); // Round value
+	// A line lights the pixel its coordinate rounds to, and that pixel's far edge can sit a pixel and
+	// a half past the vertex bounds, so lines get the wider margin too.
+	const bool wide = IsCoverageAlphaSupported() || m_vt.m_primclass == GS_LINE_CLASS;
+	const GSVector4 offset = wide ? GSVector4(-2.0f, 2.0f) : GSVector4(-1.0f, 1.0f); // Round value
 	const GSVector4 box = m_vt.m_min.p.upld(m_vt.m_max.p) + offset.xxyy();
 	return GSVector4i(box * GSVector4(rtscale)).rintersect(GSVector4i(0, 0, rtsize.x, rtsize.y));
 }
@@ -3355,6 +3613,13 @@ void GSRendererHW::Draw()
 	}
 
 	m_process_texture = PRIM->TME && !(NeedsBlending() && m_context->ALPHA.IsBlack() && !m_cached_ctx.TEX0.TCC) && !(no_rt && (!m_cached_ctx.TEST.ATE || m_cached_ctx.TEST.ATST <= ATST_ALWAYS));
+
+	// The alpha stencil counter on a device that draws it through the blend unit
+	// (GSFastStencilShadow.h). Its texture is the frame's own alpha at the pixel being written, which
+	// the blend reads for nothing, so the texture is never looked up.
+	m_fast_stencil_shadow = m_process_texture && !no_rt && IsFastStencilShadowDraw();
+	if (m_fast_stencil_shadow)
+		m_process_texture = false;
 
 	// We trigger the sw prim render here super early, to avoid creating superfluous render targets.
 	if (CanUseSwPrimRender(no_rt, no_ds, draw_sprite_tex && m_process_texture))
@@ -5827,6 +6092,26 @@ void GSRendererHW::SetupIA(float target_scale, float sx, float sy, bool req_vert
 					m_conf.indices_per_prim = 6;
 					ExpandLineIndices();
 				}
+				else if ((unscale_pt_ln || target_scale == 1.0f) && LinesToPixelRuns())
+				{
+					// Native resolution included: the GPU's single-pixel line rule is not the GS's,
+					// and it is not the same rule on every driver.
+					GL_INS("HW: Lines drawn as pixel runs.");
+					m_conf.topology = GSHWDrawConfig::Topology::Triangle;
+					m_conf.indices_per_prim = 6;
+
+					// The rectangle corners are pixel boundaries, so they take exactly half a device
+					// pixel of offset, the amount that puts a boundary between two device pixels.
+					// DetermineVSConfig can give more: Align to Native offsets by half a native pixel
+					// and the mod_xy hack scales the half pixel up. Both correct geometry a game
+					// places on pixel centres, and applied here they move every rectangle, a device
+					// pixel right and down at 2x under Align to Native. sx/sy are GS units (1/16
+					// pixel) to NDC, so half a device pixel is 8 * sx / target_scale; at native
+					// resolution this is the value DetermineVSConfig already chose.
+					const float ox = static_cast<float>(static_cast<int>(m_context->XYOFFSET.OFX));
+					const float oy = static_cast<float>(static_cast<int>(m_context->XYOFFSET.OFY));
+					m_conf.cb_vs.vertex_offset = GSVector2(ox * sx - 8.0f * sx / target_scale + 1.0f, oy * sy - 8.0f * sy / target_scale + 1.0f);
+				}
 				else if (unscale_pt_ln)
 				{
 					if (features.line_expand)
@@ -6599,12 +6884,14 @@ void GSRendererHW::DetermineVSConfig(GSTextureCache::Target* rt, float rtscale, 
 			if (m_vt.m_primclass == GS_SPRITE_CLASS && rtscale > 1.0f && (m_process_texture && PRIM->FST))
 			{
 				const GSVertex* v = &m_vertex->buff[0];
+				const int x0_frac = ((v[0].XYZ.X - m_context->XYOFFSET.OFX) & 0xf);
+				const int y0_frac = ((v[0].XYZ.Y - m_context->XYOFFSET.OFY) & 0xf);
 				const int x1_frac = ((v[1].XYZ.X - m_context->XYOFFSET.OFX) & 0xf);
 				const int y1_frac = ((v[1].XYZ.Y - m_context->XYOFFSET.OFY) & 0xf);
-				if (x1_frac & 8)
+				if (GSSpriteEdgeSnap::NativeSpritePushApplies(x0_frac, x1_frac, v[0].XYZ.X <= v[1].XYZ.X))
 					ox2 *= 1.0f + ((static_cast<float>(16 - x1_frac) / 8.0f) * rtscale);
 
-				if (y1_frac & 8)
+				if (GSSpriteEdgeSnap::NativeSpritePushApplies(y0_frac, y1_frac, v[0].XYZ.Y <= v[1].XYZ.Y))
 					oy2 *= 1.0f + ((static_cast<float>(16 - y1_frac) / 8.0f) * rtscale);
 			}
 		}
@@ -9608,6 +9895,24 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 	m_conf.tex = src_copy.get();
 }
 
+bool GSRendererHW::IsFastStencilShadowDraw() const
+{
+	if (!g_gs_device->Features().fast_stencil_shadow || m_vt.m_primclass != GS_TRIANGLE_CLASS)
+		return false;
+
+	// The renderer's cached registers, which have already dropped an alpha test that cannot change what
+	// is written. That admits Ratchet & Clank: Up Your Arsenal's effect counter (alpha test never
+	// passing, failing to the frame only), deliberately. Its counter sits at 128, and a down step from
+	// exactly 128 lands one level low on every blend unit (252/255 of 128 stores 126, the console 127), so
+	// that hidden counter can drift a few levels. Presented frames were unchanged in every dump tested,
+	// and the draw loses its render-pass break and copy. GSState::IsAutoFlushDraw reads the registers as
+	// written, where the alpha test is still present, so that counter keeps its auto-flush split.
+	return GSFastStencilShadow::IsCounterShape(*PRIM, m_cached_ctx.TEX0, m_context->TEX1, m_cached_ctx.TEST,
+			   m_cached_ctx.FRAME, m_cached_ctx.ZBUF, m_context->FBA) &&
+		   GSFastStencilShadow::VerticesQualify(m_vt.m_min.c.a, m_vt.m_max.c.a, m_vt.m_min.p, m_vt.m_max.p,
+			   m_vt.m_min.t, m_vt.m_max.t);
+}
+
 bool GSRendererHW::CanUseTexIsFB(const GSTextureCache::Target* rt, const GSTextureCache::Source* tex,
 	const TextureMinMaxResult& tmm)
 {
@@ -10273,6 +10578,17 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	CalculateAlphaRange(rt, ds, date_options, blend_alpha_min, blend_alpha_max, rt_new_alpha_min, rt_new_alpha_max,
 		rt_new_alpha_known, rt_new_alpha_via_union);
 
+	if (m_fast_stencil_shadow && rt)
+	{
+		// The counter multiplies whatever each pixel held, and one unsplit draw can step a pixel many
+		// times, so nothing is known about the result. A bound above 128 also makes
+		// DetermineAlphaScaling unscale an alpha-scaled target once, before this draw.
+		rt_new_alpha_min = 0;
+		rt_new_alpha_max = 255;
+		rt_new_alpha_known = GSAlphaKnownBits::Known::Nothing();
+		rt_new_alpha_via_union = false;
+	}
+
 	// DATE: selection of the algorithm.
 	EmulateDATESelectMethod(date_options, rt, blend_alpha_min, blend_alpha_max);
 
@@ -10335,6 +10651,23 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 			// Restrict this to only when we're overwriting the whole target.
 			new_scale_rt_alpha = full_cover || rt->m_last_draw >= s_n;
 		}
+	}
+
+	if (m_fast_stencil_shadow && rt)
+	{
+		// One blend equation for both steps: A = Ad * s + Ad * a1, with s in the first output's alpha
+		// and a1 in the second (PS_STENCIL_COUNTER). RGB keeps the destination through its blend
+		// factors as well as the write mask, because some Adreno drivers ignore the write mask while
+		// depth testing is on. The blend unit applies overlapping triangles in order, so nothing is
+		// read.
+		m_conf.blend = GSHWDrawConfig::BlendState(true, GSDevice::CONST_ZERO, GSDevice::CONST_ONE, GSDevice::OP_ADD,
+			GSDevice::DST_ALPHA, GSDevice::SRC1_ALPHA, false, 0);
+		m_conf.ps.stencil_counter = 1;
+		m_conf.ps.no_color1 = false;
+
+		// Multiplying the stored alpha is the same whether or not it is stored scaled, so this draw
+		// never switches the target's alpha scaling.
+		new_scale_rt_alpha = rt->m_rt_alpha_scale;
 	}
 
 	// The blend is chosen. A held exact alpha-mask decision is now either free or pointless.

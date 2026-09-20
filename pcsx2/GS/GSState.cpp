@@ -3,6 +3,7 @@
 
 #include "GS/GSState.h"
 #include "GS/GSDump.h"
+#include "GS/Renderers/Common/GSFastStencilShadow.h"
 #include "GS/GSSpriteCover.h"
 #include "GS/GSGL.h"
 #include "GS/GSPerfMon.h"
@@ -239,6 +240,8 @@ GSFrontState::GSFrontState(GSState* back)
 	m_mem_target = back;
 	back->m_split_back = true;
 	back->m_parse_target = this;
+	// The front splits draws for the back's engine, so it leaves unsplit what that engine does.
+	m_unsplit_stencil_counter = back->m_unsplit_stencil_counter;
 }
 
 GSFrontState::~GSFrontState()
@@ -390,10 +393,10 @@ void GSState::SetPrimHandlers()
 	// disjoint. That is -4.7% of GS-thread time in a title spending 8% of it in this one
 	// handler, and 581 GameDB entries ship autoFlush: 1.
 	//
-	// Mirrors IsAutoFlushDraw's early-out, which reads GSConfig.UserHacks_AutoFlush
-	// directly. On a hardware renderer the two are the same level. On the software
-	// engine GetAutoFlushLevel never reports SpritesOnly, so the narrowing is simply
-	// not taken there -- more staging work, same draws.
+	// Mirrors IsAutoFlushDraw's early-out, which reads the same m_autoflush_level this
+	// arming was decided from. On the software engine GetAutoFlushLevel never reports
+	// SpritesOnly, so the narrowing is simply not taken there -- more staging work, and
+	// every self-texturing draw split, not only the sprites.
 	constexpr bool non_sprite_af = auto_flush && !sprites_only;
 
 #define SetHandlerXYZ(P, auto_flush) \
@@ -1217,6 +1220,7 @@ void GSState::ResetHandlers()
 	m_fpGIFPackedRegHandlers[GIF_REG_NOP] = &GSState::GIFPackedRegHandlerNOP;
 
 	const GSHWAutoFlushLevel autoflush_level = GetAutoFlushLevel();
+	m_autoflush_level = autoflush_level;
 	if (autoflush_level != GSHWAutoFlushLevel::Disabled)
 	{
 		if (autoflush_level == GSHWAutoFlushLevel::SpritesOnly)
@@ -2388,8 +2392,9 @@ void GSState::KickPackedBatchKernel(const GIFPackedReg* RESTRICT r, u32 count)
 		// kick leave identical state, and the run can take the kernel.
 		//
 		// The predicate is invariant across a chunk for the triangle classes: it
-		// reads PRIM, the config level and the context's TEX0/TEX1/FRAME/ZBUF/
-		// TEST/CLAMP, none of which a chunk can change (a chunk contains no
+		// reads PRIM, the config level, the engine's m_unsplit_stencil_counter and
+		// the context's TEX0/TEX1/FRAME/ZBUF/TEST/CLAMP/FBA, none of which a chunk
+		// can change (a chunk contains no
 		// register write and the kernel's preconditions forbid a flush inside
 		// it), and its one per-prim input, EarlyDetectShuffle, is a constant
 		// false for anything that is not a sprite. Sprites therefore never reach
@@ -7098,12 +7103,31 @@ void GSState::GetQuadRasterizedPoints(GSVector4& xy, bool keep_order)
 
 __forceinline bool GSState::IsAutoFlushDraw(u32 prim, int& tex_layer)
 {
-	if (!PRIM->TME || (GSConfig.UserHacks_AutoFlush == GSHWAutoFlushLevel::SpritesOnly && prim != GS_SPRITE))
+	// The engine's level, not the hardware key. A software run whose GameDB entry asks
+	// for SpritesOnly used to refuse the split for every non-sprite primitive here, while
+	// ResetHandlers had already armed the full handlers from the SW rule -- so Jak 3's
+	// shadow volume, one triangle fan texturing from the frame buffer it writes, called
+	// this 5,973 times in a frame and was refused every time. The console re-reads the
+	// buffer per primitive on that draw; see GetAutoFlushLevel.
+	if (!PRIM->TME || (m_autoflush_level == GSHWAutoFlushLevel::SpritesOnly && prim != GS_SPRITE))
 		return false;
 
 	// Not using the same channels.
 	if (!(GSUtil::GetChannelMask(m_context->TEX0.PSM) & GSUtil::GetChannelMask(m_context->FRAME.PSM, m_context->FRAME.FBMSK | ~(GSLocalMemory::m_psm[m_context->FRAME.PSM].fmsk))))
 		return false;
+
+	// The alpha stencil counter, on an engine that draws it through the blend unit
+	// (GSFastStencilShadow.h). The blend applies overlapping triangles in order inside one draw, so a
+	// split buys nothing and costs a draw per triangle or two. The renderer checks what the registers
+	// cannot, vertex alpha 127..130 and every vertex sampling its own pixel; a draw that fails that
+	// takes the render-target read unsplit, so its triangles share one snapshot. No title we have
+	// captured sends one. Registers and a member only, so the answer holds for a whole kick chunk.
+	if (m_unsplit_stencil_counter && (prim == GS_TRIANGLELIST || prim == GS_TRIANGLESTRIP || prim == GS_TRIANGLEFAN) &&
+		GSFastStencilShadow::IsCounterShape(*PRIM, m_context->TEX0, m_context->TEX1, m_context->TEST, m_context->FRAME,
+			m_context->ZBUF, m_context->FBA))
+	{
+		return false;
+	}
 
 	// Try to detect shuffles, because these will not autoflush, they by design clash.
 	if (EarlyDetectShuffle(prim))

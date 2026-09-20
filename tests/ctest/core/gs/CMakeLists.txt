@@ -26,25 +26,37 @@ add_pcsx2_test(gs_vertex_tests
 	gs_snapshot_policy_tests.cpp
 	gs_sw_scanline_cpath_tests.cpp
 	gs_aa1_edge_tests.cpp
+	gs_line_walk_tests.cpp
 	gs_sw_setup_reciprocal_tests.cpp
 	gs_readback_transfer_size_tests.cpp
 	gs_astc_tests.cpp
 	gs_sw_scanline_date_tests.cpp
 	gs_sw_scanline_dither_tests.cpp
+	gs_sw_modulate16_tests.cpp
 	gs_sw_scanline_texfunc_tests.cpp
+	gs_sw_coverage_lag_tests.cpp
+	gs_sw_vertex_qdivide_tests.cpp
+	gs_sw_perspective_recip_tests.cpp
 	gs_sw_scanline_tclag_tests.cpp
+	gs_sw_stq_blit_tests.cpp
+	gs_sw_coordinate_field_tests.cpp
+	gs_sw_coordinate_grain_tests.cpp
 	gs_sw_scanline_lod_tests.cpp
 	gs_sw_textured_block_width_tests.cpp
 	gs_sw_depth_walk_tests.cpp
+	gs_sw_span_seed_tests.cpp
+	gs_sw_fog_blend_tests.cpp
 	gs_local_memory_move_tests.cpp
 	gs_clut_tests.cpp
 	gs_alpha_known_bits_tests.cpp
 	gs_depth_coverage_tests.cpp
 	gs_draw_alpha_mask_tests.cpp
+	gs_fast_stencil_shadow_tests.cpp
 	gs_sprite_cover_tests.cpp
 	gs_sprite_edge_snap_tests.cpp
 	gs_sw_texture_dirty_tests.cpp
 	gs_blend_constant_policy_tests.cpp
+	gs_autoflush_engine_level_tests.cpp
 	gs_ktx_tests.cpp
 )
 
