@@ -1,4 +1,7 @@
 # ARMSX2 — Native ARM64 JIT Fork of PCSX2
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-SgtBilko76-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/SgtBilko76)
+
 [![All Platforms](https://img.shields.io/github/actions/workflow/status/ARMSX2/ARMSX2/build-all.yml?branch=master&label=All%20Platforms)](https://github.com/ARMSX2/ARMSX2/actions/workflows/build-all.yml)
 
 ARMSX2 is a free and open-source PlayStation 2 (PS2) emulator based on PCSX2. Its purpose is to emulate the PS2's hardware, using a combination of MIPS CPU [Interpreters](<https://en.wikipedia.org/wiki/Interpreter_(computing)>), [Recompilers](https://en.wikipedia.org/wiki/Dynamic_recompilation) and a [Virtual Machine](https://en.wikipedia.org/wiki/Virtual_machine) which manages hardware states and PS2 system memory. This allows you to play PS2 games on your phone, PC, or gaming handheld, with many additional features and benefits.
