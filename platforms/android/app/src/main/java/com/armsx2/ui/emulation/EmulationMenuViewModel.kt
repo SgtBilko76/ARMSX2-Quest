@@ -120,6 +120,9 @@ class EmulationMenuViewModel(application: Application) : AndroidViewModel(applic
      */
     fun openFullSettings() = com.armsx2.ui.WindowImpl.openInGameScreen(com.armsx2.ui.InGameScreen.Settings)
 
+    /** Quest build only; the pause menu hides the entry everywhere else. */
+    fun openVrSettings() = com.armsx2.ui.WindowImpl.openInGameScreen(com.armsx2.ui.InGameScreen.Vr)
+
     /** In-game access to the manager screens the library drawer exposes. */
     fun openMemcard() = com.armsx2.ui.WindowImpl.openInGameScreen(com.armsx2.ui.InGameScreen.Memcard)
 

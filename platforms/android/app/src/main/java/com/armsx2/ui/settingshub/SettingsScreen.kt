@@ -421,7 +421,10 @@ private fun SettingsCategoryBar(
     }
 }
 
-private fun settingsSections() = listOf(
+private fun settingsSections() = listOfNotNull(
+    // First, so the one thing that is tuned while wearing the headset is the first thing in reach.
+    // Quest build only; the tab does not exist anywhere else.
+    SettingsSection(SettingsCategory.Vr, "tab.vr", "◉").takeIf { com.armsx2.BuildConfig.QUEST_VR },
     SettingsSection(SettingsCategory.General, "tab.app", "⌂"),
     SettingsSection(SettingsCategory.Info, "tab.info", "ⓘ"),
     SettingsSection(SettingsCategory.Performance, "tab.performance", "↯"),
@@ -441,6 +444,7 @@ private fun settingsSections() = listOf(
 @Composable
 private fun CategoryContent(category: SettingsCategory, viewModel: SettingsViewModel) {
     when (category) {
+        SettingsCategory.Vr -> com.armsx2.ui.settings.VrTab()
         SettingsCategory.General -> AppTab()
         SettingsCategory.Info -> com.armsx2.ui.settings.InfoTab(viewModel.uiState.value.game)
         SettingsCategory.Performance -> PerformanceTab(viewModel.settings)
@@ -459,6 +463,7 @@ private fun CategoryContent(category: SettingsCategory, viewModel: SettingsViewM
 
 @Composable
 internal fun categoryTitle(category: SettingsCategory): String = when (category) {
+    SettingsCategory.Vr -> str("tab.vr")
     SettingsCategory.General -> str("tab.app")
     SettingsCategory.Info -> str("tab.info")
     SettingsCategory.Performance -> str("tab.performance")

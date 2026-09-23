@@ -212,6 +212,23 @@ private val BASE_EN: Map<String, String> = mapOf(
     // no-op would leave the user tapping a dead row forever.
     "about.openFailed" to "No app available to open this link.",
     // --- settings tabs ---
+    // Quest build only; the tab is hidden everywhere else.
+    "tab.vr" to "VR",
+    "vr.depth.label" to "3D Depth",
+    "vr.depth.description" to "How far apart the two eye images are pushed. Higher is more depth; too high and the eyes cannot fuse the picture.",
+    "vr.convergence.label" to "Screen Plane",
+    "vr.convergence.description" to "Which distance sits ON the screen. 0 puts the background there and everything else comes toward you; raising it pushes the whole scene further out.",
+    "vr.screenWidth.label" to "Screen Size",
+    "vr.screenWidth.description" to "Width of the virtual screen in centimetres.",
+    "vr.distance.label" to "Screen Distance",
+    "vr.distance.description" to "How far away the screen sits, in centimetres.",
+    "vr.curved.label" to "Curved Screen",
+    "vr.curved.description" to "Wrap the screen around you instead of a flat panel.",
+    "vr.reproject.label" to "Stereoscopic 3D",
+    "vr.reproject.description" to "Off shows the same flat image to both eyes. On reprojects each frame by the scene's depth, which is what gives it real depth.",
+    "vr.reset" to "Reset to defaults",
+    "vr.note" to "Changes apply immediately, also while a game is running in VR.",
+    "vr.quick.detail" to "3D depth and screen",
     "tab.app" to "App",
     "tab.info" to "Info",
     "info.noGame.title" to "No game selected",

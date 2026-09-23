@@ -26,6 +26,8 @@ sealed interface AppRoute {
 }
 
 enum class SettingsCategory {
+    // Quest build only (see settingsSections): the virtual screen and the 3D.
+    Vr,
     General,
     Info,
     Performance,

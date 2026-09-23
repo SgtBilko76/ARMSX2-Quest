@@ -117,6 +117,16 @@ namespace
 		return true;
 	}
 
+	// The VR settings tab (com.armsx2.vr.VrSettings) pushes here; the XR thread reads them on its
+	// next tuning poll. Defaults match the constants above, so a build with nothing stored behaves
+	// as it always did, and the debug.armsx2.* properties still win when set.
+	std::atomic<float> s_cfg_separation{kStereoSeparation};
+	std::atomic<float> s_cfg_convergence{kStereoConvergence};
+	std::atomic<float> s_cfg_screen_width{kScreenWidthM};
+	std::atomic<float> s_cfg_distance{kScreenDistanceM};
+	std::atomic<bool> s_cfg_curved{true};
+	std::atomic<bool> s_cfg_reproject{true};
+
 	// Latest PS2 rumble for Player 1, stored by the emulator thread (ArmsX2Xr::SetRumbleSink) and
 	// turned into controller haptics on the XR thread.
 	std::atomic<float> s_rumble_large{0.0f};
@@ -611,6 +621,13 @@ namespace
 					// presenting into a full buffer queue would stall the whole emulator.
 					if (!m_window_handed_over)
 					{
+						m_stereo_separation = s_cfg_separation.load(std::memory_order_relaxed);
+						m_stereo_convergence = s_cfg_convergence.load(std::memory_order_relaxed);
+						m_screen_width_m = s_cfg_screen_width.load(std::memory_order_relaxed);
+						m_screen_distance_m = s_cfg_distance.load(std::memory_order_relaxed);
+						m_curved = s_cfg_curved.load(std::memory_order_relaxed);
+						m_reproject = s_cfg_reproject.load(std::memory_order_relaxed);
+						ArmsX2Xr::SetStereoReprojection(m_reproject);
 						ArmsX2Xr::SetStereo(true, m_stereo_separation, m_stereo_convergence);
 						ArmsX2Xr::SetRumbleSink(&OnPadRumble);
 						ArmsX2Xr::SetRenderWindow(m_screen_window, kSurfaceWidthPx, kScreenHeightPx, m_refresh_hz);
@@ -663,7 +680,7 @@ namespace
 				ArmsX2Xr::SetStereoDebugDepth(show_depth);
 			}
 
-			const bool reproject = ReadFloatProperty(kReprojectProperty, 1.0f) != 0.0f;
+			const bool reproject = ReadFloatProperty(kReprojectProperty, s_cfg_reproject.load(std::memory_order_relaxed) ? 1.0f : 0.0f) != 0.0f;
 			if (reproject != m_reproject)
 			{
 				m_reproject = reproject;
@@ -671,7 +688,7 @@ namespace
 				ArmsX2Xr::SetStereoReprojection(reproject);
 			}
 
-			const bool curved = ReadFloatProperty(kCurvedProperty, 1.0f) != 0.0f;
+			const bool curved = ReadFloatProperty(kCurvedProperty, s_cfg_curved.load(std::memory_order_relaxed) ? 1.0f : 0.0f) != 0.0f;
 			if (curved != m_curved)
 			{
 				m_curved = curved;
@@ -681,8 +698,8 @@ namespace
 				XR_LOG("screen: curved=%d", static_cast<int>(curved));
 			}
 
-			const float screen_width = ReadFloatProperty(kScreenWidthProperty, kScreenWidthM);
-			const float distance = ReadFloatProperty(kScreenDistanceProperty, kScreenDistanceM);
+			const float screen_width = ReadFloatProperty(kScreenWidthProperty, s_cfg_screen_width.load(std::memory_order_relaxed));
+			const float distance = ReadFloatProperty(kScreenDistanceProperty, s_cfg_distance.load(std::memory_order_relaxed));
 			if (screen_width != m_screen_width_m || distance != m_screen_distance_m)
 			{
 				m_screen_width_m = std::max(0.2f, screen_width);
@@ -692,8 +709,8 @@ namespace
 				XR_LOG("screen: width=%.2fm distance=%.2fm", m_screen_width_m, m_screen_distance_m);
 			}
 
-			const float separation = ReadFloatProperty(kSeparationProperty, kStereoSeparation);
-			const float convergence = ReadFloatProperty(kConvergenceProperty, kStereoConvergence);
+			const float separation = ReadFloatProperty(kSeparationProperty, s_cfg_separation.load(std::memory_order_relaxed));
+			const float convergence = ReadFloatProperty(kConvergenceProperty, s_cfg_convergence.load(std::memory_order_relaxed));
 			if (separation == m_stereo_separation && convergence == m_stereo_convergence)
 				return;
 
@@ -1090,6 +1107,20 @@ namespace
 	std::mutex s_xr_mutex;
 	std::unique_ptr<QuestXr> s_xr;
 } // namespace
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_armsx2_vr_QuestVrNative_nativeSetConfig(JNIEnv* /*env*/, jobject /*thiz*/, jfloat separation,
+	jfloat convergence, jfloat screen_width_m, jfloat distance_m, jboolean curved, jboolean reproject)
+{
+	s_cfg_separation.store(separation, std::memory_order_relaxed);
+	s_cfg_convergence.store(convergence, std::memory_order_relaxed);
+	s_cfg_screen_width.store(screen_width_m, std::memory_order_relaxed);
+	s_cfg_distance.store(distance_m, std::memory_order_relaxed);
+	s_cfg_curved.store(curved == JNI_TRUE, std::memory_order_relaxed);
+	s_cfg_reproject.store(reproject == JNI_TRUE, std::memory_order_relaxed);
+	// No session running is fine: it reads these when it starts, and a running one picks them up on
+	// its next tuning poll (a few times a second).
+}
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_armsx2_vr_QuestVrActivity_nativeStart(JNIEnv* env, jobject thiz)

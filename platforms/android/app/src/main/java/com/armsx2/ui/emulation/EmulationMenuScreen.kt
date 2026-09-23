@@ -647,7 +647,12 @@ private fun SessionPane(state: EmulationMenuUiState, viewModel: EmulationMenuVie
     val context = androidx.compose.ui.platform.LocalContext.current
     val gsDumpQueued = str("gsdump.quick.queued")
     ActionGrid(
-        actions = listOf(
+        actions = listOfNotNull(
+            // First tile on the Quest build: the 3D and the virtual screen are tuned while wearing
+            // the headset, so they belong one tap from the game rather than inside All Settings.
+            // Absent everywhere else.
+            MenuAction(str("tab.vr"), str("vr.quick.detail"), "◉", null, viewModel::openVrSettings)
+                .takeIf { com.armsx2.BuildConfig.QUEST_VR },
             MenuAction(str("action.resume"), str("action.play"), "▶", Success, viewModel::resume),
             MenuAction(
                 str("action.fastForward"),

@@ -27,7 +27,7 @@ import com.armsx2.runtime.MainActivityRuntime
 import kotlinx.coroutines.flow.first
 
 /** A full manager screen shown as an overlay over the paused game (in-game menu). */
-enum class InGameScreen { Settings, Achievements, Memcard, Patches, Controls, Skins, Textures, SaveState, LoadState }
+enum class InGameScreen { Settings, Vr, Achievements, Memcard, Patches, Controls, Skins, Textures, SaveState, LoadState }
 
 object WindowImpl {
     val toolbarVisible = mutableStateOf(true)
@@ -159,6 +159,14 @@ object WindowImpl {
                     when (screen) {
                         InGameScreen.Settings -> com.armsx2.ui.settingshub.SettingsScreen(
                             initialCategory = com.armsx2.navigation.SettingsCategory.General,
+                            game = MainActivityRuntime.currentGame.value,
+                            onBack = dismiss,
+                        )
+                        // Straight to the VR tab of the settings hub, like Skins below: the values
+                        // are judged with the headset on, so the fewer taps between the game and
+                        // them, the better.
+                        InGameScreen.Vr -> com.armsx2.ui.settingshub.SettingsScreen(
+                            initialCategory = com.armsx2.navigation.SettingsCategory.Vr,
                             game = MainActivityRuntime.currentGame.value,
                             onBack = dismiss,
                         )
