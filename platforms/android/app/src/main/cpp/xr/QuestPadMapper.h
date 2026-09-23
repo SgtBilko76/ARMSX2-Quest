@@ -9,14 +9,14 @@
 //
 //   A / B / X / Y          Cross / Circle / Square / Triangle
 //   Grips / Triggers       L1 R1 / L2 R2 (triggers are analog)
-//   Stick clicks           L3 / R3
+//   Left stick click       Start
+//   Right stick click      Select
 //   Sticks                 left / right analog; a hard push on the left stick is the D-pad
-//   Menu tap               Start
-//   Menu long press        Select
-//   Menu held + right stick    D-pad
+//   Menu tap               open the ARMSX2 menu (leaves VR for the panel it lives on)
+//   Menu held + left stick click   L3
+//   Menu held + right stick click  R3
 //   Menu held + B              left stick: analog + D-pad on hard push (default), or analog only
 //   Menu held + right trigger  recenter the screen
-//   Menu held + right grip     leave VR (back to the panel and the pause menu)
 //
 // Menu is on the left controller under the left thumb, so every chord partner is on the right.
 
@@ -104,11 +104,10 @@ namespace ArmsX2Xr
 		// run of presses that skips menu entries.
 		static constexpr float kStickDpadPress = 0.75f;
 		static constexpr float kStickDpadRelease = 0.55f;
-		// Menu tap = Start, Menu long press = Select. Both are decided on RELEASE, since until then a
-		// press could still turn into a chord (which fires neither).
+		// A Menu TAP opens the ARMSX2 menu, which lives on the 2D panel, so it leaves VR. Decided on
+		// RELEASE: until then the press could still turn into a chord, and a chord must not also
+		// throw the user out of VR. A long press does nothing.
 		static constexpr double kMenuTapSeconds = 0.5;
-		// The button is sent for a moment after release, long enough for the game to poll it.
-		static constexpr double kStartPulseSeconds = 0.1;
 
 		MapperOutput Update(const ControllerInput& in, double now)
 		{
@@ -123,11 +122,8 @@ namespace ArmsX2Xr
 			else if (!in.menu && m_menu_down)
 			{
 				m_menu_down = false;
-				if (!m_menu_chorded)
-				{
-					double& until = (now - m_menu_pressed_at < kMenuTapSeconds) ? m_start_until : m_select_until;
-					until = now + kStartPulseSeconds;
-				}
+				if (!m_menu_chorded && now - m_menu_pressed_at < kMenuTapSeconds)
+					out.exit_vr = true;
 			}
 			const bool shift = m_menu_down;
 
@@ -146,37 +142,28 @@ namespace ArmsX2Xr
 				m_menu_chorded = true;
 				out.recenter = true;
 			}
-			if (Claim(m_rg_claimed, rg_down, m_prev_rg, shift))
-			{
+			// The stick clicks are Start and Select; the pad's own L3/R3 ride the Menu chord.
+			if (Claim(m_l3_claimed, in.left_stick_click, m_prev_l3, shift))
 				m_menu_chorded = true;
-				out.exit_vr = true;
-			}
+			if (Claim(m_r3_claimed, in.right_stick_click, m_prev_r3, shift))
+				m_menu_chorded = true;
 
 			PadState& pad = out.pad;
 			pad.Set(PAD_CROSS, in.a ? 1.0f : 0.0f);
-			pad.Set(PAD_SELECT, now < m_select_until ? 1.0f : 0.0f);
+			pad.Set(PAD_SELECT, (in.right_stick_click && !m_r3_claimed) ? 1.0f : 0.0f);
 			pad.Set(PAD_CIRCLE, (in.b && !m_b_claimed) ? 1.0f : 0.0f);
 			pad.Set(PAD_SQUARE, in.x ? 1.0f : 0.0f);
 			pad.Set(PAD_TRIANGLE, in.y ? 1.0f : 0.0f);
 			pad.Set(PAD_L1, Hysteresis(m_lg_down, in.left_grip) ? 1.0f : 0.0f);
-			pad.Set(PAD_R1, (rg_down && !m_rg_claimed) ? 1.0f : 0.0f);
+			pad.Set(PAD_R1, rg_down ? 1.0f : 0.0f);
 			pad.Set(PAD_L2, Deadzone(in.left_trigger, kTriggerDeadzone));
 			pad.Set(PAD_R2, m_rt_claimed ? 0.0f : Deadzone(in.right_trigger, kTriggerDeadzone));
-			pad.Set(PAD_L3, in.left_stick_click ? 1.0f : 0.0f);
-			pad.Set(PAD_R3, in.right_stick_click ? 1.0f : 0.0f);
-			pad.Set(PAD_START, now < m_start_until ? 1.0f : 0.0f);
+			pad.Set(PAD_L3, m_l3_claimed ? 1.0f : 0.0f);
+			pad.Set(PAD_R3, m_r3_claimed ? 1.0f : 0.0f);
+			pad.Set(PAD_START, (in.left_stick_click && !m_l3_claimed) ? 1.0f : 0.0f);
 
 			bool up = false, down = false, left = false, right = false;
-			if (shift)
-			{
-				AddDpad(in.right_x, in.right_y, up, down, left, right);
-				if (up || down || left || right)
-					m_menu_chorded = true;
-			}
-			else
-			{
-				SplitStick(pad, in.right_x, in.right_y, PAD_R_UP, PAD_R_DOWN, PAD_R_LEFT, PAD_R_RIGHT);
-			}
+			SplitStick(pad, in.right_x, in.right_y, PAD_R_UP, PAD_R_DOWN, PAD_R_LEFT, PAD_R_RIGHT);
 
 			// Left stick: analog, and by default a hard push is the D-pad INSTEAD on that axis. Plenty of
 			// PS2 menus only answer to the D-pad (GT4's in-race pause menu), so the stick has to reach
@@ -290,11 +277,9 @@ namespace ArmsX2Xr
 		bool m_menu_down = false;
 		bool m_menu_chorded = false;
 		double m_menu_pressed_at = 0.0;
-		double m_start_until = -1.0;
-		double m_select_until = -1.0;
 
 		bool m_rt_down = false, m_rg_down = false, m_lg_down = false;
-		bool m_prev_b = false, m_prev_rt = false, m_prev_rg = false;
-		bool m_b_claimed = false, m_rt_claimed = false, m_rg_claimed = false;
+		bool m_prev_b = false, m_prev_rt = false, m_prev_l3 = false, m_prev_r3 = false;
+		bool m_b_claimed = false, m_rt_claimed = false, m_l3_claimed = false, m_r3_claimed = false;
 	};
 } // namespace ArmsX2Xr
