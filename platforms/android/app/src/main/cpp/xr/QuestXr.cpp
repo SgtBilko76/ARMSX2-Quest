@@ -250,12 +250,38 @@ namespace
 		{
 			// xrInitializeLoaderKHR may only succeed once per process, and the activity can be
 			// entered many times in one.
+			//
+			// ★ The context handed over here must outlive EVERY session. Meta's loader keeps it and
+			// reaches for it again on each later init (it re-initializes itself from inside
+			// xrEnumerateInstanceExtensionProperties), so passing the ACTIVITY aborted the process on
+			// the second entry into VR -- "JNI DETECTED ERROR: java_class == null in GetMethodID",
+			// the activity having been destroyed and its global ref deleted meanwhile. The
+			// application context lives as long as the process, and this reference is never freed.
 			static bool s_loader_initialized = false;
+			static jobject s_loader_context = nullptr;
 			if (!s_loader_initialized)
 			{
+				JNIEnv* env = nullptr;
+				if (m_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK || !env)
+					return Fail("no JNIEnv for the loader init");
+
+				jclass activity_class = env->GetObjectClass(m_activity);
+				jmethodID get_app_context = env->GetMethodID(activity_class, "getApplicationContext", "()Landroid/content/Context;");
+				jobject app_context = get_app_context ? env->CallObjectMethod(m_activity, get_app_context) : nullptr;
+				env->DeleteLocalRef(activity_class);
+				if (env->ExceptionCheck())
+				{
+					env->ExceptionDescribe();
+					env->ExceptionClear();
+				}
+				if (!app_context)
+					return Fail("no application context for the loader init");
+				s_loader_context = env->NewGlobalRef(app_context);
+				env->DeleteLocalRef(app_context);
+
 				XrLoaderInitInfoAndroidKHR loader_info{XR_TYPE_LOADER_INIT_INFO_ANDROID_KHR};
 				loader_info.applicationVM = m_vm;
-				loader_info.applicationContext = m_activity;
+				loader_info.applicationContext = s_loader_context;
 				InitializeLoaderFn initialize_loader = nullptr;
 				if (!LoadFunction(XR_NULL_HANDLE, "xrInitializeLoaderKHR", initialize_loader))
 					return Fail("OpenXR loader has no xrInitializeLoaderKHR");
