@@ -32,7 +32,7 @@ layout(push_constant) uniform cb10
 	// Quest VR stereo, packed into the spare push-constant tail. Signed per eye.
 	float u_stereo_separation;
 	float u_stereo_convergence;
-	float u_stereo_pad;
+	float u_stereo_debug; // >0.5: show the packed depth instead of the game (diagnostic)
 };
 
 layout(location = 0) in vec2 v_tex;
@@ -458,6 +458,16 @@ void ps_automagical_supersampling()
 // everywhere except at silhouettes, where there is no data for what the shift uncovers anyway.
 void ps_stereo()
 {
+	// Diagnostic: paint the depth that feeds the reprojection, amplified by 16^(mode-1) so that a
+	// depth range far smaller than 0..1 still shows up. Black at every amplification means no depth
+	// reached the shader at all.
+	if (u_stereo_debug > 0.5f)
+	{
+		const float amplification = pow(16.0f, max(u_stereo_debug - 1.0f, 0.0f));
+		o_col0 = vec4(vec3(clamp(sample_c(v_tex).a * amplification, 0.0f, 1.0f)), 1.0f);
+		return;
+	}
+
 	vec2 uv = v_tex;
 	for (int i = 0; i < 6; i++)
 	{

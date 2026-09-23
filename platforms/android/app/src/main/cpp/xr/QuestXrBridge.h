@@ -20,6 +20,10 @@ namespace ArmsX2Xr
 	// sits on the screen plane.
 	void SetStereo(bool enabled, float separation, float convergence);
 
+	// Diagnostic: draw the packed depth buffer instead of the game, to see what the reprojection
+	// is actually given.
+	void SetStereoDebugDepth(float mode);
+
 	// Keep the eye split but skip the depth reprojection (and its GPU passes). Diagnostic A/B.
 	void SetStereoReprojection(bool enabled);
 

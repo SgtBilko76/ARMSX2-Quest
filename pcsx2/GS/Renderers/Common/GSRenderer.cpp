@@ -807,6 +807,7 @@ namespace GSStereo
 	std::atomic<float> separation{0.004f};
 	std::atomic<float> convergence{0.5f};
 	std::atomic<bool> reproject{true};
+	std::atomic<float> debug_depth{0.0f};
 
 	static constexpr u32 NO_RESCUE_TARGET = ~0u;
 	static u32 s_rescue_bp = NO_RESCUE_TARGET;
@@ -815,6 +816,11 @@ namespace GSStereo
 
 	void SetRescueTarget(u32 bp)
 	{
+		// A bigger depth-writing draw took over as the frame's main pass. Anything rescued for the
+		// previous target is now the wrong buffer -- GT4 draws a 384x768 mirror before the scene,
+		// and keeping its depth meant reprojecting the race by the mirror's shape.
+		if (bp != s_rescue_bp)
+			s_depth_snapshot_this_frame = false;
 		s_rescue_bp = bp;
 	}
 

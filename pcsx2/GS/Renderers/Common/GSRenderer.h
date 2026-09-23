@@ -25,6 +25,8 @@ namespace GSStereo
 	/// When false, frames still go to both eyes but without the depth reprojection -- flat, and
 	/// without its extra full-screen passes. For isolating what the 3D costs.
 	extern std::atomic<bool> reproject;
+	/// Diagnostic: 0 draws the game, >0 draws the packed depth amplified by 16^(mode-1).
+	extern std::atomic<float> debug_depth;
 
 	// Depth rescue, GS thread only. Some games are done with their depth buffer before the frame
 	// is presented -- GT4 reuses its memory as a colour target for post effects, and the texture

@@ -75,6 +75,8 @@ namespace
 	constexpr const char* kCurvedProperty = "debug.armsx2.curved";
 	//   adb shell setprop debug.armsx2.reproject 0   (1 = depth 3D, 0 = same image both eyes)
 	constexpr const char* kReprojectProperty = "debug.armsx2.reproject";
+	//   adb shell setprop debug.armsx2.showdepth 1   (draw the depth buffer instead of the game)
+	constexpr const char* kShowDepthProperty = "debug.armsx2.showdepth";
 
 	float ReadFloatProperty(const char* name, float fallback)
 	{
@@ -626,6 +628,15 @@ namespace
 				return;
 			m_tuning_countdown = 0;
 
+			// A MODE, not a flag: 1 draws the depth as-is, each step up amplifies it 16x.
+			const float show_depth = ReadFloatProperty(kShowDepthProperty, 0.0f);
+			if (show_depth != m_show_depth)
+			{
+				m_show_depth = show_depth;
+				XR_LOG("stereo: showdepth=%.1f", show_depth);
+				ArmsX2Xr::SetStereoDebugDepth(show_depth);
+			}
+
 			const bool reproject = ReadFloatProperty(kReprojectProperty, 1.0f) != 0.0f;
 			if (reproject != m_reproject)
 			{
@@ -1037,6 +1048,7 @@ namespace
 		bool m_has_cylinder_ext = false;
 		bool m_curved = true;
 		bool m_reproject = true;
+		float m_show_depth = 0.0f;
 		bool m_screen_placed = false;
 
 		// Pulses outlast the refresh, so sustained rumble has no gaps between re-applies.

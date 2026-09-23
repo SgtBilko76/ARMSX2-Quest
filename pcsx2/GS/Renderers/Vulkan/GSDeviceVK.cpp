@@ -6164,8 +6164,12 @@ GSTexture* GSDeviceVK::PrepareStereoFrame(GSTexture* sTex, GSTexture* depth)
 	// RGB gets the frame; A then gets the depth buffer, scaled from whatever resolution the depth
 	// target happens to be at (it is the same draw scale as the colour target in practice).
 	StretchRect(sTex, full_uv, m_stereo_packed, full_rect, ShaderConvert::COPY, Nearest);
+	// ★ NEAREST, not linear. Depth formats usually do not advertise linear filtering (Adreno does
+	// not), and sampling one through a linear sampler reads back as zero -- which is a frame with no
+	// depth at all, i.e. a flat picture. Nearest is also what depth wants: averaging across a
+	// silhouette invents a distance that is neither surface.
 	DoStretchRect(static_cast<GSTextureVK*>(depth), full_uv, static_cast<GSTextureVK*>(m_stereo_packed),
-		full_rect, m_depth_to_alpha, Biln, false);
+		full_rect, m_depth_to_alpha, Nearest, false);
 	return m_stereo_packed;
 }
 
@@ -6190,7 +6194,8 @@ void GSDeviceVK::PresentStereoRect(GSTexture* sTex, const GSVector4& sRect, cons
 		// further RIGHT in the left eye (and further left in the right eye); the shader samples at
 		// uv.x + shift, so sampling left of the output pixel is what moves the content right.
 		// Getting this backwards swaps the eyes, which reads as depth turned inside out.
-		cb.TimeAndPad = GSVector4(shaderTime, (eye == 0) ? -separation : separation, convergence, 0.0f);
+		cb.TimeAndPad = GSVector4(shaderTime, (eye == 0) ? -separation : separation, convergence,
+			GSStereo::debug_depth.load(std::memory_order_relaxed));
 		SetUtilityPushConstants(&cb, sizeof(cb));
 		DoStretchRect(static_cast<GSTextureVK*>(sTex), sRect, nullptr, dRect, m_present_stereo, filter, true);
 	}
