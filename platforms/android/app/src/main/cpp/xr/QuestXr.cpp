@@ -340,6 +340,13 @@ namespace
 				extensions.push_back(XR_EXT_PERFORMANCE_SETTINGS_EXTENSION_NAME);
 				m_has_perf_settings_ext = true;
 			}
+						// PICO controllers. Optional: the bytedance/* interaction profiles below only exist when
+			// the runtime offers this, and a Meta runtime simply does not.
+			if (has_ext(XR_BD_CONTROLLER_INTERACTION_EXTENSION_NAME))
+			{
+				extensions.push_back(XR_BD_CONTROLLER_INTERACTION_EXTENSION_NAME);
+				m_has_bd_controllers = true;
+			}
 						// Curved screen. Optional: without it the screen is submitted as a flat quad instead.
 			if (has_ext(XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME))
 			{
@@ -353,7 +360,10 @@ namespace
 			}
 			else
 			{
-				XR_ERR("%s unavailable: the screen will be upside down", XR_FB_COMPOSITION_LAYER_IMAGE_LAYOUT_EXTENSION_NAME);
+				// No Meta image-layout extension (a PICO runtime, say). The compositor samples a
+				// surface swapchain bottom-up either way, so the GS draws the frame flipped instead.
+				XR_LOG("%s unavailable: flipping the image in the GS instead",
+					XR_FB_COMPOSITION_LAYER_IMAGE_LAYOUT_EXTENSION_NAME);
 			}
 
 			XrInstanceCreateInfoAndroidKHR android_info{XR_TYPE_INSTANCE_CREATE_INFO_ANDROID_KHR};
@@ -480,14 +490,31 @@ namespace
 				bindings.push_back({*def.action, path});
 			}
 
-			// Touch Pro and Touch Plus controllers are presented through this profile too.
-			XrInteractionProfileSuggestedBinding suggested{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
-			xrStringToPath(m_instance, "/interaction_profiles/oculus/touch_controller", &suggested.interactionProfile);
-			suggested.suggestedBindings = bindings.data();
-			suggested.countSuggestedBindings = static_cast<uint32_t>(bindings.size());
-			res = xrSuggestInteractionProfileBindings(m_instance, &suggested);
-			if (XR_FAILED(res))
-				return Fail("xrSuggestInteractionProfileBindings failed", res);
+			// Every controller this build knows. A runtime rejects the profiles it does not implement
+			// (a Meta runtime has no bytedance/*, a PICO runtime no oculus/*), so each is suggested on
+			// its own and a refusal is not fatal -- only having NONE accepted is. The component paths
+			// are the same across them: both families are a stick, two face buttons, grip and trigger.
+			const char* const profiles[] = {
+				"/interaction_profiles/oculus/touch_controller",
+				"/interaction_profiles/bytedance/pico4_controller",
+				"/interaction_profiles/bytedance/pico_neo3_controller",
+			};
+			int accepted = 0;
+			for (const char* profile : profiles)
+			{
+				XrInteractionProfileSuggestedBinding suggested{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
+				if (XR_FAILED(xrStringToPath(m_instance, profile, &suggested.interactionProfile)))
+					continue;
+				suggested.suggestedBindings = bindings.data();
+				suggested.countSuggestedBindings = static_cast<uint32_t>(bindings.size());
+				if (XR_SUCCEEDED(xrSuggestInteractionProfileBindings(m_instance, &suggested)))
+				{
+					accepted++;
+					XR_LOG("controller profile accepted: %s", profile);
+				}
+			}
+			if (accepted == 0)
+				return Fail("the runtime accepted none of this build's controller profiles");
 
 			XrSessionActionSetsAttachInfo attach{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};
 			attach.countActionSets = 1;
@@ -539,6 +566,7 @@ namespace
 				s_rumble_large.store(0.0f, std::memory_order_relaxed);
 				s_rumble_small.store(0.0f, std::memory_order_relaxed);
 				StopHaptics();
+				ArmsX2Xr::SetFlipY(false);
 				ArmsX2Xr::SetStereo(false, 0.0f, 0.0f);
 				ArmsX2Xr::SetRenderWindow(nullptr, 0, 0, 0.0f);
 				m_window_handed_over = false;
@@ -628,6 +656,8 @@ namespace
 						m_curved = s_cfg_curved.load(std::memory_order_relaxed);
 						m_reproject = s_cfg_reproject.load(std::memory_order_relaxed);
 						ArmsX2Xr::SetStereoReprojection(m_reproject);
+						// Only when the compositor cannot do it for us (see the image-layout extension).
+						ArmsX2Xr::SetFlipY(!m_has_image_layout_ext);
 						ArmsX2Xr::SetStereo(true, m_stereo_separation, m_stereo_convergence);
 						ArmsX2Xr::SetRumbleSink(&OnPadRumble);
 						ArmsX2Xr::SetRenderWindow(m_screen_window, kSurfaceWidthPx, kScreenHeightPx, m_refresh_hz);
@@ -1070,6 +1100,7 @@ namespace
 		float m_stereo_convergence = kStereoConvergence;
 		int m_tuning_countdown = 0;
 		bool m_has_refresh_rate_ext = false;
+		bool m_has_bd_controllers = false;
 		bool m_has_perf_settings_ext = false;
 		SetPerformanceLevelFn m_set_performance_level = nullptr;
 		bool m_has_image_layout_ext = false;

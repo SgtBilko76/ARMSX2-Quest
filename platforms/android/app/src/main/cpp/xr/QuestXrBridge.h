@@ -20,6 +20,11 @@ namespace ArmsX2Xr
 	// sits on the screen plane.
 	void SetStereo(bool enabled, float separation, float convergence);
 
+	// Draw the frame upside down, for runtimes that have no compositor-side vertical flip
+	// (XR_FB_composition_layer_image_layout). A surface swapchain is sampled bottom-up, so without
+	// one or the other the picture is inverted.
+	void SetFlipY(bool enabled);
+
 	// Diagnostic: draw the packed depth buffer instead of the game, to see what the reprojection
 	// is actually given.
 	void SetStereoDebugDepth(float mode);

@@ -27,6 +27,8 @@ namespace GSStereo
 	extern std::atomic<bool> reproject;
 	/// Diagnostic: 0 draws the game, >0 draws the packed depth amplified by 16^(mode-1).
 	extern std::atomic<float> debug_depth;
+	/// Draw the frame vertically flipped, for XR runtimes whose compositor cannot flip it.
+	extern std::atomic<bool> flip_y;
 
 	// Depth rescue, GS thread only. Some games are done with their depth buffer before the frame
 	// is presented -- GT4 reuses its memory as a colour target for post effects, and the texture

@@ -808,6 +808,7 @@ namespace GSStereo
 	std::atomic<float> convergence{0.5f};
 	std::atomic<bool> reproject{true};
 	std::atomic<float> debug_depth{0.0f};
+	std::atomic<bool> flip_y{false};
 
 	static constexpr u32 NO_RESCUE_TARGET = ~0u;
 	static u32 s_rescue_bp = NO_RESCUE_TARGET;
@@ -881,6 +882,14 @@ bool GSRenderer::CalculateStereoDrawRects(const GSVector4i& src_rect, const GSVe
 	left_rect = CalculateDrawDstRect(half_width, pres_size.y, src_rect, src_size, s_display_alignment,
 		g_gs_device->UsesLowerLeftOrigin(), GetVideoMode() == GSVideoMode::SDTV_480P);
 	right_rect = left_rect + GSVector4(static_cast<float>(half_width), 0.0f, static_cast<float>(half_width), 0.0f);
+
+	// Swapping top and bottom draws the frame upside down, which is the fix when the XR compositor
+	// has no flip of its own -- it samples a surface swapchain bottom-up regardless.
+	if (GSStereo::flip_y.load(std::memory_order_relaxed))
+	{
+		left_rect = GSVector4(left_rect.x, left_rect.w, left_rect.z, left_rect.y);
+		right_rect = GSVector4(right_rect.x, right_rect.w, right_rect.z, right_rect.y);
+	}
 	return true;
 }
 

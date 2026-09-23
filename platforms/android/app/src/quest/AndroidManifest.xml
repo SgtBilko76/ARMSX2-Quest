@@ -31,6 +31,12 @@
             android:name="com.oculus.supportedDevices"
             android:value="quest2|questpro|quest3|quest3s" />
 
+        <!-- PICO headsets: how PICO OS recognises a VR application. Ignored by Horizon OS, so both
+             live in the one build. UNTESTED on real PICO hardware. -->
+        <meta-data
+            android:name="pvr.app.type"
+            android:value="vr" />
+
         <!-- Panel activities: the launcher splash and the emulator UI it hands over to.
              <layout> is how Horizon OS sizes a 2D panel. Without it the app opened at the system
              default, far too small for a library of covers; 1440x810dp is the largest 16:9 inside

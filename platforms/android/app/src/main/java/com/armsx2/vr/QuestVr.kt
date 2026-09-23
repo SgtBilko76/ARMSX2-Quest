@@ -27,10 +27,15 @@ object QuestVr {
     @Volatile
     private var unavailable = false
 
+    // Meta and PICO. The XR layer itself is vendor-neutral OpenXR -- it suggests both controller
+    // profiles and falls back where a Meta-only extension is missing -- so the only vendor knowledge
+    // here is which devices should go into VR at all. PICO is UNTESTED: written from the OpenXR
+    // spec and PICO's manifest requirements, never run on the hardware.
+    private val VR_MANUFACTURERS = listOf("oculus", "meta", "pico", "bytedance")
+
     val isHeadset: Boolean
         get() = BuildConfig.QUEST_VR && !unavailable &&
-            (Build.MANUFACTURER.equals("Oculus", ignoreCase = true) ||
-                Build.MANUFACTURER.equals("Meta", ignoreCase = true))
+            VR_MANUFACTURERS.any { Build.MANUFACTURER.lowercase().contains(it) }
 
     fun markUnavailable() {
         unavailable = true

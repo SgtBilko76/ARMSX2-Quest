@@ -2587,6 +2587,11 @@ void ArmsX2Xr::SetStereo(bool enabled, float separation, float convergence)
     GSStereo::enabled.store(enabled, std::memory_order_relaxed);
 }
 
+void ArmsX2Xr::SetFlipY(bool enabled)
+{
+    GSStereo::flip_y.store(enabled, std::memory_order_relaxed);
+}
+
 void ArmsX2Xr::SetStereoDebugDepth(float mode)
 {
     GSStereo::debug_depth.store(mode, std::memory_order_relaxed);
